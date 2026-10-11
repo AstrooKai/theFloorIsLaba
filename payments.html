@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payments | The Floor is Laba</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-page="payments">
+    <div class="app">
+      <aside class="side">
+        <div class="brand">
+          <strong>The Floor is Laba</strong><span>Staff console</span>
+        </div>
+        <nav class="nav" aria-label="Main">
+          <a href="services.html">Services</a>
+          <a href="payments.html" aria-current="page">Payments</a>
+          <a href="pickup-delivery.html">Pickup &amp; delivery</a>
+        </nav>
+      </aside>
+
+      <main class="main" id="view" data-one="payment" data-noun="payments">
+        <header class="head">
+          <div>
+            <h1>Payments</h1>
+            <p>
+              Record what customers have paid toward each order. An order can be
+              paid in more than one payment.
+            </p>
+          </div>
+          <div class="btns">
+            <button class="btn" data-act="csv" type="button">Export CSV</button>
+            <button
+              class="btn btn-primary"
+              id="addBtn"
+              data-act="add"
+              type="button"
+            >
+              Record payment
+            </button>
+          </div>
+        </header>
+
+        <div class="stats">
+          <div class="stat collected">
+            <span>Collected</span><strong data-stat="Paid"></strong>
+          </div>
+          <div class="stat pending">
+            <span>Pending confirmation</span
+            ><strong data-stat="Pending"></strong>
+          </div>
+          <div class="stat refunded">
+            <span>Refunded</span><strong data-stat="Refunded"></strong>
+          </div>
+        </div>
+
+        <section class="toolbar" role="search" aria-label="Search and filter">
+          <div class="tf grow">
+            <label for="fl_q">Search</label
+            ><input
+              id="fl_q"
+              data-flt="q"
+              type="search"
+              placeholder="Customer, order number, or reference"
+            />
+          </div>
+          <div class="tf">
+            <label for="fl_m">Method</label
+            ><select id="fl_m" data-flt="m">
+              <option value="">All methods</option>
+              <option>Cash</option>
+              <option>GCash</option>
+              <option>Maya</option>
+              <option>Card</option>
+            </select>
+          </div>
+          <div class="tf">
+            <label for="fl_st">Status</label
+            ><select id="fl_st" data-flt="st">
+              <option value="">All</option>
+              <option>Paid</option>
+              <option>Pending</option>
+              <option>Refunded</option>
+            </select>
+          </div>
+          <div class="tf">
+            <label for="fl_from">From</label
+            ><input id="fl_from" data-flt="from" type="date" />
+          </div>
+          <div class="tf">
+            <label for="fl_to">To</label
+            ><input id="fl_to" data-flt="to" type="date" />
+          </div>
+          <button class="btn" data-act="clear" type="button">
+            Clear filters
+          </button>
+        </section>
+
+        <div class="banner" id="banner" hidden>
+          <span id="bannerMsg"></span
+          ><button class="btn sm" data-act="retry" type="button">
+            Try again
+          </button>
+        </div>
+        <p class="count" id="count" aria-live="polite"></p>
+
+        <div class="tw" id="list">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Payment</th>
+                <th scope="col">Order / customer</th>
+                <th scope="col">Method</th>
+                <th scope="col">Date</th>
+                <th scope="col" class="num">Amount</th>
+                <th scope="col">Status</th>
+                <th scope="col"><span class="sr">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="out"></tbody>
+          </table>
+        </div>
+        <div class="tw empty" id="emptyNone" hidden>
+          <h3>No payments yet</h3>
+          <p>Record the first payment when a customer pays for an order.</p>
+          <button class="btn btn-primary" type="button" data-act="add">
+            Record payment
+          </button>
+        </div>
+        <div class="tw empty" id="emptyFilt" hidden>
+          <h3>No payments match those filters</h3>
+          <p>Try a different search or clear the filters.</p>
+          <button class="btn" type="button" data-act="clear">
+            Clear filters
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <dialog class="modal" id="dlg" aria-labelledby="dlgT">
+      <form id="form" novalidate>
+        <div class="mh">
+          <h2 id="dlgT"></h2>
+          <p>Fields marked <span class="req">*</span> are required.</p>
+        </div>
+        <div class="mb">
+          <div class="grid">
+            <div class="field full" data-f="order_id">
+              <label for="f_order_id">Order <span class="req">*</span></label>
+              <select
+                id="f_order_id"
+                name="order_id"
+                data-fill="orders-total"
+                data-lock
+              >
+                <option value="">Choose an order</option></select
+              ><span class="hint" id="h_order_id">&nbsp;</span>
+              <span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-f="amount">
+              <label for="f_amount"
+                >Amount (₱) <span class="req">*</span></label
+              >
+              <input
+                id="f_amount"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                inputmode="decimal"
+              />
+              <span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-f="method">
+              <label for="f_method">Method <span class="req">*</span></label>
+              <select id="f_method" name="method">
+                <option value="">Choose a method</option>
+                <option>Cash</option>
+                <option>GCash</option>
+                <option>Maya</option>
+                <option>Card</option>
+              </select>
+              <span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-f="reference_no">
+              <label for="f_reference_no"
+                >Reference number
+                <span class="req" id="refStar" hidden>*</span></label
+              >
+              <input
+                id="f_reference_no"
+                name="reference_no"
+                type="text"
+                maxlength="30"
+                autocomplete="off"
+              /><span class="hint" id="h_reference_no"
+                >Not needed for cash.</span
+              >
+              <span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-f="paid_at">
+              <label for="f_paid_at"
+                >Payment date <span class="req">*</span></label
+              >
+              <input id="f_paid_at" name="paid_at" type="date" />
+              <span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-f="status">
+              <label for="f_status">Status</label>
+              <select id="f_status" name="status">
+                <option>Paid</option>
+                <option>Pending</option>
+                <option>Refunded</option>
+              </select>
+              <span class="err" role="alert"></span>
+            </div>
+          </div>
+        </div>
+        <div class="mf">
+          <button class="btn" type="button" id="cancel">Cancel</button>
+          <button class="btn btn-primary" id="save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal sm-dlg" id="confirm">
+      <div class="mh"><h2 id="cT"></h2></div>
+      <div class="mb"><p id="cM"></p></div>
+      <div class="mf">
+        <button class="btn" value="0">Keep it</button>
+        <button class="btn btn-solid" value="1" id="cOk">Delete</button>
+      </div>
+    </dialog>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
