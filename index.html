@@ -261,6 +261,170 @@
         </section>
       </main>
     </div>
-      
+
+    <!-- dialogs -->
+    <dialog class="modal" id="dlg-service" aria-labelledby="dlg-service-title">
+      <form id="f-service" novalidate>
+        <div class="modal-head">
+          <h2 id="dlg-service-title">Add service</h2>
+          <p>
+            Fields marked <span style="color: var(--bad)">*</span> are required.
+          </p>
+        </div>
+        <div class="modal-body">
+          <div class="grid-2">
+            <div class="field full" data-field="service_name">
+              <label for="service_name"
+                >Service name <span class="req">*</span></label
+              >
+              <input
+                id="service_name"
+                name="service_name"
+                maxlength="50"
+                autocomplete="off"
+              /><span class="err" role="alert"></span>
+            </div>
+            <div class="field full" data-field="price_per_kg">
+              <label for="price_per_kg"
+                >Price per kg (₱) <span class="req">*</span></label
+              >
+              <input
+                id="price_per_kg"
+                name="price_per_kg"
+                type="number"
+                step="0.01"
+                min="0"
+                inputmode="decimal"
+              />
+              <span class="hint">Used to compute order item subtotals.</span
+              ><span class="err" role="alert"></span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" type="button" data-close>Cancel</button
+          ><button class="btn btn-primary" type="submit" id="svcSave">
+            Save service
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="dlg-payment" aria-labelledby="dlg-payment-title">
+      <form id="f-payment" novalidate>
+        <div class="modal-head">
+          <h2 id="dlg-payment-title">Record payment</h2>
+          <p>
+            Fields marked <span style="color: var(--bad)">*</span> are required.
+          </p>
+        </div>
+        <div class="modal-body">
+          <div class="grid-2">
+            <div class="field full" data-field="order_id">
+              <label for="order_id">Order <span class="req">*</span></label>
+              <select id="order_id" name="order_id"></select>
+              <span class="hint" id="balHint"></span
+              ><span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-field="amount_paid">
+              <label for="amount_paid"
+                >Amount paid (₱) <span class="req">*</span></label
+              >
+              <input
+                id="amount_paid"
+                name="amount_paid"
+                type="number"
+                step="0.01"
+                min="0"
+                inputmode="decimal"
+              /><span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-field="payment_method">
+              <label for="payment_method"
+                >Payment method <span class="req">*</span></label
+              >
+              <select id="payment_method" name="payment_method">
+                <option value="">Choose a method</option>
+                <option>Cash</option>
+                <option>GCash</option>
+                <option>Maya</option></select
+              ><span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-field="payment_date">
+              <label for="payment_date"
+                >Payment date <span class="req">*</span></label
+              >
+              <input id="payment_date" name="payment_date" type="date" /><span
+                class="err"
+                role="alert"
+              ></span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" type="button" data-close>Cancel</button
+          ><button class="btn btn-primary" type="submit" id="paySave">
+            Save payment
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="dlg-order" aria-labelledby="dlg-order-title">
+      <form id="f-order" novalidate>
+        <div class="modal-head">
+          <h2 id="dlg-order-title">Release details</h2>
+          <p id="dlg-order-sub"></p>
+        </div>
+        <div class="modal-body">
+          <div class="grid-2">
+            <div class="field full" data-field="release_type">
+              <span class="lbl">Release type <span class="req">*</span></span>
+              <div class="seg" role="radiogroup" aria-label="Release type">
+                <label
+                  ><input type="radio" name="release_type" value="Pickup" />
+                  Customer picks up</label
+                >
+                <label
+                  ><input type="radio" name="release_type" value="Delivery" />
+                  We deliver</label
+                >
+              </div>
+              <span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-field="release_date">
+              <label for="release_date">Release date</label>
+              <input id="release_date" name="release_date" type="date" /><span
+                class="hint"
+                id="relHint"
+              ></span
+              ><span class="err" role="alert"></span>
+            </div>
+            <div class="field" data-field="status_id">
+              <label for="status_id">Status <span class="req">*</span></label>
+              <select id="status_id" name="status_id"></select
+              ><span class="err" role="alert"></span>
+            </div>
+            <div class="field full" data-field="staff_id">
+              <label for="staff_id"
+                >Handled by <span class="req">*</span></label
+              >
+              <select id="staff_id" name="staff_id"></select
+              ><span class="err" role="alert"></span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" type="button" data-close>Cancel</button
+          ><button class="btn btn-primary" type="submit" id="ordSave">
+            Save changes
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    
     </main>
   </body>
+</html>
