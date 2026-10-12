@@ -16,12 +16,11 @@ const pool = mysql.createPool({
 async function testConnection() {
     try {
         const connection = await pool.getConnection();
-        console.log(`✅ Connected to MySQL database successfully [${process.env.DB_NAME || 'laundry_shop_db'}]`);
+        console.log(`Connected to MySQL database successfully [${process.env.DB_NAME || 'laundry_shop_db'}]`);
         connection.release();
         return true;
     } catch (error) {
-        console.error('❌ Database connection error:', error.message);
-        console.error('👉 Tip: Ensure MySQL (XAMPP) is started and database has been imported.');
+        console.error('Database connection error:', error.message);
         return false;
     }
 }
