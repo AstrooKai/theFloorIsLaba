@@ -1,11 +1,6 @@
--- =====================================================
--- Laundry Shop Order Tracking System - Seed Data
--- Database: laundry_shop_db
--- =====================================================
-
 USE laundry_shop_db;
 
--- 1. Seed customers (5)
+-- Insert sample customers
 INSERT INTO customers (first_name, last_name, phone, address) VALUES
 ('Lisa',   'Delos Santos', '09171234501', '12 Rizal St., Cabuyao, Laguna'),
 ('Cedric', 'Garcia',       '09171234502', '45 Mabini Ave., Cabuyao, Laguna'),
@@ -13,7 +8,7 @@ INSERT INTO customers (first_name, last_name, phone, address) VALUES
 ('Janine', 'Gonzales',     '09171234504', '23 Luna St., Cabuyao, Laguna'),
 ('Eugene', 'Reyes',        '09171234505', '67 Del Pilar St., Binan, Laguna');
 
--- 2. Seed staff (5)
+-- Insert sample staff
 INSERT INTO staff (first_name, last_name, role, phone) VALUES
 ('Maria', 'Santos',    'Cashier', '09181112201'),
 ('Jose',  'Dela Cruz', 'Washer',  '09181112202'),
@@ -21,7 +16,7 @@ INSERT INTO staff (first_name, last_name, role, phone) VALUES
 ('Pedro', 'Ramos',     'Rider',   '09181112204'),
 ('Rosa',  'Mendoza',   'Manager', '09181112205');
 
--- 3. Seed service_types (5)
+-- Insert sample service types
 INSERT INTO service_types (service_name, price_per_kg) VALUES
 ('Wash and Fold',  45.00),
 ('Wash and Dry',   55.00),
@@ -29,7 +24,7 @@ INSERT INTO service_types (service_name, price_per_kg) VALUES
 ('Ironing Only',   35.00),
 ('Comforter Wash', 150.00);
 
--- 4. Seed order_statuses (5)
+-- Insert sample order statuses
 INSERT INTO order_statuses (status_name) VALUES
 ('Received'),
 ('Washing'),
@@ -37,7 +32,7 @@ INSERT INTO order_statuses (status_name) VALUES
 ('Out for Delivery'),
 ('Completed');
 
--- 5. Seed orders (5)
+-- Insert sample orders
 INSERT INTO orders (customer_id, staff_id, status_id, order_date, release_type, release_date) VALUES
 (1, 1, 5, '2026-10-01', 'Pickup',   '2026-10-03'),
 (2, 1, 5, '2026-10-02', 'Delivery', '2026-10-04'),
@@ -45,7 +40,7 @@ INSERT INTO orders (customer_id, staff_id, status_id, order_date, release_type, 
 (4, 1, 4, '2026-10-06', 'Delivery', NULL),
 (5, 1, 2, '2026-10-07', 'Pickup',   NULL);
 
--- 6. Seed order_items (8) (subtotal = weight_kg x price_per_kg)
+-- Insert sample order items
 INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES
 (1, 1, 4.00, 180.00),
 (1, 4, 2.00,  70.00),
@@ -56,7 +51,7 @@ INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES
 (5, 1, 6.00, 270.00),
 (5, 4, 1.00,  35.00);
 
--- 7. Seed payments (5)
+-- Insert sample payments
 INSERT INTO payments (order_id, amount_paid, payment_method, payment_date) VALUES
 (1, 250.00, 'Cash',  '2026-10-03'),
 (2, 275.00, 'GCash', '2026-10-04'),

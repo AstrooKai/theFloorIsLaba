@@ -1,39 +1,24 @@
--- =====================================================
--- Laundry Shop Order Tracking System - Demonstration Queries
--- CCS110 Finals Research Project Rubric Requirements
--- =====================================================
-
 USE laundry_shop_db;
 
--- =====================================================
--- 1. CRUD DEMONSTRATIONS
--- =====================================================
-
--- INSERT: Register a new customer
+-- Insert
 INSERT INTO customers (first_name, last_name, phone, address) 
 VALUES ('Sarah', 'Jenkins', '09171234506', '99 Main St., Cabuyao, Laguna');
 
--- SELECT with WHERE: Retrieve customers living in Cabuyao
+-- Select with WHERE
 SELECT customer_id, first_name, last_name, phone, address 
 FROM customers 
 WHERE address LIKE '%Cabuyao%';
 
--- UPDATE: Update a customer's phone number
+-- Update
 UPDATE customers 
 SET phone = '09179999999' 
 WHERE customer_id = 1;
 
--- DELETE: Remove a payment record
+-- Delete
 DELETE FROM payments 
 WHERE payment_id = 5;
 
-
--- =====================================================
--- 2. ADVANCED QUERY (RUBRIC REQUIREMENT)
--- Clauses used: SELECT, JOIN, WHERE, GROUP BY, ORDER BY
--- Purpose: Total payments made by customers whose orders are 
---          marked for 'Delivery', sorted from highest to lowest.
--- =====================================================
+-- Advanced Query (JOIN, WHERE, GROUP BY, ORDER BY)
 SELECT 
     c.customer_id,
     CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
@@ -46,12 +31,7 @@ WHERE o.release_type = 'Delivery'
 GROUP BY c.customer_id, c.first_name, c.last_name
 ORDER BY total_amount_paid DESC;
 
-
--- =====================================================
--- 3. EXTRA SYSTEM QUERIES (Used by Backend API & Dashboard)
--- =====================================================
-
--- Query A: Full order overview with customer name, staff handler, status, total cost, and amount paid
+-- Order Summary
 SELECT 
     o.order_id,
     o.order_date,
@@ -81,7 +61,7 @@ LEFT JOIN (
 GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, c.first_name, c.last_name, c.phone, s.first_name, s.last_name, os.status_name, pay.total_paid
 ORDER BY o.order_id DESC;
 
--- Query B: Revenue by service type
+-- Revenue by Service Type
 SELECT 
     st.service_name,
     COUNT(oi.order_item_id) AS orders_count,

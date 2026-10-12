@@ -1,16 +1,11 @@
--- =====================================================
--- Laundry Shop Order Tracking System - Schema
--- CCS110 Finals Research Project
--- Database: laundry_shop_db
--- =====================================================
-
+-- Database schema
 CREATE DATABASE IF NOT EXISTS laundry_shop_db
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
 USE laundry_shop_db;
 
--- Drop tables in reverse order of dependencies to avoid FK conflicts
+-- Drop tables in order of dependencies to avoid foreign key constraints
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -19,7 +14,7 @@ DROP TABLE IF EXISTS service_types;
 DROP TABLE IF EXISTS staff;
 DROP TABLE IF EXISTS customers;
 
--- 1. MAIN ENTITY: customers
+-- Customers table
 CREATE TABLE customers (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name  VARCHAR(50)  NOT NULL,
@@ -29,7 +24,7 @@ CREATE TABLE customers (
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. MAIN ENTITY: staff
+-- Staff table
 CREATE TABLE staff (
     staff_id   INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
@@ -39,27 +34,27 @@ CREATE TABLE staff (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. MAIN ENTITY: service_types
+-- Service types table
 CREATE TABLE service_types (
     service_id   INT AUTO_INCREMENT PRIMARY KEY,
     service_name VARCHAR(50)  NOT NULL,
     price_per_kg DECIMAL(8,2) NOT NULL
 );
 
--- 4. LOOKUP TABLE: order_statuses
+-- Order statuses table
 CREATE TABLE order_statuses (
     status_id   INT AUTO_INCREMENT PRIMARY KEY,
     status_name VARCHAR(30) NOT NULL
 );
 
--- 5. TRANSACTION TABLE: orders
+-- Orders table
 CREATE TABLE orders (
     order_id     INT AUTO_INCREMENT PRIMARY KEY,
     customer_id  INT NOT NULL,
     staff_id     INT NOT NULL,
     status_id    INT NOT NULL,
     order_date   DATE NOT NULL,
-    release_type VARCHAR(10) NOT NULL,   -- 'Pickup' or 'Delivery'
+    release_type VARCHAR(10) NOT NULL,
     release_date DATE NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) 
@@ -70,7 +65,7 @@ CREATE TABLE orders (
         REFERENCES order_statuses(status_id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- 6. JUNCTION TABLE: order_items (orders <-> service_types, many-to-many)
+-- Order items table
 CREATE TABLE order_items (
     order_item_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id      INT NOT NULL,
@@ -83,7 +78,7 @@ CREATE TABLE order_items (
         REFERENCES service_types(service_id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- 7. TRANSACTION TABLE: payments
+-- Payments table
 CREATE TABLE payments (
     payment_id     INT AUTO_INCREMENT PRIMARY KEY,
     order_id       INT NOT NULL,
