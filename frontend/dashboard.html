@@ -1,0 +1,115 @@
+<!doctype html> 
+<html lang="en"> 
+<head>   
+  <meta charset="utf-8">   
+  <title>Basecamp Overview | The Floor Is Laba</title>   
+  <link rel="stylesheet" href="style.css"> 
+</head> 
+<body data-page="dashboard">   
+  <div class="app-layout">     
+    <aside class="sidebar">       
+      <div class="sidebar-logo">         
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--magma-500)" stroke-width="2"><path d="M2 12h4l2-9 5 18 3-10h6"></path></svg>         
+        <span>The Floor Is <b>Laba.</b></span>       
+      </div>       
+      <div class="nav-group">         
+        <div class="nav-group-title">Lava Workspace</div>         
+        <div class="side-nav">           
+          <a href="dashboard.html" aria-current="page"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg> Overview</a> 
+          <a href="customers.html"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Customers</a> 
+          <a href="orders.html"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Laundry Orders</a>         
+        </div>       
+      </div>       
+      <div class="nav-group">         
+        <div class="nav-group-title">Basecamp Admin</div>         
+        <div class="side-nav">           
+          <a href="services.html">Lava Services</a> 
+          <a href="payments.html">Payment Vault</a> 
+          <a href="pickup-delivery.html">Transport Runs</a>         
+        </div>       
+      </div>              
+      <div class="sidebar-bottom">         
+        <div class="user-profile">           
+          <div class="avatar">A</div>           
+          <div>             
+            <div style="font-size: 13px; font-weight: 700; color: #fff;">Administrator</div>             
+            <div style="font-size: 11px; color: var(--text-muted);">Active Staff</div>           
+          </div>         
+        </div>         
+        <button class="btn-signout" id="signOutBtn">           
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>           
+          Sign Out         
+        </button>       
+      </div>     
+    </aside>     
+    <main class="main-content">   
+      <div class="dash-banner">     
+        <div class="dash-banner-content">       
+          <h1>Every load, one smooth cycle.</h1>       
+          <p>Keep customer details organized and follow each laundry order through the magma into the safe zone.</p>       
+          <div class="dash-banner-actions">         
+            <button class="btn-white" onclick="window.location.href='orders.html'">Track laundry orders &rarr;</button>         
+            <span class="banner-status">Your workspace is ready</span>       
+          </div>     
+        </div>     
+        <div class="dash-graphic">       
+          <svg viewBox="0 0 200 240" width="160" height="200" xmlns="http://www.w3.org/2000/svg">         
+            <rect x="20" y="20" width="160" height="200" rx="24" fill="#FFFFFF" opacity="0.1" />         
+            <rect x="20" y="20" width="160" height="40" rx="24" fill="#FFFFFF" opacity="0.2" />         
+            <circle cx="150" cy="40" r="8" fill="#E85D04" />         
+            <circle cx="100" cy="130" r="60" fill="#160D0A" opacity="0.5" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="4" />         
+            <circle cx="100" cy="130" r="48" fill="#FFFFFF" opacity="0.1" />         
+            <path d="M52 140 Q100 160 148 140 A48 48 0 0 1 52 140 Z" fill="#E85D04" opacity="0.8" />         
+            <path d="M60 150 Q100 130 140 150 A40 40 0 0 1 60 150 Z" fill="#FAA307" opacity="0.9" />       
+          </svg>     
+        </div>   
+      </div>   
+      <div class="stats">     
+        <div class="stat">       
+          <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>       
+          <span>Registered customers</span>       
+          <strong>5</strong>       
+          <span class="stat-desc">Records currently stored</span>     
+        </div>     
+        <div class="stat">       
+          <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>       
+          <span>Total laundry orders</span>       
+          <strong>12</strong>       
+          <span class="stat-desc">All recorded orders</span>     
+        </div>     
+        <div class="stat collected">       
+          <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg></div>       
+          <span>Safe / completed</span>       
+          <strong>5</strong>       
+          <span class="stat-desc">Ready for pickup or completed</span>     
+        </div>   
+      </div>   
+      <div class="tw">     
+        <div class="table-header">       
+          <div>         
+            <h3>Latest laundry orders</h3>         
+            <span class="sub">A quick view of your most recently added orders</span>       
+          </div>       
+          <a href="orders.html">View all orders &rarr;</a>     
+        </div>     
+        <table>       
+          <thead><tr><th>Order ID</th><th>Customer</th><th>Order Date</th><th>Status</th><th class="num">Amount</th></tr></thead>       
+          <tbody>         
+            <tr><td><strong>ORD-1005</strong></td><td>Liza Mendoza</td><td>Oct 07, 2026</td><td><span class="badge bad">In the Magma</span></td><td class="num">₱960.00</td></tr>         
+            <tr><td><strong>ORD-1006</strong></td><td>Carlo Navarro</td><td>Oct 08, 2026</td><td><span class="badge ok">Safe Zone</span></td><td class="num">₱275.00</td></tr>       
+          </tbody>     
+        </table>   
+      </div> 
+    </main>          
+    <dialog class="modal sm-dlg" id="signOutModal">       
+      <div class="mh"><h2>Confirm Sign Out</h2></div>       
+      <div class="mb"><p>Are you sure you want to leave the Basecamp?</p></div>       
+      <div class="mf">         
+        <button class="btn" id="cancelSignOut">Cancel</button>         
+        <button class="btn btn-danger" id="confirmSignOut">Sign Out</button>       
+      </div>     
+    </dialog>        
+  </div>   
+  <script src="script.js"></script> 
+</body> 
+</html>
