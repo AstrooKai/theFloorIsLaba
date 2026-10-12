@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
       draw(list) {
         const g = {}; list.forEach((r) => (g[r.scheduled_date] ||= []).push(r));
         const label = (d) => d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
-        return Object.keys(g).sort().map((d) => `<section class="day">2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
+        return Object.keys(g).sort().map((d) => `<section class="day"><h2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
           const act = r.status === "Scheduled" || r.status === "On the way";
           return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${r.type}</span></div><div class="tm"><div class="tt"><strong>${esc(nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(r.address)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b></span></div><div class="acts" style="justify-content:flex-start">${r.status === "Scheduled" ? btn("start", r.delivery_id, "Start run", "btn-primary") : r.status === "On the way" ? btn("done", r.delivery_id, "Mark completed", "btn-primary") : ""}${btn("edit", r.delivery_id, "Edit")}${act ? btn("cancel", r.delivery_id, "Cancel run") : ""}${btn("del", r.delivery_id, "Delete", "btn-danger")}</div></div></article>`;
         }).join("")}</section>`).join("");
