@@ -45,60 +45,46 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-const KEY = "laba_";
 const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id" };
-const SEED = {
-  customers: [
-    { customer_id: 1, full_name: "Lisa Delos Santos", contact: "09171234501", address: "12 Rizal St., Cabuyao", status: "Active" },
-    { customer_id: 2, full_name: "Cedric Garcia", contact: "09171234502", address: "45 Mabini Ave., Cabuyao", status: "Active" },
-    { customer_id: 3, full_name: "Maria Santos", contact: "09171234567", address: "Blk 5 Lot 12, Katapatan Mutual Homes, Cabuyao", status: "Active" },
-    { customer_id: 4, full_name: "Jose Rizal Jr.", contact: "09281112233", address: "24 Mabini St., Brgy. Sala, Cabuyao", status: "Active" },
-    { customer_id: 5, full_name: "Liza Mendoza", contact: "09189876543", address: "88 Pook St., Cabuyao", status: "Active" }
-  ],
-  orders: [
-    { order_id: 1001, customer_name: "Maria Santos", contact: "09171234567", address: "Blk 5 Lot 12, Katapatan Mutual Homes, Banay-banay, Cabuyao", total: 450, order_date: addDays(-6), stage: "Safe Zone" },
-    { order_id: 1002, customer_name: "Jose Rizal Jr.", contact: "09281112233", address: "24 Mabini St., Brgy. Sala, Cabuyao", total: 1200, order_date: addDays(-5), stage: "In the Magma" },
-    { order_id: 1005, customer_name: "Liza Mendoza", contact: "09189876543", address: "88 Pook St., Cabuyao", total: 960, order_date: "2026-10-07", stage: "In the Magma" },
-    { order_id: 1006, customer_name: "Carlo Navarro", contact: "09192223344", address: "10 San Jose, Cabuyao", total: 275, order_date: "2026-10-08", stage: "Safe Zone" }
-  ],
-  riders: [{ staff_id: 1, full_name: "Jun Dela Cruz" }, { staff_id: 2, full_name: "Ana Reyes" }],
-  services: [
-    { service_id: 1, service_name: "Regular wash & fold", category: "Wash & fold", unit: "kg", price: 60, turnaround_hours: 24, status: "Active", description: "Machine wash, dry, and fold. Detergent included." },
-    { service_id: 2, service_name: "Express wash & fold", category: "Wash & fold", unit: "kg", price: 95, turnaround_hours: 6, status: "Active", description: "Same day for orders received before noon." },
-    { service_id: 3, service_name: "Dry cleaning (suit)", category: "Dry cleaning", unit: "piece", price: 350, turnaround_hours: 72, status: "Active", description: "Two-piece suit, cleaned and pressed." }
-  ],
-  payments: [
-    { payment_id: 1, order_id: 1001, amount: 450, method: "Cash", reference_no: "", status: "Paid", paid_at: addDays(-6) },
-    { payment_id: 2, order_id: 1002, amount: 600, method: "GCash", reference_no: "GC8842190011", status: "Paid", paid_at: addDays(-5) }
-  ],
-  deliveries: [
-    { delivery_id: 1, order_id: 1001, type: "Pickup", address: "Blk 5 Lot 12, Katapatan Mutual Homes, Cabuyao", contact: "09171234567", scheduled_date: today(), time_slot: "10:00 AM - 12:00 PM", rider: "Jun Dela Cruz", fee: 0, status: "Completed", notes: "" },
-    { delivery_id: 2, order_id: 1002, type: "Delivery", address: "24 Mabini St., Brgy. Sala, Cabuyao", contact: "09281112233", scheduled_date: today(), time_slot: "8:00 - 10:00 AM", rider: "Ana Reyes", fee: 50, status: "On the way", notes: "Call at the gate." }
-  ]
-};
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const load = (n) => {
-  const v = localStorage.getItem(KEY + n);
-  if (v) return JSON.parse(v);
-  localStorage.setItem(KEY + n, JSON.stringify(SEED[n] || []));
-  return JSON.parse(JSON.stringify(SEED[n] || []));
-};
 
 const db = {
-  async list(n) { await sleep(50); return load(n); },
-  async save(n, id, d) {
-    await sleep(50);
-    const rows = load(n), k = ID[n] || "id";
-    if (id) { const i = rows.findIndex((r) => r[k] == id); rows[i] = { ...rows[i], ...d, [k]: rows[i][k] }; } 
-    else rows.push({ ...d, [k]: rows.reduce((m, r) => Math.max(m, r[k] || 0), 0) + 1 });
-    localStorage.setItem(KEY + n, JSON.stringify(rows));
+  async list(resource) {
+    const endpoint = resource === "riders" ? "/api/staff/riders" : `/api/${resource}`;
+    const res = await fetch(endpoint);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to fetch ${resource}`);
+    }
+    return await res.json();
   },
-  async del(n, id) {
-    await sleep(50);
-    localStorage.setItem(KEY + n, JSON.stringify(load(n).filter((r) => r[ID[n] || "id"] != id)));
+
+  async save(resource, id, data) {
+    const method = id ? "PUT" : "POST";
+    const url = id ? `/api/${resource}/${id}` : `/api/${resource}`;
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to save ${resource}`);
+    }
+    return await res.json();
+  },
+
+  async del(resource, id) {
+    const res = await fetch(`/api/${resource}/${id}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to delete from ${resource}`);
+    }
+    return await res.json();
   }
 };
+
 
 document.addEventListener("DOMContentLoaded", () => {
   const cur = document.body.dataset.page;
@@ -269,5 +255,75 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if(ENT[cur]) init(true);
-});
+  // Dashboard initialization
+  async function initDashboard() {
+    try {
+      const res = await fetch("/api/dashboard/summary");
+      if (!res.ok) throw new Error("Failed to load dashboard metrics");
+      const data = await res.json();
+
+      const statElements = document.querySelectorAll(".stats .stat strong");
+      if (statElements.length >= 3) {
+        statElements[0].textContent = data.counts.customers;
+        statElements[1].textContent = data.counts.orders;
+        statElements[2].textContent = data.counts.completed;
+      }
+
+      const tbody = document.querySelector(".tw tbody");
+      if (tbody && Array.isArray(data.latest_orders)) {
+        if (data.latest_orders.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted);">No orders recorded yet.</td></tr>';
+        } else {
+          tbody.innerHTML = data.latest_orders.map(o => `
+            <tr>
+              <td><strong>${ord(o.order_id)}</strong></td>
+              <td>${esc(o.customer_name)}</td>
+              <td>${o.formatted_date || o.order_date}</td>
+              <td>${badge(o.stage || (o.order_status === "Completed" ? "Safe Zone" : "In the Magma"), (o.stage === "Safe Zone" || o.order_status === "Completed") ? "ok" : "bad")}</td>
+              <td class="num">${peso(o.total)}</td>
+            </tr>
+          `).join("");
+        }
+      }
+    } catch (err) {
+      toast("Error loading dashboard: " + err.message, 1);
+    }
+  }
+
+  // Staff login handler
+  const loginForm = document.querySelector(".login-form-container form");
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const emailInput = loginForm.querySelector('input[type="email"]');
+      const email = emailInput ? emailInput.value.trim() : "";
+      try {
+        const res = await fetch("/api/staff/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Login failed");
+        sessionStorage.setItem("current_staff", JSON.stringify(data.staff));
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        alert("Login error: " + err.message);
+      }
+    });
+  }
+
+  // Display logged in staff in sidebar
+  const currentStaff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+  if (currentStaff) {
+    const nameEl = document.querySelector(".user-profile div div:first-child");
+    const roleEl = document.querySelector(".user-profile div div:last-child");
+    const avatarEl = document.querySelector(".user-profile .avatar");
+    if (nameEl) nameEl.textContent = currentStaff.full_name || currentStaff.first_name;
+    if (roleEl) roleEl.textContent = `${currentStaff.role} · Basecamp`;
+    if (avatarEl) avatarEl.textContent = (currentStaff.first_name || "A")[0].toUpperCase();
+  }
+
+  if (ENT[cur]) init(true);
+  if (cur === "dashboard") initDashboard();
+});
