@@ -27,6 +27,7 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/staff', require('./routes/staff'));
 app.use('/api/deliveries', require('./routes/deliveries'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 
 // Start server
 app.listen(PORT, async () => {
