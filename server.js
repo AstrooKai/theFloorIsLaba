@@ -20,6 +20,9 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// API Routes
+app.use('/api/customers', require('./routes/customers'));
+
 // Start server
 app.listen(PORT, async () => {
     console.log(`Server running at http://localhost:${PORT}`);
