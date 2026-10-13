@@ -24,6 +24,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/payments', require('./routes/payments'));
 
 // Start server
 app.listen(PORT, async () => {
