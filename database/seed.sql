@@ -9,12 +9,13 @@ INSERT INTO customers (first_name, last_name, phone, address) VALUES
 ('Eugene', 'Reyes',        '09171234505', '67 Del Pilar St., Binan, Laguna');
 
 -- Insert sample staff
-INSERT INTO staff (first_name, last_name, role, phone) VALUES
-('Maria', 'Santos',    'Cashier', '09181112201'),
-('Jose',  'Dela Cruz', 'Washer',  '09181112202'),
-('Ana',   'Lopez',     'Folder',  '09181112203'),
-('Pedro', 'Ramos',     'Rider',   '09181112204'),
-('Rosa',  'Mendoza',   'Manager', '09181112205');
+INSERT INTO staff (first_name, last_name, role, email, password, phone) VALUES
+('Maria', 'Santos',    'Cashier', 'maria.santos@laba.ph',   'admin123', '09181112201'),
+('Jose',  'Dela Cruz', 'Washer',  'jose.delacruz@laba.ph', 'admin123', '09181112202'),
+('Ana',   'Lopez',     'Folder',  'ana.lopez@laba.ph',     'admin123', '09181112203'),
+('Pedro', 'Ramos',     'Rider',   'pedro.ramos@laba.ph',   'admin123', '09181112204'),
+('Rosa',  'Mendoza',   'Manager', 'rosa.mendoza@laba.ph',  'admin123', '09181112205');
+
 
 -- Insert sample service types
 INSERT INTO service_types (service_name, price_per_kg) VALUES

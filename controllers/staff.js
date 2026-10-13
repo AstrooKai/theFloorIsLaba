@@ -9,6 +9,7 @@ exports.getAllStaff = async (req, res) => {
                 last_name,
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 role,
+                email,
                 phone,
                 created_at
             FROM staff
@@ -29,6 +30,7 @@ exports.getRiders = async (req, res) => {
                 last_name,
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 role,
+                email,
                 phone
             FROM staff
             WHERE LOWER(role) = 'rider'
@@ -50,6 +52,7 @@ exports.getStaffById = async (req, res) => {
                 last_name,
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 role,
+                email,
                 phone,
                 created_at
             FROM staff
@@ -67,7 +70,7 @@ exports.getStaffById = async (req, res) => {
 
 exports.createStaff = async (req, res) => {
     try {
-        let { first_name, last_name, full_name, role = 'Staff', phone } = req.body;
+        let { first_name, last_name, full_name, role = 'Staff', email, password = 'password123', phone } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
@@ -78,9 +81,11 @@ exports.createStaff = async (req, res) => {
             return res.status(400).json({ error: 'First name is required' });
         }
 
+        const finalEmail = (email || `${first_name.toLowerCase()}.${(last_name || 'staff').toLowerCase()}@laba.ph`).trim().toLowerCase();
+
         const [result] = await pool.query(
-            'INSERT INTO staff (first_name, last_name, role, phone) VALUES (?, ?, ?, ?)',
-            [first_name, last_name || '', role, phone || '']
+            'INSERT INTO staff (first_name, last_name, role, email, password, phone) VALUES (?, ?, ?, ?, ?, ?)',
+            [first_name, last_name || '', role, finalEmail, password, phone || '']
         );
 
         res.status(201).json({
@@ -89,6 +94,7 @@ exports.createStaff = async (req, res) => {
             last_name: last_name || '',
             full_name: `${first_name} ${last_name || ''}`.trim(),
             role,
+            email: finalEmail,
             phone: phone || ''
         });
     } catch (error) {
@@ -99,7 +105,7 @@ exports.createStaff = async (req, res) => {
 exports.updateStaff = async (req, res) => {
     try {
         const { id } = req.params;
-        let { first_name, last_name, full_name, role, phone } = req.body;
+        let { first_name, last_name, full_name, role, email, password, phone } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
@@ -120,6 +126,14 @@ exports.updateStaff = async (req, res) => {
         if (role) {
             updates.push('role = ?');
             params.push(role);
+        }
+        if (email) {
+            updates.push('email = ?');
+            params.push(email.trim().toLowerCase());
+        }
+        if (password) {
+            updates.push('password = ?');
+            params.push(password);
         }
         if (phone !== undefined) {
             updates.push('phone = ?');
@@ -143,6 +157,7 @@ exports.updateStaff = async (req, res) => {
             last_name,
             full_name: first_name ? `${first_name} ${last_name || ''}`.trim() : undefined,
             role,
+            email,
             phone
         });
     } catch (error) {
@@ -170,36 +185,34 @@ exports.deleteStaff = async (req, res) => {
 
 exports.loginStaff = async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email) {
-            return res.status(400).json({ error: 'Email or username is required' });
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const [staffList] = await pool.query(`
+        const [rows] = await pool.query(`
             SELECT 
                 staff_id,
                 first_name,
                 last_name,
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 role,
+                email,
                 phone
             FROM staff
-            ORDER BY staff_id ASC
-        `);
+            WHERE LOWER(email) = LOWER(?) AND password = ?
+        `, [email.trim(), password]);
 
-        const matched = staffList.find(s => 
-            email.toLowerCase().includes(s.first_name.toLowerCase()) || 
-            email.toLowerCase().includes(s.last_name.toLowerCase())
-        ) || staffList[0] || {
-            staff_id: 1,
-            full_name: 'Administrator',
-            role: 'Manager'
-        };
+        if (rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const staffMember = rows[0];
 
         res.json({
             success: true,
-            staff: matched,
-            message: `Welcome back, ${matched.full_name}!`
+            staff: staffMember,
+            message: `Welcome back, ${staffMember.full_name}!`
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

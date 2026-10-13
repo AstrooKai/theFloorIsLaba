@@ -293,22 +293,33 @@ document.addEventListener("DOMContentLoaded", () => {
   // Staff login handler
   const loginForm = document.querySelector(".login-form-container form");
   if (loginForm) {
+    const showToggle = loginForm.querySelector(".form-group span");
+    const passInput = loginForm.querySelector('input[type="password"]');
+    if (showToggle && passInput) {
+      showToggle.addEventListener("click", () => {
+        const isPass = passInput.type === "password";
+        passInput.type = isPass ? "text" : "password";
+        showToggle.textContent = isPass ? "Hide" : "Show";
+      });
+    }
+
     loginForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const emailInput = loginForm.querySelector('input[type="email"]');
       const email = emailInput ? emailInput.value.trim() : "";
+      const password = passInput ? passInput.value : "";
       try {
         const res = await fetch("/api/staff/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ email, password })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Login failed");
         sessionStorage.setItem("current_staff", JSON.stringify(data.staff));
         window.location.href = "dashboard.html";
       } catch (err) {
-        alert("Login error: " + err.message);
+        alert(err.message);
       }
     });
   }
