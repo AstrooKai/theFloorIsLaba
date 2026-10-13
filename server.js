@@ -22,6 +22,7 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/customers', require('./routes/customers'));
+app.use('/api/services', require('./routes/services'));
 
 // Start server
 app.listen(PORT, async () => {
