@@ -45,7 +45,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   const confirmSignOut = $("#confirmSignOut");
   if (confirmSignOut) {
-    confirmSignOut.addEventListener("click", () => window.location.href = "staff-login.html");
+    confirmSignOut.addEventListener("click", () => {
+      sessionStorage.removeItem("current_staff");
+      window.location.href = "staff-login.html";
+    });
   }
   const cancelSignOut = $("#cancelSignOut");
   if (cancelSignOut && signOutModal) {
