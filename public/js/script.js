@@ -10,11 +10,10 @@ const pay = (id) => "PAY-" + String(id).padStart(4, "0");
 const badge = (t, c) => `<span class="badge ${c}">${esc(t)}</span>`;
 const orderStatusBadge = (st) => {
   const s = String(st || "Received").trim();
-  const cls = (s === "Completed" || s === "Safe Zone") ? "ok"
-    : (s === "Washing" || s === "In the Magma" || s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
+  const cls = (s === "Completed") ? "ok"
+    : (s === "Washing" || s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
     : "mute";
-  const label = s === "Safe Zone" ? "Completed" : s === "In the Magma" ? "Received" : s;
-  return badge(label, cls);
+  return badge(s, cls);
 };
 const btn = (act, id, label, cls = "") => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}" type="button">${label}</button>`;
 const std = (r, k, extra = "") => `<div class="acts">${extra}${btn("edit", r[k], "Edit")}${btn("del", r[k], "Delete", "btn-danger")}</div>`;
@@ -170,9 +169,9 @@ document.addEventListener("DOMContentLoaded", () => {
     orders: {
       name: "orders", id: "order_id",
       filter: (rows, f) => rows.filter((r) => !f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status || o.stage)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
-      payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received", stage: d.order_status || "Received" }),
+      payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received" }),
       delMsg: (r) => `Delete order ${ord(r.order_id)}?`
     },
     services: {
@@ -290,7 +289,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <td><strong>${ord(o.order_id)}</strong></td>
               <td>${esc(o.customer_name)}</td>
               <td>${o.formatted_date || o.order_date}</td>
-              <td>${orderStatusBadge(o.order_status || o.stage)}</td>
+              <td>${orderStatusBadge(o.order_status)}</td>
               <td class="num">${peso(o.total)}</td>
             </tr>
           `).join("");

@@ -17,7 +17,6 @@ exports.getAllOrders = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
-                os.status_name AS stage,
                 COALESCE(SUM(oi.subtotal), 0) AS total_amount,
                 COALESCE(SUM(oi.subtotal), 0) AS total,
                 COALESCE(pay.total_paid, 0) AS total_paid,
@@ -62,7 +61,6 @@ exports.getOrderById = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
-                os.status_name AS stage,
                 COALESCE(SUM(oi.subtotal), 0) AS total
             FROM orders o
             JOIN customers c ON o.customer_id = c.customer_id
@@ -128,7 +126,6 @@ exports.createOrder = async (req, res) => {
             staff_id,
             status_id,
             order_status,
-            stage,
             release_type = 'Pickup',
             release_date = null,
             order_date,
@@ -175,12 +172,9 @@ exports.createOrder = async (req, res) => {
                 'Washing': 2,
                 'Ready for Pickup': 3,
                 'Out for Delivery': 4,
-                'Completed': 5,
-                'Safe Zone': 5,
-                'In the Magma': 1
+                'Completed': 5
             };
-            const sName = order_status || stage;
-            finalStatusId = (sName && statusMap[sName]) ? statusMap[sName] : 1;
+            finalStatusId = (order_status && statusMap[order_status]) ? statusMap[order_status] : 1;
         }
 
         const finalOrderDate = order_date || new Date().toISOString().split('T')[0];
@@ -225,7 +219,6 @@ exports.createOrder = async (req, res) => {
             address: address || '',
             order_date: finalOrderDate,
             order_status: order_status || (finalStatusId === 5 ? 'Completed' : 'Received'),
-            stage: order_status || (finalStatusId === 5 ? 'Completed' : 'Received'),
             total: Number(total) || 0
         });
     } catch (error) {
@@ -242,7 +235,7 @@ exports.updateOrder = async (req, res) => {
         await conn.beginTransaction();
 
         const { id } = req.params;
-        const { stage, status_id, release_type, release_date, customer_name, contact, address, total } = req.body;
+        const { order_status, status_id, release_type, release_date, customer_name, contact, address, total } = req.body;
 
         const [existing] = await conn.query('SELECT * FROM orders WHERE order_id = ?', [id]);
         if (existing.length === 0) {
@@ -251,19 +244,16 @@ exports.updateOrder = async (req, res) => {
         }
 
         let newStatusId = status_id;
-        if (!newStatusId && (order_status || stage)) {
+        if (!newStatusId && order_status) {
             const statusMap = {
                 'Received': 1,
                 'Washing': 2,
                 'Ready for Pickup': 3,
                 'Out for Delivery': 4,
-                'Completed': 5,
-                'Safe Zone': 5,
-                'In the Magma': 2
+                'Completed': 5
             };
-            const sName = order_status || stage;
-            if (statusMap[sName]) {
-                newStatusId = statusMap[sName];
+            if (statusMap[order_status]) {
+                newStatusId = statusMap[order_status];
             }
         }
 
@@ -329,7 +319,6 @@ exports.updateOrder = async (req, res) => {
         res.json({
             order_id: Number(id),
             order_status: resolvedName,
-            stage: resolvedName,
             total: Number(total) || 0
         });
     } catch (error) {

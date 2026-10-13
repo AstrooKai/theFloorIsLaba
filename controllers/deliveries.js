@@ -63,7 +63,7 @@ exports.getDeliveryById = async (req, res) => {
         `, [id]);
 
         if (rows.length === 0) {
-            return res.status(404).json({ error: 'Transport run not found' });
+            return res.status(404).json({ error: 'Delivery run not found' });
         }
         res.json(rows[0]);
     } catch (error) {
@@ -165,7 +165,7 @@ exports.deleteDelivery = async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query('UPDATE orders SET release_date = NULL WHERE order_id = ?', [id]);
-        res.json({ message: 'Transport run cleared successfully', delivery_id: Number(id) });
+        res.json({ message: 'Delivery run cleared successfully', delivery_id: Number(id) });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

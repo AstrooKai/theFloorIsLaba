@@ -6,7 +6,7 @@ exports.getDashboardSummary = async (req, res) => {
             [customerCount],
             [orderCount],
             [completedCount],
-            [magmaCount],
+            [inProgressCount],
             [revenueSum],
             [deliveryCount],
             latestOrders,
@@ -35,7 +35,6 @@ exports.getDashboardSummary = async (req, res) => {
                     DATE_FORMAT(o.order_date, '%b %d, %Y') AS formatted_date,
                     o.order_date,
                     os.status_name AS order_status,
-                    os.status_name AS stage,
                     COALESCE(SUM(oi.subtotal), 0) AS total
                 FROM orders o
                 JOIN customers c ON o.customer_id = c.customer_id
@@ -63,8 +62,7 @@ exports.getDashboardSummary = async (req, res) => {
                 customers: customerCount[0]?.total || 0,
                 orders: orderCount[0]?.total || 0,
                 completed: completedCount[0]?.total || 0,
-                in_magma: magmaCount[0]?.total || 0,
-                in_progress: magmaCount[0]?.total || 0,
+                in_progress: inProgressCount[0]?.total || 0,
                 revenue: Number(revenueSum[0]?.total || 0),
                 deliveries: deliveryCount[0]?.total || 0
             },
