@@ -17,10 +17,7 @@ exports.getAllOrders = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
-                CASE 
-                    WHEN os.status_name = 'Completed' THEN 'Safe Zone'
-                    ELSE 'In the Magma'
-                END AS stage,
+                os.status_name AS stage,
                 COALESCE(SUM(oi.subtotal), 0) AS total_amount,
                 COALESCE(SUM(oi.subtotal), 0) AS total,
                 COALESCE(pay.total_paid, 0) AS total_paid,
@@ -65,10 +62,7 @@ exports.getOrderById = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
-                CASE 
-                    WHEN os.status_name = 'Completed' THEN 'Safe Zone'
-                    ELSE 'In the Magma'
-                END AS stage,
+                os.status_name AS stage,
                 COALESCE(SUM(oi.subtotal), 0) AS total
             FROM orders o
             JOIN customers c ON o.customer_id = c.customer_id
@@ -133,6 +127,7 @@ exports.createOrder = async (req, res) => {
             address,
             staff_id,
             status_id,
+            order_status,
             stage,
             release_type = 'Pickup',
             release_date = null,
@@ -147,7 +142,7 @@ exports.createOrder = async (req, res) => {
             const rawName = (customer_name || 'Walk-in Customer').trim();
             const parts = rawName.split(/\s+/);
             const firstName = parts[0] || 'Customer';
-            const lastName = parts.slice(1).join(' ') || 'Participant';
+            const lastName = parts.slice(1).join(' ') || 'Customer';
 
             const [found] = await conn.query(
                 'SELECT customer_id FROM customers WHERE (first_name = ? AND last_name = ?) OR (phone = ? AND phone != "") LIMIT 1',
@@ -175,7 +170,17 @@ exports.createOrder = async (req, res) => {
         // Resolve status
         let finalStatusId = status_id;
         if (!finalStatusId) {
-            finalStatusId = (stage === 'Safe Zone') ? 5 : 1;
+            const statusMap = {
+                'Received': 1,
+                'Washing': 2,
+                'Ready for Pickup': 3,
+                'Out for Delivery': 4,
+                'Completed': 5,
+                'Safe Zone': 5,
+                'In the Magma': 1
+            };
+            const sName = order_status || stage;
+            finalStatusId = (sName && statusMap[sName]) ? statusMap[sName] : 1;
         }
 
         const finalOrderDate = order_date || new Date().toISOString().split('T')[0];
@@ -219,7 +224,8 @@ exports.createOrder = async (req, res) => {
             contact: contact || '',
             address: address || '',
             order_date: finalOrderDate,
-            stage: stage || 'In the Magma',
+            order_status: order_status || (finalStatusId === 5 ? 'Completed' : 'Received'),
+            stage: order_status || (finalStatusId === 5 ? 'Completed' : 'Received'),
             total: Number(total) || 0
         });
     } catch (error) {
@@ -245,8 +251,20 @@ exports.updateOrder = async (req, res) => {
         }
 
         let newStatusId = status_id;
-        if (!newStatusId && stage) {
-            newStatusId = stage === 'Safe Zone' ? 5 : 2;
+        if (!newStatusId && (order_status || stage)) {
+            const statusMap = {
+                'Received': 1,
+                'Washing': 2,
+                'Ready for Pickup': 3,
+                'Out for Delivery': 4,
+                'Completed': 5,
+                'Safe Zone': 5,
+                'In the Magma': 2
+            };
+            const sName = order_status || stage;
+            if (statusMap[sName]) {
+                newStatusId = statusMap[sName];
+            }
         }
 
         const updates = [];
@@ -306,9 +324,12 @@ exports.updateOrder = async (req, res) => {
 
         await conn.commit();
 
+        const statusNames = { 1: 'Received', 2: 'Washing', 3: 'Ready for Pickup', 4: 'Out for Delivery', 5: 'Completed' };
+        const resolvedName = order_status || statusNames[newStatusId] || 'Received';
         res.json({
             order_id: Number(id),
-            stage: stage || (newStatusId === 5 ? 'Safe Zone' : 'In the Magma'),
+            order_status: resolvedName,
+            stage: resolvedName,
             total: Number(total) || 0
         });
     } catch (error) {

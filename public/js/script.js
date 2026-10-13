@@ -8,6 +8,14 @@ const fmt = (s) => { if(!s) return ""; const [y, m, d] = s.split("-"); return ne
 const ord = (id) => "ORD-" + String(id).padStart(4, "0");
 const pay = (id) => "PAY-" + String(id).padStart(4, "0");
 const badge = (t, c) => `<span class="badge ${c}">${esc(t)}</span>`;
+const orderStatusBadge = (st) => {
+  const s = String(st || "Received").trim();
+  const cls = (s === "Completed" || s === "Safe Zone") ? "ok"
+    : (s === "Washing" || s === "In the Magma" || s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
+    : "mute";
+  const label = s === "Safe Zone" ? "Completed" : s === "In the Magma" ? "Received" : s;
+  return badge(label, cls);
+};
 const btn = (act, id, label, cls = "") => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}" type="button">${label}</button>`;
 const std = (r, k, extra = "") => `<div class="acts">${extra}${btn("edit", r[k], "Edit")}${btn("del", r[k], "Delete", "btn-danger")}</div>`;
 const debounce = (f, ms = 150) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
@@ -159,9 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
     orders: {
       name: "orders", id: "order_id",
       filter: (rows, f) => rows.filter((r) => !f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${badge(o.stage || "In the Magma", (o.stage || "In the Magma") === "Safe Zone" ? "ok" : "bad")}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status || o.stage)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
-      payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), stage: d.stage || "In the Magma" }),
+      payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received", stage: d.order_status || "Received" }),
       delMsg: (r) => `Delete order ${ord(r.order_id)}?`
     },
     services: {
@@ -279,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <td><strong>${ord(o.order_id)}</strong></td>
               <td>${esc(o.customer_name)}</td>
               <td>${o.formatted_date || o.order_date}</td>
-              <td>${badge(o.stage || (o.order_status === "Completed" ? "Safe Zone" : "In the Magma"), (o.stage === "Safe Zone" || o.order_status === "Completed") ? "ok" : "bad")}</td>
+              <td>${orderStatusBadge(o.order_status || o.stage)}</td>
               <td class="num">${peso(o.total)}</td>
             </tr>
           `).join("");
@@ -331,7 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const roleEl = document.querySelector(".user-profile div div:last-child");
     const avatarEl = document.querySelector(".user-profile .avatar");
     if (nameEl) nameEl.textContent = currentStaff.full_name || currentStaff.first_name;
-    if (roleEl) roleEl.textContent = `${currentStaff.role} · Basecamp`;
+    if (roleEl) roleEl.textContent = currentStaff.role || "Active Staff";
     if (avatarEl) avatarEl.textContent = (currentStaff.first_name || "A")[0].toUpperCase();
   }
 
