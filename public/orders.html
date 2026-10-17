@@ -75,10 +75,34 @@
               </div>       
               <div class="modal-body py-4">         
                 <div class="grid">           
-                  <div class="field full" data-f="customer_name"><label>Customer Name <span class="req">*</span></label><input name="customer_name" class="form-control"></div>           
-                  <div class="field" data-f="contact"><label>Contact Number</label><input name="contact" class="form-control" placeholder="0917XXXXXXX"></div>           
+                  <div class="field" data-f="first_name"><label>First Name <span class="req">*</span></label><input name="first_name" class="form-control" required></div>           
+                  <div class="field" data-f="last_name"><label>Last Name <span class="req">*</span></label><input name="last_name" class="form-control" required></div>           
+                  <div class="field" data-f="contact"><label>Contact Number <span class="req">*</span></label><input name="contact" class="form-control" placeholder="0917XXXXXXX" required></div>           
                   <div class="field" data-f="release_type"><label>Release Type</label><select name="release_type" class="form-select"><option value="Pickup">Pickup</option><option value="Delivery">Delivery</option></select></div>
-                  <div class="field full" data-f="address"><label>Address</label><textarea name="address" class="form-control" rows="2"></textarea></div>           
+                  <div class="field" data-f="street"><label>Street Address <span class="req">*</span></label><input name="street" class="form-control" placeholder="House/Unit #, Street Name" required></div>           
+                  <div class="field" data-f="barangay"><label>Barangay <span class="req">*</span></label>
+                    <select name="barangay" class="form-select" required>
+                      <option value="">Select Barangay</option>
+                      <option value="Baclaran">Baclaran</option>
+                      <option value="Banay-banay">Banay-banay</option>
+                      <option value="Banlic">Banlic</option>
+                      <option value="Bigaa">Bigaa</option>
+                      <option value="Buting">Buting</option>
+                      <option value="Casile">Casile</option>
+                      <option value="Diezmo">Diezmo</option>
+                      <option value="Gulod">Gulod</option>
+                      <option value="Mamatid">Mamatid</option>
+                      <option value="Marinig">Marinig</option>
+                      <option value="Niugan">Niugan</option>
+                      <option value="Pittland">Pittland</option>
+                      <option value="Poblacion I">Poblacion I</option>
+                      <option value="Poblacion II">Poblacion II</option>
+                      <option value="Poblacion III">Poblacion III</option>
+                      <option value="Pulo">Pulo</option>
+                      <option value="Sala">Sala</option>
+                      <option value="San Isidro">San Isidro</option>
+                    </select>
+                  </div>           
                   <div class="field" data-f="service_id"><label>Laundry Service <span class="req">*</span></label><select name="service_id" id="f_service_id" class="form-select" data-fill="services"></select></div>
                   <div class="field" data-f="weight_kg"><label id="serviceUnitLabel">Quantity / Weight (kg) <span class="req">*</span></label><input name="weight_kg" id="f_weight_kg" type="number" step="0.1" min="0.1" value="1.0" class="form-control"></div>
                   <div class="field" data-f="total"><label>Total Amount (₱) <span class="req">*</span></label><input name="total" id="f_total" type="number" step="0.01" class="form-control" readonly style="font-weight: 700; background-color: var(--card-bg, #f8f9fa);"></div>           

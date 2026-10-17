@@ -479,6 +479,11 @@ document.addEventListener("DOMContentLoaded", () => {
       init: (f) => {
         fillSelects();
         if (EDIT) {
+          if (f.elements.first_name && EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
+          if (f.elements.last_name && EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
+          if (f.elements.contact && (EDIT.contact || EDIT.phone)) f.elements.contact.value = EDIT.contact || EDIT.phone;
+          if (f.elements.street) f.elements.street.value = EDIT.street || EDIT.address || "";
+          if (f.elements.barangay && EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
           if (f.elements.service_id && EDIT.service_id) f.elements.service_id.value = EDIT.service_id;
           if (f.elements.weight_kg) f.elements.weight_kg.value = EDIT.weight_kg || "1.0";
           if (f.elements.release_type && EDIT.release_type) f.elements.release_type.value = EDIT.release_type;
@@ -516,7 +521,11 @@ document.addEventListener("DOMContentLoaded", () => {
       draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button></div></td></tr>`).join(""),
       validate(d) {
         const e = {};
-        if (!d.customer_name) e.customer_name = "Required";
+        if (!d.first_name) e.first_name = "First name is required";
+        if (!d.last_name) e.last_name = "Last name is required";
+        if (!d.contact) e.contact = "Contact number is required";
+        if (!d.street) e.street = "Street address is required";
+        if (!d.barangay) e.barangay = "Please select a barangay";
         if (!d.service_id) e.service_id = "Please select a service";
         if (!d.weight_kg || Number(d.weight_kg) <= 0) e.weight_kg = "Valid weight/quantity required";
         return e;
@@ -526,9 +535,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const weight = Number(d.weight_kg) || 1.0;
         const totalVal = Number(d.total) || 0;
         return {
-          customer_name: d.customer_name,
+          first_name: d.first_name,
+          last_name: d.last_name,
+          customer_name: `${d.first_name || ''} ${d.last_name || ''}`.trim(),
           contact: d.contact,
-          address: d.address,
+          street: d.street,
+          barangay: d.barangay,
+          address: `${d.street || ''}, ${d.barangay || ''}`.trim(),
           release_type: d.release_type || "Pickup",
           total: totalVal,
           order_date: d.order_date || today(),

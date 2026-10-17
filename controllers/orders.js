@@ -13,9 +13,13 @@ exports.getAllOrders = async (req, res) => {
                 o.release_date,
                 COALESCE(o.is_archived, FALSE) AS is_archived,
                 o.customer_id,
+                c.first_name,
+                c.last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS customer_phone,
                 c.phone AS contact,
+                c.street,
+                c.barangay,
                 c.address,
                 o.staff_id,
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
@@ -42,7 +46,7 @@ exports.getAllOrders = async (req, res) => {
                 GROUP BY order_id
             ) pay ON o.order_id = pay.order_id
             ${archiveFilter}
-            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.is_archived, o.customer_id, c.first_name, c.last_name, c.phone, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
+            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.is_archived, o.customer_id, c.first_name, c.last_name, c.phone, c.street, c.barangay, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
             ORDER BY o.order_id DESC
         `);
         res.json(rows);
@@ -142,23 +146,37 @@ exports.createOrder = async (req, res) => {
 
         // Resolve customer
         let finalCustomerId = customer_id;
+        let firstName = (req.body.first_name || '').trim();
+        let lastName = (req.body.last_name || '').trim();
+        const contactNo = (contact || req.body.phone || '').trim();
+        const streetAddr = (req.body.street || '').trim();
+        const barangayVal = (req.body.barangay || '').trim();
+        const finalAddress = address || (streetAddr && barangayVal ? `${streetAddr}, ${barangayVal}` : (streetAddr || barangayVal || 'Cabuyao, Laguna'));
+
         if (!finalCustomerId) {
-            const rawName = (customer_name || 'Walk-in Customer').trim();
-            const parts = rawName.split(/\s+/);
-            const firstName = parts[0] || 'Customer';
-            const lastName = parts.slice(1).join(' ') || 'Customer';
+            if (!firstName && customer_name) {
+                const parts = customer_name.trim().split(/\s+/);
+                firstName = parts[0] || 'Customer';
+                lastName = parts.slice(1).join(' ') || 'Customer';
+            }
 
             const [found] = await conn.query(
                 'SELECT customer_id FROM customers WHERE (first_name = ? AND last_name = ?) OR (phone = ? AND phone != "") LIMIT 1',
-                [firstName, lastName, contact || '']
+                [firstName, lastName, contactNo]
             );
 
             if (found.length > 0) {
                 finalCustomerId = found[0].customer_id;
+                if (streetAddr || barangayVal) {
+                    await conn.query(
+                        'UPDATE customers SET street = COALESCE(NULLIF(street, ""), ?), barangay = COALESCE(NULLIF(barangay, ""), ?), address = COALESCE(NULLIF(address, ""), ?) WHERE customer_id = ?',
+                        [streetAddr, barangayVal, finalAddress, finalCustomerId]
+                    );
+                }
             } else {
                 const [createdCust] = await conn.query(
-                    'INSERT INTO customers (first_name, last_name, phone, address) VALUES (?, ?, ?, ?)',
-                    [firstName, lastName, contact || '09170000000', address || 'Cabuyao, Laguna']
+                    'INSERT INTO customers (first_name, last_name, phone, street, barangay, address, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, "Active", FALSE)',
+                    [firstName || 'Customer', lastName || '', contactNo || '09170000000', streetAddr, barangayVal, finalAddress]
                 );
                 finalCustomerId = createdCust.insertId;
             }
