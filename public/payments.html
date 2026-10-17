@@ -76,6 +76,12 @@
           <strong data-stat="Refunded">₱0.00</strong>
         </div>   
       </div>   
+      <section class="toolbar" role="search">
+        <div class="tf grow"><label>Search Payments</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by customer, order ID, or reference #..."></div>
+        <div class="tf"><label>Method</label><select id="fl_m" data-flt="m"><option value="">All Methods</option><option value="cash">Cash</option><option value="e-wallet">E-Wallet</option><option value="card">Card</option></select></div>
+        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="refunded">Refunded</option></select></div>
+        <button class="btn" data-act="clear" type="button">Clear</button>
+      </section>
       <p class="count" id="count" aria-live="polite"></p>   
       <div class="tw" id="list">     
         <table class="table table-hover align-middle mb-0">       
@@ -94,9 +100,9 @@
               <div class="modal-body py-4">         
                 <div class="grid">           
                   <div class="field full" data-f="order_id"><label>Order <span class="req">*</span></label><select name="order_id" data-fill="orders-total" class="form-select" data-lock><option value="">Choose an order</option></select><span class="hint" id="h_order_id">&nbsp;</span></div>           
-                  <div class="field" data-f="amount"><label>Amount (₱) <span class="req">*</span></label><input name="amount" type="number" class="form-control"></div>           
-                  <div class="field" data-f="method"><label>Method <span class="req">*</span></label><select name="method" class="form-select"><option value="">Choose a method</option><option>Cash</option><option>GCash</option></select></div>           
-                  <div class="field" data-f="reference_no"><label>Reference number</label><input name="reference_no" class="form-control"></div>           
+                  <div class="field" data-f="amount"><label>Amount (₱) <span class="req">*</span></label><input name="amount" type="number" step="0.01" class="form-control"></div>           
+                  <div class="field" data-f="method"><label>Payment Method <span class="req">*</span></label><select name="method" class="form-select"><option value="">Choose a method</option><option value="Cash">Cash</option><option value="E-Wallet">E-Wallet</option><option value="Card">Card</option></select></div>           
+                  <div class="field" data-f="reference_no" id="f_ref_field"><label>Reference Number <span class="req" id="refStar">*</span></label><input name="reference_no" class="form-control" placeholder="Transaction / Reference #"><span class="hint" id="h_reference_no">Required for non-cash payments</span></div>           
                   <div class="field" data-f="paid_at"><label>Date <span class="req">*</span></label><input name="paid_at" type="date" class="form-control"></div>           
                   <div class="field" data-f="status"><label>Status</label><select name="status" class="form-select"><option>Paid</option><option>Pending</option><option>Refunded</option></select></div>         
                 </div>       

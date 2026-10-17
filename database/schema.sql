@@ -83,7 +83,10 @@ CREATE TABLE IF NOT EXISTS payments (
     order_id       INT NOT NULL,
     amount_paid    DECIMAL(10,2) NOT NULL,
     payment_method VARCHAR(20) NOT NULL,
+    reference_no   VARCHAR(100) NULL,
     payment_date   DATE NOT NULL,
+    status         VARCHAR(20) DEFAULT 'Paid',
+    is_archived    BOOLEAN DEFAULT FALSE,
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_payments_order FOREIGN KEY (order_id) 
         REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE

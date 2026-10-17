@@ -598,14 +598,27 @@ document.addEventListener("DOMContentLoaded", () => {
       delMsg: (r) => `Delete ${r.service_name}?`
     },
     payments: {
-      name: "payments", id: "payment_id", defaults: () => ({ paid_at: today() }),
-      init: (f) => { f.elements.paid_at.max = today(); if(f.elements.method) ENT.payments.change({ target: f.elements.method }); if(f.elements.order_id) ENT.payments.change({ target: f.elements.order_id }, false); },
+      name: "payments", id: "payment_id", defaults: () => ({ paid_at: today(), method: "Cash", status: "Paid" }),
+      init: (f) => {
+        f.elements.paid_at.max = today();
+        if (f.elements.method) {
+          if (!EDIT && !f.elements.method.value) f.elements.method.value = "Cash";
+          ENT.payments.change({ target: f.elements.method });
+        }
+        if (f.elements.order_id) ENT.payments.change({ target: f.elements.order_id }, false);
+      },
       change(e, prefill = true) {
         const f = $("#form");
         if (e.target.name === "method") {
-          const need = e.target.value && e.target.value !== "Cash";
-          if($("#refStar")) $("#refStar").hidden = !need;
-          if($("#h_reference_no")) $("#h_reference_no").textContent = need ? "Copy it from the receipt." : "Not needed for cash.";
+          const methodVal = e.target.value;
+          const isNonCash = methodVal === "E-Wallet" || methodVal === "Card";
+          const refField = $("#f_ref_field") || (f.elements.reference_no ? f.elements.reference_no.closest(".field") : null);
+          if (refField) {
+            refField.style.display = isNonCash ? "block" : "none";
+          }
+          if ($("#refStar")) $("#refStar").hidden = !isNonCash;
+          if ($("#h_reference_no")) $("#h_reference_no").textContent = isNonCash ? "Required for digital/card payments." : "Not needed for cash.";
+          if (!isNonCash && f.elements.reference_no) f.elements.reference_no.value = "";
         }
         if (e.target.name === "order_id") {
           const id = EDIT ? EDIT.order_id : e.target.value, h = $("#h_order_id");
@@ -615,13 +628,42 @@ document.addEventListener("DOMContentLoaded", () => {
           if (prefill && b > 0 && !f.elements.amount.value) f.elements.amount.value = b.toFixed(2);
         }
       },
-      filter: (rows, f) => rows.filter((p) => (!f.q || `${nameOf(p)} ${ord(p.order_id)} ${p.order_id} ${p.reference_no}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
+      filter: (rows, f) => rows.filter((p) => (!f.q || `${nameOf(p)} ${ord(p.order_id)} ${p.order_id} ${p.reference_no || ''}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
       stats: (list) => Object.fromEntries(["Paid", "Pending", "Refunded"].map((s) => [s, peso(list.filter((p) => p.status === s).reduce((n, p) => n + Number(p.amount), 0))])),
-      draw: (list) => list.map((p) => `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${fmt(p.paid_at)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td>${std(p, "payment_id", p.status === "Pending" ? btn("paid", p.payment_id, "Mark paid") : "")}</td></tr>`).join(""),
-      validate(d) { const e = {}; if (!d.order_id) e.order_id = "Required"; if (!d.amount) e.amount = "Required"; return e; },
-      payload: (d) => ({ order_id: +d.order_id, amount: +d.amount, method: d.method, reference_no: d.method === "Cash" ? "" : d.reference_no.trim(), status: d.status, paid_at: d.paid_at }),
-      delMsg: (r) => `Delete payment for ${peso(r.amount)}?`,
-      act(a, r) { if (a === "paid") return patch(r, { status: "Paid" }, `Marked as paid.`); }
+      draw: (list) => list.map((p) => `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td><div class="acts">${p.status === "Pending" ? btn("paid", p.payment_id, "Mark paid", "btn-success") : ""}<button class="btn sm" data-act="edit" data-id="${p.payment_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${p.payment_id}" type="button">Archive</button></div></td></tr>`).join(""),
+      validate(d) {
+        const e = {};
+        if (!d.order_id) e.order_id = "Required";
+        if (!d.amount || Number(d.amount) <= 0) e.amount = "Valid amount required";
+        if (!d.method) e.method = "Payment method required";
+        if ((d.method === "E-Wallet" || d.method === "Card") && (!d.reference_no || !d.reference_no.trim())) {
+          e.reference_no = "Reference number is required for digital/card payments";
+        }
+        return e;
+      },
+      payload: (d) => ({
+        order_id: +d.order_id,
+        amount: +d.amount,
+        amount_paid: +d.amount,
+        method: d.method,
+        payment_method: d.method,
+        reference_no: (d.method === "Cash") ? "" : (d.reference_no || "").trim(),
+        status: d.status || "Paid",
+        paid_at: d.paid_at || today(),
+        payment_date: d.paid_at || today()
+      }),
+      delMsg: (r) => `Archive payment for ${peso(r.amount)}?`,
+      async act(a, r) {
+        if (a === "paid") return patch(r, { status: "Paid" }, `Marked as paid.`);
+        if (a === "archive") {
+          if (await ask("Archive Payment?", `Archive payment #${pay(r.payment_id)} of ${peso(r.amount)}? It will be hidden while preserving financial audit trails.`, "Archive")) {
+            const res = await fetch(`/api/payments/${r.payment_id}/archive`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to archive payment");
+            toast(`Payment #${pay(r.payment_id)} archived successfully.`);
+            await init();
+          }
+        }
+      }
     },
     deliveries: {
       name: "deliveries", id: "delivery_id", defaults: () => ({ scheduled_date: today() }),

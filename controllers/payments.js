@@ -2,6 +2,9 @@ const pool = require('../config/db');
 
 exports.getAllPayments = async (req, res) => {
     try {
+        const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
+        const archiveFilter = includeArchived ? '' : 'WHERE (p.is_archived IS NULL OR p.is_archived = FALSE)';
+
         const [rows] = await pool.query(`
             SELECT 
                 p.payment_id,
@@ -12,14 +15,16 @@ exports.getAllPayments = async (req, res) => {
                 p.payment_method AS method,
                 DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS payment_date,
                 DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS paid_at,
-                'Paid' AS status,
-                '' AS reference_no,
+                COALESCE(p.status, 'Paid') AS status,
+                COALESCE(p.reference_no, '') AS reference_no,
+                COALESCE(p.is_archived, FALSE) AS is_archived,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS contact,
                 p.created_at
             FROM payments p
             JOIN orders o ON p.order_id = o.order_id
             JOIN customers c ON o.customer_id = c.customer_id
+            ${archiveFilter}
             ORDER BY p.payment_date DESC, p.payment_id DESC
         `);
         res.json(rows);
@@ -41,8 +46,9 @@ exports.getPaymentById = async (req, res) => {
                 p.payment_method AS method,
                 DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS payment_date,
                 DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS paid_at,
-                'Paid' AS status,
-                '' AS reference_no,
+                COALESCE(p.status, 'Paid') AS status,
+                COALESCE(p.reference_no, '') AS reference_no,
+                COALESCE(p.is_archived, FALSE) AS is_archived,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS contact,
                 p.created_at
@@ -63,10 +69,12 @@ exports.getPaymentById = async (req, res) => {
 
 exports.createPayment = async (req, res) => {
     try {
-        const { order_id, amount, amount_paid, method, payment_method, paid_at, payment_date } = req.body;
+        const { order_id, amount, amount_paid, method, payment_method, paid_at, payment_date, reference_no, status } = req.body;
         const finalAmount = amount_paid !== undefined ? amount_paid : amount;
         const finalMethod = payment_method || method || 'Cash';
         const finalDate = payment_date || paid_at || new Date().toISOString().split('T')[0];
+        const finalRef = (finalMethod === 'Cash') ? '' : (reference_no || '').trim();
+        const finalStatus = status || 'Paid';
 
         if (!order_id || finalAmount === undefined) {
             return res.status(400).json({ error: 'order_id and amount are required' });
@@ -78,8 +86,8 @@ exports.createPayment = async (req, res) => {
         }
 
         const [result] = await pool.query(
-            'INSERT INTO payments (order_id, amount_paid, payment_method, payment_date) VALUES (?, ?, ?, ?)',
-            [order_id, Number(finalAmount), finalMethod, finalDate]
+            'INSERT INTO payments (order_id, amount_paid, payment_method, reference_no, payment_date, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
+            [order_id, Number(finalAmount), finalMethod, finalRef, finalDate, finalStatus]
         );
 
         res.status(201).json({
@@ -89,9 +97,11 @@ exports.createPayment = async (req, res) => {
             amount: Number(finalAmount),
             payment_method: finalMethod,
             method: finalMethod,
+            reference_no: finalRef,
             payment_date: finalDate,
             paid_at: finalDate,
-            status: 'Paid'
+            status: finalStatus,
+            is_archived: false
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -101,9 +111,9 @@ exports.createPayment = async (req, res) => {
 exports.updatePayment = async (req, res) => {
     try {
         const { id } = req.params;
-        const { amount, amount_paid, method, payment_method, paid_at, payment_date } = req.body;
+        const { amount, amount_paid, method, payment_method, paid_at, payment_date, reference_no, status, is_archived } = req.body;
         const finalAmount = amount_paid !== undefined ? amount_paid : amount;
-        const finalMethod = payment_method || method || 'Cash';
+        const finalMethod = payment_method || method;
         const finalDate = payment_date || paid_at;
 
         const updates = [];
@@ -117,9 +127,21 @@ exports.updatePayment = async (req, res) => {
             updates.push('payment_method = ?');
             params.push(finalMethod);
         }
+        if (reference_no !== undefined) {
+            updates.push('reference_no = ?');
+            params.push((finalMethod === 'Cash') ? '' : String(reference_no).trim());
+        }
         if (finalDate) {
             updates.push('payment_date = ?');
             params.push(finalDate);
+        }
+        if (status) {
+            updates.push('status = ?');
+            params.push(status);
+        }
+        if (is_archived !== undefined) {
+            updates.push('is_archived = ?');
+            params.push(Boolean(is_archived));
         }
 
         if (updates.length === 0) {
@@ -139,10 +161,40 @@ exports.updatePayment = async (req, res) => {
             amount: finalAmount !== undefined ? Number(finalAmount) : undefined,
             payment_method: finalMethod,
             method: finalMethod,
+            reference_no: reference_no,
             payment_date: finalDate,
             paid_at: finalDate,
-            status: 'Paid'
+            status: status || 'Paid',
+            is_archived: is_archived !== undefined ? Boolean(is_archived) : undefined
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.archivePayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query(
+            'UPDATE payments SET is_archived = TRUE WHERE payment_id = ?',
+            [id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Payment not found' });
+        res.json({ success: true, message: 'Payment archived successfully', payment_id: Number(id) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unarchivePayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query(
+            'UPDATE payments SET is_archived = FALSE WHERE payment_id = ?',
+            [id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Payment not found' });
+        res.json({ success: true, message: 'Payment unarchived successfully', payment_id: Number(id) });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
