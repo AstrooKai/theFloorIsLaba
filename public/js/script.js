@@ -23,11 +23,42 @@ const std = (r, k, extra = "") => `<div class="acts">${extra}${btn("edit", r[k],
 const debounce = (f, ms = 150) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 
 function toast(m, err) {
+  let container = $("#toasts");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toasts";
+    container.className = "toasts";
+    document.body.appendChild(container);
+  }
   const t = document.createElement("div");
   t.className = "toast" + (err ? " e" : "");
-  t.innerHTML = err ? `⚠️ ${m}` : `✅ ${m}`;
-  $("#toasts")?.append(t);
-  setTimeout(() => t.remove(), 3500);
+  t.setAttribute("role", "alert");
+  t.setAttribute("aria-live", "assertive");
+
+  const iconSvg = err
+    ? `<span class="toast-icon err"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>`
+    : `<span class="toast-icon ok"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span>`;
+
+  t.innerHTML = `
+    <div class="toast-body-content">
+      ${iconSvg}
+      <span>${esc(m)}</span>
+    </div>
+    <button class="toast-close" type="button" aria-label="Dismiss notification">
+      <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  `;
+
+  const dismiss = () => {
+    t.style.animation = "toastSlideOut 0.25s forwards";
+    setTimeout(() => t.remove(), 250);
+  };
+
+  const closeBtn = t.querySelector(".toast-close");
+  if (closeBtn) closeBtn.addEventListener("click", dismiss);
+
+  container.appendChild(t);
+  setTimeout(dismiss, 5000);
 }
 
 function openModal(el) {
@@ -448,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
       payload: (d) => ({ order_id: +d.order_id, type: d.type, address: d.address.trim(), contact: d.contact, scheduled_date: d.scheduled_date, time_slot: d.time_slot, rider: d.rider, fee: d.fee === "" ? 0 : +d.fee, status: d.status, notes: d.notes }),
       delMsg: () => "Delete run?",
       async act(a, r) {
-        if (a === "start") return r.rider ? patch(r, { status: "On the way" }, "Run started.") : toast("Assign a rider first.", 1);
+        if (a === "start") return r.rider ? patch(r, { status: "On the way" }, "Run started.") : toast("Please assign a rider before starting the run.", 1);
         if (a === "done") return patch(r, { status: "Completed" }, "Run completed.");
         if (a === "cancel" && (await ask("Cancel run?", `Cancel this run?`))) return patch(r, { status: "Cancelled" }, "Run cancelled.");
       }
@@ -482,7 +513,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (a === "add") return openForm();
       if (a === "edit") return openForm(r);
-      if (a === "del" && await ask("Delete?", e.delMsg(r))) { await db.del(e.name, r[e.id]); await init(); }
+      if (a === "del" && await ask("Delete?", e.delMsg(r))) {
+        await db.del(e.name, r[e.id]);
+        const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
+        toast(`${entityLabel} deleted successfully.`);
+        await init();
+      }
       if (e.act) await e.act(a, r);
     });
     $("#view").addEventListener("input", debounce((ev) => { if (ev.target.dataset.flt) draw(); }));
@@ -497,7 +533,11 @@ document.addEventListener("DOMContentLoaded", () => {
       ev.target.querySelectorAll("[data-lock]").forEach((i) => { if (EDIT) d[i.name] = EDIT[i.name]; });
       if (!setErrors(e.validate(d))) return;
       await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
-      closeModal($("#dlg")); toast("Saved."); await init();
+      closeModal($("#dlg"));
+      const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
+      const msg = EDIT ? `${entityLabel} updated successfully.` : `New ${M.one || 'record'} created successfully.`;
+      toast(msg);
+      await init();
     });
   }
 
