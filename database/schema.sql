@@ -11,7 +11,11 @@ CREATE TABLE IF NOT EXISTS customers (
     first_name  VARCHAR(50)  NOT NULL,
     last_name   VARCHAR(50)  NOT NULL,
     phone       VARCHAR(15)  NOT NULL,
+    street      VARCHAR(100) NULL,
+    barangay    VARCHAR(50)  NULL,
     address     VARCHAR(150) NOT NULL,
+    status      VARCHAR(20)  DEFAULT 'Active',
+    is_archived BOOLEAN      DEFAULT FALSE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

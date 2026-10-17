@@ -75,10 +75,46 @@
               </div>       
               <div class="modal-body py-4">         
                 <div class="grid">           
-                  <div class="field full" data-f="full_name"><label>Full Name <span class="req">*</span></label><input name="full_name" class="form-control"></div>           
-                  <div class="field" data-f="contact"><label>Contact</label><input name="contact" class="form-control"></div>           
-                  <div class="field full" data-f="address"><label>Address</label><textarea name="address" class="form-control"></textarea></div>           
-                  <div class="field" data-f="status"><label>Status</label><select name="status" class="form-select"><option>Active</option><option>Inactive</option></select></div>         
+                  <div class="field" data-f="first_name"><label>First Name <span class="req">*</span></label><input name="first_name" class="form-control" required></div>           
+                  <div class="field" data-f="last_name"><label>Last Name <span class="req">*</span></label><input name="last_name" class="form-control" required></div>           
+                  <div class="field full" data-f="contact"><label>Contact Number <span class="req">*</span></label><input name="contact" class="form-control" placeholder="0917XXXXXXX" required></div>           
+                  <div class="field" data-f="street"><label>Street Address <span class="req">*</span></label><input name="street" class="form-control" placeholder="House/Unit #, Street Name" required></div>           
+                  <div class="field" data-f="barangay"><label>Barangay <span class="req">*</span></label>
+                    <select name="barangay" class="form-select" required>
+                      <option value="">Select Barangay</option>
+                      <option value="Baclaran">Baclaran</option>
+                      <option value="Banay-banay">Banay-banay</option>
+                      <option value="Banlic">Banlic</option>
+                      <option value="Bigaa">Bigaa</option>
+                      <option value="Buting">Buting</option>
+                      <option value="Casile">Casile</option>
+                      <option value="Diezmo">Diezmo</option>
+                      <option value="Gulod">Gulod</option>
+                      <option value="Mamatid">Mamatid</option>
+                      <option value="Marinig">Marinig</option>
+                      <option value="Niugan">Niugan</option>
+                      <option value="Pittland">Pittland</option>
+                      <option value="Poblacion I">Poblacion I</option>
+                      <option value="Poblacion II">Poblacion II</option>
+                      <option value="Poblacion III">Poblacion III</option>
+                      <option value="Pulo">Pulo</option>
+                      <option value="Sala">Sala</option>
+                      <option value="San Isidro">San Isidro</option>
+                    </select>
+                  </div>           
+                  <div class="field full" data-f="status">
+                    <label class="d-block mb-2">Account Status</label>
+                    <div class="d-flex gap-4 pt-1">
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="status" id="custStatusActive" value="Active" checked>
+                        <label class="form-check-label fw-medium" for="custStatusActive">Active</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="status" id="custStatusInactive" value="Inactive">
+                        <label class="form-check-label fw-medium" for="custStatusInactive">Inactive</label>
+                      </div>
+                    </div>
+                  </div>         
                 </div>       
               </div>       
               <div class="modal-footer border-0 pt-0">

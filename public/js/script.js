@@ -426,11 +426,52 @@ document.addEventListener("DOMContentLoaded", () => {
   const ENT = {
     customers: {
       name: "customers", id: "customer_id",
+      init: (f) => {
+        if (EDIT) {
+          if (EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
+          if (EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
+          if (EDIT.phone || EDIT.contact) f.elements.contact.value = EDIT.phone || EDIT.contact;
+          if (EDIT.street) f.elements.street.value = EDIT.street;
+          else if (EDIT.address) f.elements.street.value = EDIT.address;
+          if (EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
+          if (EDIT.status) f.elements.status.value = EDIT.status;
+        } else {
+          f.elements.status.value = "Active";
+        }
+      },
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.address||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
-      draw: (list) => list.map((c) => `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact)}</td><td>${esc(c.address)}</td><td><span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span></td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${c.customer_id}" type="button">Delete</button></div></td></tr>`).join(""),
-      validate(d) { const e = {}; if (!d.full_name) e.full_name = "Required"; return e; },
-      payload: (d) => ({ full_name: d.full_name, contact: d.contact, address: d.address, status: d.status || "Active" }),
-      delMsg: (r) => `Delete customer ${r.full_name}?`
+      draw: (list) => list.map((c) => `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact || c.phone)}</td><td>${esc(c.address || `${c.street || ''}, ${c.barangay || ''}`)}</td><td><span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span></td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${c.customer_id}" type="button">Archive</button></div></td></tr>`).join(""),
+      validate(d) {
+        const e = {};
+        if (!d.first_name) e.first_name = "First name is required";
+        if (!d.last_name) e.last_name = "Last name is required";
+        if (!d.contact) e.contact = "Contact number is required";
+        if (!d.street) e.street = "Street address is required";
+        if (!d.barangay) e.barangay = "Please select a barangay";
+        return e;
+      },
+      payload: (d) => ({
+        first_name: d.first_name,
+        last_name: d.last_name,
+        full_name: `${d.first_name || ''} ${d.last_name || ''}`.trim(),
+        phone: d.contact,
+        contact: d.contact,
+        street: d.street,
+        barangay: d.barangay,
+        address: `${d.street || ''}, ${d.barangay || ''}`.trim(),
+        status: d.status || "Active"
+      }),
+      delMsg: (r) => `Archive customer ${r.full_name}?`,
+      async act(a, r) {
+        if (a === "archive") {
+          if (await ask("Archive Customer?", `Archive customer "${r.full_name}"? Their profile will be deactivated.`, "Archive")) {
+            const res = await fetch(`/api/customers/${r.customer_id}/archive`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to archive customer");
+            toast(`Customer "${r.full_name}" archived successfully.`);
+            await init();
+          }
+        }
+      }
     },
     orders: {
       name: "orders", id: "order_id",

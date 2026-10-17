@@ -6,6 +6,8 @@ router.get('/', customers.getAllCustomers);
 router.get('/:id', customers.getCustomerById);
 router.post('/', customers.createCustomer);
 router.put('/:id', customers.updateCustomer);
+router.put('/:id/archive', customers.archiveCustomer);
+router.put('/:id/unarchive', customers.unarchiveCustomer);
 router.delete('/:id', customers.deleteCustomer);
 
 module.exports = router;
