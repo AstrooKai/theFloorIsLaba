@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS staff (
     email      VARCHAR(100) NOT NULL UNIQUE,
     password   VARCHAR(255) NOT NULL,
     phone      VARCHAR(15),
+    status     VARCHAR(20)  DEFAULT 'Active',
+    is_archived BOOLEAN     DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

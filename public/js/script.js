@@ -261,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id" };
+const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id", staff: "staff_id" };
 
 const getAuthHeaders = () => {
   const staff = JSON.parse(sessionStorage.getItem("current_staff") || "{}");
@@ -479,6 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (cur === "orders" && !isCashierMgr) addBtn.style.display = "none";
       if (cur === "deliveries" && !isCashierMgr) addBtn.style.display = "none";
       if (cur === "customers" && !isCashierMgr) addBtn.style.display = "none";
+      if (cur === "staff" && !isMgr) addBtn.style.display = "none";
     }
 
     if (cur === "payments" && !isMgr) {
@@ -966,6 +967,70 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }
+    },
+    staff: {
+      name: "staff", id: "staff_id", defaults: () => ({ role: "Cashier", status: "Active" }),
+      filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + r.email + " " + (r.phone || "") + " " + r.role).toLowerCase().includes(f.q)) && (!f.role || r.role.toLowerCase() === f.role) && (!f.st || (r.status || "Active").toLowerCase() === f.st)).sort((a, b) => a.staff_id - b.staff_id),
+      draw: (list) => {
+        const isMgr = isManager();
+        return list.map((s) => {
+          const roleBadgeCls = s.role === "Manager" ? "ok" : s.role === "Rider" ? "info" : s.role === "Cashier" ? "warn" : "mute";
+          const statusCls = (s.status || "Active") === "Active" ? "ok" : "mute";
+          const statusBadge = isMgr
+            ? `<span class="badge status-clickable ${statusCls}" data-act="quick-status" data-id="${s.staff_id}" data-current="${esc(s.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(s.status || "Active")}</span>`
+            : `<span class="badge ${statusCls}">${esc(s.status || "Active")}</span>`;
+          const editBtn = isMgr ? `<button class="btn sm" data-act="edit" data-id="${s.staff_id}" type="button">Edit</button>` : "";
+          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${s.staff_id}" type="button">Archive</button>` : "";
+          const acts = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">View only</span>`;
+          return `<tr><td><strong>#${s.staff_id}</strong></td><td><strong>${esc(s.full_name || `${s.first_name} ${s.last_name || ''}`)}</strong></td><td><span class="badge ${roleBadgeCls}">${esc(s.role)}</span></td><td>${esc(s.email)}</td><td>${esc(s.phone || '—')}</td><td>${statusBadge}</td><td>${acts}</td></tr>`;
+        }).join("");
+      },
+      init: (f) => {
+        const pwdHelp = $("#pwdHelp");
+        if (pwdHelp) pwdHelp.textContent = EDIT ? "Leave blank to keep existing password." : "Default password if blank: admin123";
+        if (EDIT) {
+          if (EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
+          if (EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
+          if (EDIT.role) f.elements.role.value = EDIT.role;
+          if (EDIT.email) f.elements.email.value = EDIT.email;
+          if (EDIT.phone) f.elements.phone.value = EDIT.phone;
+          if (EDIT.status) f.elements.status.value = EDIT.status;
+          if (f.elements.password) f.elements.password.value = "";
+        }
+      },
+      validate(d) {
+        const e = {};
+        if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
+        if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
+        if (!d.email || !d.email.trim()) e.email = "Email is required";
+        if (!d.role) e.role = "Role is required";
+        return e;
+      },
+      payload: (d) => {
+        const data = {
+          first_name: (d.first_name || "").trim(),
+          last_name: (d.last_name || "").trim(),
+          role: d.role || "Cashier",
+          email: (d.email || "").trim().toLowerCase(),
+          phone: (d.phone || "").trim(),
+          status: d.status || "Active"
+        };
+        if (d.password && d.password.trim()) {
+          data.password = d.password.trim();
+        }
+        return data;
+      },
+      delMsg: (r) => `Archive staff account for ${r.full_name}?`,
+      async act(a, r) {
+        if (a === "archive") {
+          if (await ask("Archive Staff Member?", `Archive staff account for "${r.full_name}" (${r.role})? The account will be deactivated without affecting historical order records.`, "Archive")) {
+            const res = await fetch(`/api/staff/${r.staff_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to archive staff");
+            toast(`Staff account "${r.full_name}" archived successfully.`);
+            await init();
+          }
+        }
+      }
     }
   };
 
@@ -991,6 +1056,17 @@ document.addEventListener("DOMContentLoaded", () => {
           const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
           if (await ask("Change Customer Status", `Update status for "${r.full_name}" to "${next}"?`, "Update Status")) {
             await patch(r, { status: next }, `Customer status updated to ${next}.`);
+          }
+          return;
+        }
+        if (cur === "staff") {
+          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
+          const actWord = next === "Inactive" ? "Deactivate" : "Activate";
+          if (await ask(`${actWord} Staff Account?`, `${actWord} account for "${r.full_name}"? ${next === 'Inactive' ? 'They will not be able to log in until reactivated.' : 'They will be able to log in.'}`, actWord)) {
+            const res = await fetch(`/api/staff/${r.staff_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to update staff status");
+            toast(`Staff member "${r.full_name}" status updated to ${next}.`);
+            await init();
           }
           return;
         }
