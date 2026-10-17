@@ -405,6 +405,25 @@ document.addEventListener("DOMContentLoaded", () => {
   if (loginForm) {
     const showToggle = loginForm.querySelector(".form-group span");
     const passInput = loginForm.querySelector('input[type="password"]');
+    const emailInput = loginForm.querySelector('input[type="email"]');
+    const errorEl = document.getElementById("loginError");
+
+    const clearError = () => {
+      if (errorEl) {
+        errorEl.textContent = "";
+        errorEl.style.display = "none";
+      }
+    };
+
+    if (emailInput) {
+      emailInput.addEventListener("input", clearError);
+      emailInput.addEventListener("focus", clearError);
+    }
+    if (passInput) {
+      passInput.addEventListener("input", clearError);
+      passInput.addEventListener("focus", clearError);
+    }
+
     if (showToggle && passInput) {
       showToggle.addEventListener("click", () => {
         const isPass = passInput.type === "password";
@@ -415,7 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loginForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      const emailInput = loginForm.querySelector('input[type="email"]');
+      clearError();
       const email = emailInput ? emailInput.value.trim() : "";
       const password = passInput ? passInput.value : "";
       try {
@@ -429,7 +448,12 @@ document.addEventListener("DOMContentLoaded", () => {
         sessionStorage.setItem("current_staff", JSON.stringify(data.staff));
         window.location.href = "dashboard.html";
       } catch (err) {
-        alert(err.message);
+        if (errorEl) {
+          errorEl.textContent = err.message;
+          errorEl.style.display = "block";
+        } else {
+          toast(err.message, 1);
+        }
       }
     });
   }
