@@ -64,6 +64,12 @@ function enforceAuthAndRouteGuards() {
 }
 
 enforceAuthAndRouteGuards();
+const getStaffRole = () => (JSON.parse(sessionStorage.getItem("current_staff") || "{}").role || "Manager").toLowerCase();
+const isManager = () => getStaffRole() === "manager";
+const isCashierOrManager = () => ["cashier", "manager"].includes(getStaffRole());
+const isProductionStaff = () => ["washer", "folder"].includes(getStaffRole());
+const isRider = () => getStaffRole() === "rider";
+
 const peso = (n) => "₱" + Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const iso = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
@@ -78,7 +84,8 @@ const orderStatusBadge = (st, id) => {
   const cls = (s === "Completed") ? "ok"
     : (s === "Washing" || s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
     : "mute";
-  if (id) {
+  const canAdvance = isCashierOrManager() || (isProductionStaff() && (s === "Received" || s === "Washing"));
+  if (id && canAdvance) {
     return `<span class="badge status-clickable ${cls}" data-act="quick-status" data-id="${id}" data-current="${esc(s)}" role="button" tabindex="0" title="Click to advance status">${esc(s)}</span>`;
   }
   return badge(s, cls);
@@ -460,12 +467,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function applyActionPermissions() {
+    const role = getStaffRole();
+    const isMgr = role === "manager";
+    const isCashierMgr = ["cashier", "manager"].includes(role);
+
+    const addBtn = $("#addBtn");
+    if (addBtn) {
+      if (cur === "services" && !isMgr) addBtn.style.display = "none";
+      if (cur === "payments" && !isCashierMgr) addBtn.style.display = "none";
+      if (cur === "orders" && !isCashierMgr) addBtn.style.display = "none";
+      if (cur === "deliveries" && !isCashierMgr) addBtn.style.display = "none";
+      if (cur === "customers" && !isCashierMgr) addBtn.style.display = "none";
+    }
+
+    if (cur === "payments" && !isMgr) {
+      const statsEl = $(".stats");
+      if (statsEl) statsEl.style.display = "none";
+    }
+  }
+
   function draw() {
     const e = ENT[cur], list = e.filter(S.rows, flt());
     if($("#count")) $("#count").textContent = `Showing ${list.length} of ${S.rows.length} ${M.noun || ''}`;
     if (e.stats) { const st = e.stats(list); document.querySelectorAll("[data-stat]").forEach((el) => (el.textContent = st[el.dataset.stat] || 0)); }
     if($("#out")) $("#out").innerHTML = e.draw(list);
     if($("#list")) $("#list").hidden = !list.length;
+    applyActionPermissions();
     initTablesSorting();
   }
 
@@ -514,7 +542,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.address||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
-      draw: (list) => list.map((c) => `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact || c.phone)}</td><td>${esc(c.address || `${c.street || ''}, ${c.barangay || ''}`)}</td><td><span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span></td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${c.customer_id}" type="button">Archive</button></div></td></tr>`).join(""),
+      draw: (list) => {
+        const isMgr = isManager();
+        const isCashierMgr = isCashierOrManager();
+        return list.map((c) => {
+          const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button>` : "";
+          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${c.customer_id}" type="button">Archive</button>` : "";
+          const acts = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">View only</span>`;
+          const statusBadge = isCashierMgr
+            ? `<span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span>`
+            : `<span class="badge ${c.status === "Inactive" ? "mute" : "ok"}">${esc(c.status || "Active")}</span>`;
+          return `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact || c.phone)}</td><td>${esc(c.address || `${c.street || ''}, ${c.barangay || ''}`)}</td><td>${statusBadge}</td><td>${acts}</td></tr>`;
+        }).join("");
+      },
       validate(d) {
         const e = {};
         if (!d.first_name) e.first_name = "First name is required";
@@ -592,7 +632,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button></div></td></tr>`).join(""),
+      draw: (list) => {
+        const isMgr = isManager();
+        const isCashierMgr = isCashierOrManager();
+        return list.map((o) => {
+          const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
+          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
+          const actsHtml = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">Production</span>`;
+          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
+        }).join("");
+      },
       validate(d) {
         const e = {};
         if (!d.first_name) e.first_name = "First name is required";
@@ -666,12 +715,22 @@ document.addEventListener("DOMContentLoaded", () => {
     services: {
       name: "services", id: "service_id",
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.service_name + " " + (r.description || '')).toLowerCase().includes(f.q)) && (!f.cat || (r.category || '').toLowerCase() === f.cat) && (!f.st || (r.status || '').toLowerCase() === f.st)).sort((a, b) => a.service_name.localeCompare(b.service_name)),
-      draw: (list) => list.map((r) => {
-        const toggleBtn = (r.status || "Active") === "Active"
-          ? `<button class="btn sm btn-outline-danger" data-act="toggle-status" data-id="${r.service_id}" type="button">Disable</button>`
-          : `<button class="btn sm btn-outline-success" data-act="toggle-status" data-id="${r.service_id}" type="button">Enable</button>`;
-        return `<tr><td><strong>${esc(r.service_name)}</strong>${r.description ? `<span class="sub">${esc(r.description)}</span>` : ""}</td><td>${esc(r.category || 'Wash & fold')}</td><td class="num">${peso(r.price || r.price_per_kg)}<span class="sub">per ${esc(r.unit || 'kg')}</span></td><td class="num">${hrs(r.turnaround_hours || 24)}</td><td><span class="badge status-clickable ${(r.status || "Active") === "Active" ? "ok" : "mute"}" data-act="quick-status" data-id="${r.service_id}" data-current="${esc(r.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(r.status || "Active")}</span></td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${r.service_id}" type="button">Edit</button>${toggleBtn}</div></td></tr>`;
-      }).join(""),
+      draw: (list) => {
+        const isMgr = isManager();
+        return list.map((r) => {
+          const toggleBtn = isMgr
+            ? ((r.status || "Active") === "Active"
+              ? `<button class="btn sm btn-outline-danger" data-act="toggle-status" data-id="${r.service_id}" type="button">Disable</button>`
+              : `<button class="btn sm btn-outline-success" data-act="toggle-status" data-id="${r.service_id}" type="button">Enable</button>`)
+            : "";
+          const editBtn = isMgr ? `<button class="btn sm" data-act="edit" data-id="${r.service_id}" type="button">Edit</button>` : "";
+          const actsHtml = (editBtn || toggleBtn) ? `<div class="acts">${editBtn}${toggleBtn}</div>` : `<span class="text-muted small">Read only</span>`;
+          const badgeHtml = isMgr
+            ? `<span class="badge status-clickable ${(r.status || "Active") === "Active" ? "ok" : "mute"}" data-act="quick-status" data-id="${r.service_id}" data-current="${esc(r.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(r.status || "Active")}</span>`
+            : `<span class="badge ${(r.status || "Active") === "Active" ? "ok" : "mute"}">${esc(r.status || "Active")}</span>`;
+          return `<tr><td><strong>${esc(r.service_name)}</strong>${r.description ? `<span class="sub">${esc(r.description)}</span>` : ""}</td><td>${esc(r.category || 'Wash & fold')}</td><td class="num">${peso(r.price || r.price_per_kg)}<span class="sub">per ${esc(r.unit || 'kg')}</span></td><td class="num">${hrs(r.turnaround_hours || 24)}</td><td>${badgeHtml}</td><td>${actsHtml}</td></tr>`;
+        }).join("");
+      },
       validate(d) {
         const e = {};
         if (!d.service_name || !d.service_name.trim()) e.service_name = "Service name is required";
@@ -735,7 +794,21 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       filter: (rows, f) => rows.filter((p) => (!f.q || `${nameOf(p)} ${ord(p.order_id)} ${p.order_id} ${p.reference_no || ''}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
       stats: (list) => Object.fromEntries(["Paid", "Pending", "Refunded"].map((s) => [s, peso(list.filter((p) => p.status === s).reduce((n, p) => n + Number(p.amount), 0))])),
-      draw: (list) => list.map((p) => `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td><div class="acts">${p.status === "Pending" ? btn("paid", p.payment_id, "Mark paid", "btn-success") : ""}<button class="btn sm" data-act="edit" data-id="${p.payment_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${p.payment_id}" type="button">Archive</button></div></td></tr>`).join(""),
+      draw: (list) => {
+        const isMgr = isManager();
+        const isCashierMgr = isCashierOrManager();
+        const isProdOrRider = isProductionStaff() || isRider();
+        return list.map((p) => {
+          if (isProdOrRider) {
+            return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td><span class="text-muted small">View only</span></td></tr>`;
+          }
+          const paidBtn = (p.status === "Pending" && isCashierMgr) ? btn("paid", p.payment_id, "Mark paid", "btn-success") : "";
+          const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${p.payment_id}" type="button">Edit</button>` : "";
+          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${p.payment_id}" type="button">Archive</button>` : "";
+          const actsHtml = (paidBtn || editBtn || archiveBtn) ? `<div class="acts">${paidBtn}${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">View only</span>`;
+          return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td>${actsHtml}</td></tr>`;
+        }).join("");
+      },
       validate(d) {
         const e = {};
         if (!d.order_id) e.order_id = "Required";
@@ -816,20 +889,39 @@ document.addEventListener("DOMContentLoaded", () => {
           if (f.elements.barangay && (!f.elements.barangay.value || !EDIT) && o.barangay) f.elements.barangay.value = o.barangay;
         }
       },
-      filter: (rows, f) => rows.filter((r) => (!f.q || `${nameOf(r)} ${ord(r.order_id)} ${r.address} ${r.rider}`.toLowerCase().includes(f.q)) && (!f.type || r.type.toLowerCase() === f.type) && (!f.rider || (r.rider && r.rider.toLowerCase() === f.rider)) && (!f.st || r.status.toLowerCase() === f.st) && (!f.date || r.scheduled_date === f.date)).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date) || slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot)),
+      filter: (rows, f) => {
+        const staff = JSON.parse(sessionStorage.getItem("current_staff") || "{}");
+        const isR = isRider();
+        return rows.filter((r) => {
+          if (isR) {
+            const staffName = (staff.full_name || `${staff.first_name || ''} ${staff.last_name || ''}`).trim().toLowerCase();
+            const rRider = (r.rider || "").toLowerCase();
+            const matchesId = staff.staff_id && Number(r.rider_id) === Number(staff.staff_id);
+            const matchesName = staffName && rRider && rRider === staffName;
+            if (!matchesId && !matchesName) return false;
+          }
+          return (!f.q || `${nameOf(r)} ${ord(r.order_id)} ${r.address} ${r.rider}`.toLowerCase().includes(f.q)) && (!f.type || r.type.toLowerCase() === f.type) && (!f.rider || (r.rider && r.rider.toLowerCase() === f.rider)) && (!f.st || r.status.toLowerCase() === f.st) && (!f.date || r.scheduled_date === f.date);
+        }).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date) || slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot));
+      },
       stats() { const all = ENT.deliveries.filter(S.rows, { ...flt(), st: "" }); return Object.fromEntries(["Scheduled", "On the way", "Completed", "Cancelled"].map((s) => [s, all.filter((r) => r.status === s).length])); },
       draw(list) {
+        const isMgr = isManager();
+        const isCashierMgr = isCashierOrManager();
+        const isR = isRider();
         const g = {}; list.forEach((r) => (g[r.scheduled_date] ||= []).push(r));
         const label = (d) => d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
         return Object.keys(g).sort().map((d) => `<section class="day"><h2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
           const act = r.status === "Scheduled" || r.status === "On the way";
-          const startBtn = r.status === "Scheduled" ? btn("start", r.delivery_id, "Start run", "btn-warning") : "";
-          const doneBtn = r.status === "On the way" ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
-          const editBtn = (r.status !== "Completed" && r.status !== "Cancelled") ? btn("edit", r.delivery_id, "Edit") : "";
-          const cancelBtn = act ? btn("cancel", r.delivery_id, "Cancel run", "btn-danger") : "";
-          const archiveBtn = r.status === "Completed" ? btn("archive", r.delivery_id, "Archive", "btn-outline-secondary") : "";
+          const startBtn = (r.status === "Scheduled" && (isCashierMgr || isR)) ? btn("start", r.delivery_id, "Start run", "btn-warning") : "";
+          const doneBtn = (r.status === "On the way" && (isCashierMgr || isR)) ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
+          const editBtn = ((r.status !== "Completed" && r.status !== "Cancelled") && isCashierMgr) ? btn("edit", r.delivery_id, "Edit") : "";
+          const cancelBtn = (act && isCashierMgr) ? btn("cancel", r.delivery_id, "Cancel run", "btn-danger") : "";
+          const archiveBtn = (r.status === "Completed" && isMgr) ? btn("archive", r.delivery_id, "Archive", "btn-outline-secondary") : "";
+          const acts = (startBtn || doneBtn || editBtn || cancelBtn || archiveBtn)
+            ? `${startBtn}${doneBtn}${editBtn}${cancelBtn}${archiveBtn}`
+            : `<span class="text-muted small">View only</span>`;
           const displayAddress = r.street && r.barangay ? `${r.street}, ${r.barangay}` : (r.address || "Cabuyao, Laguna");
-          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${esc(r.type)}</span></div><div class="tm"><div class="tt"><strong>${esc(r.customer_name || nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(displayAddress)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b></span></div><div class="acts" style="justify-content:flex-start">${startBtn}${doneBtn}${editBtn}${cancelBtn}${archiveBtn}</div></div></article>`;
+          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${esc(r.type)}</span></div><div class="tm"><div class="tt"><strong>${esc(r.customer_name || nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(displayAddress)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b></span></div><div class="acts" style="justify-content:flex-start">${acts}</div></div></article>`;
         }).join("")}</section>`).join("");
       },
       validate(d) {
@@ -903,8 +995,21 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (cur === "orders" || cur === "history") {
-          const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
           const curr = r.order_status || "Received";
+          if (isProductionStaff()) {
+            if (curr !== "Received" && curr !== "Washing") {
+              return toast("Washers and Folders can only update orders up to 'Ready for Pickup'.", 1);
+            }
+            const next = curr === "Received" ? "Washing" : "Ready for Pickup";
+            if (await ask("Update Order Status", `Advance Order #${ord(r.order_id)} from "${curr}" to "${next}"?`, "Update Status")) {
+              await patch(r, { order_status: next }, `Order #${ord(r.order_id)} status updated to ${next}.`);
+            }
+            return;
+          }
+          if (isRider()) {
+            return toast("Riders update order status via Pickup & Delivery runs.", 1);
+          }
+          const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
           const idx = steps.indexOf(curr);
           const next = steps[(idx + 1) % steps.length];
           if (await ask("Update Order Status", `Advance Order #${ord(r.order_id)} from "${curr}" to "${next}"?`, "Update Status")) {
@@ -984,6 +1089,30 @@ document.addEventListener("DOMContentLoaded", () => {
               if (!b) return;
               const orderId = b.dataset.id;
               const curr = b.dataset.current || "Received";
+              if (isProductionStaff()) {
+                if (curr !== "Received" && curr !== "Washing") {
+                  return toast("Washers and Folders can only update orders up to 'Ready for Pickup'.", 1);
+                }
+                const next = curr === "Received" ? "Washing" : "Ready for Pickup";
+                if (await ask("Update Order Status", `Advance Order #${ord(orderId)} from "${curr}" to "${next}"?`, "Update Status")) {
+                  try {
+                    const res = await fetch(`/api/orders/${orderId}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+                      body: JSON.stringify({ order_status: next })
+                    });
+                    if (!res.ok) throw new Error("Failed to update status");
+                    toast(`Order #${ord(orderId)} status updated to ${next}.`);
+                    await initDashboard();
+                  } catch (err) {
+                    toast(err.message, 1);
+                  }
+                }
+                return;
+              }
+              if (isRider()) {
+                return toast("Riders update order status via Pickup & Delivery runs.", 1);
+              }
               const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
               const idx = steps.indexOf(curr);
               const next = steps[(idx + 1) % steps.length];
@@ -991,7 +1120,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 try {
                   const res = await fetch(`/api/orders/${orderId}`, {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
                     body: JSON.stringify({ order_status: next })
                   });
                   if (!res.ok) throw new Error("Failed to update status");
