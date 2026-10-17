@@ -180,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (confirmSignOut) {
     confirmSignOut.addEventListener("click", () => {
       sessionStorage.removeItem("current_staff");
-      window.location.href = "staff-login.html";
+      window.location.href = "/login";
     });
   }
   const cancelSignOut = $("#cancelSignOut");

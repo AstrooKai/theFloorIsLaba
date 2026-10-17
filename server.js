@@ -12,6 +12,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Redirect old /staff-login.html to clean route /login
+app.get('/staff-login.html', (req, res) => {
+    res.redirect(301, '/login');
+});
+
+// Clean route for Staff Login
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'staff-login.html'));
+});
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, 'public')));
 
