@@ -1,5 +1,69 @@
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const ROLE_PERMISSIONS = {
+  manager: ["dashboard.html", "customers.html", "orders.html", "services.html", "payments.html", "pickup-delivery.html", "history.html", "staff.html"],
+  cashier: ["dashboard.html", "customers.html", "orders.html", "payments.html", "pickup-delivery.html", "history.html"],
+  washer: ["dashboard.html", "orders.html"],
+  folder: ["dashboard.html", "orders.html"],
+  rider: ["dashboard.html", "pickup-delivery.html", "orders.html"]
+};
+
+const ROLE_DEFAULT_PAGES = {
+  manager: "dashboard.html",
+  cashier: "dashboard.html",
+  washer: "orders.html",
+  folder: "orders.html",
+  rider: "pickup-delivery.html"
+};
+
+function enforceAuthAndRouteGuards() {
+  const path = window.location.pathname;
+  let page = path.split("/").pop();
+  if (!page || page === "") page = "index.html";
+
+  const WORKSPACE_PAGES = ["dashboard.html", "orders.html", "customers.html", "payments.html", "services.html", "pickup-delivery.html", "history.html", "staff.html"];
+  const isWorkspace = WORKSPACE_PAGES.includes(page);
+  const isLoginPage = (page === "login" || page === "staff-login.html" || path.endsWith("/login"));
+  const isLandingPage = (page === "index.html" || path === "/" || path === "");
+
+  const currentStaff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+
+  if (!currentStaff && isWorkspace) {
+    sessionStorage.setItem("auth_redirect_msg", "Please sign in to access the staff workspace.");
+    window.location.replace("/login");
+    return false;
+  }
+
+  if (currentStaff && (isLoginPage || isLandingPage)) {
+    const role = (currentStaff.role || "Manager").toLowerCase();
+    const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+    window.location.replace(target);
+    return false;
+  }
+
+  if (currentStaff && isWorkspace) {
+    const role = (currentStaff.role || "Manager").toLowerCase();
+    const permitted = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.manager;
+
+    if (!permitted.includes(page)) {
+      const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+      sessionStorage.setItem("auth_redirect_msg", `Access restricted: Your role (${currentStaff.role}) does not have permission to view ${page}. Redirected to your authorized workspace.`);
+      window.location.replace(target);
+      return false;
+    }
+  }
+
+  const redirectMsg = sessionStorage.getItem("auth_redirect_msg");
+  if (redirectMsg) {
+    sessionStorage.removeItem("auth_redirect_msg");
+    setTimeout(() => toast(redirectMsg, 1), 300);
+  }
+
+  return true;
+}
+
+enforceAuthAndRouteGuards();
 const peso = (n) => "₱" + Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const iso = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
@@ -993,7 +1057,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Login failed");
         sessionStorage.setItem("current_staff", JSON.stringify(data.staff));
-        window.location.href = "dashboard.html";
+        const role = (data.staff.role || "Manager").toLowerCase();
+        const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+        window.location.href = target;
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = err.message;
@@ -1005,16 +1071,37 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Display logged in staff in sidebar
-  const currentStaff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
-  if (currentStaff) {
+  function applyRoleNavVisibility() {
+    const staff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+    if (!staff) return;
+    const role = (staff.role || "Manager").toLowerCase();
+    const permitted = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.manager;
+
+    document.querySelectorAll(".side-nav a").forEach(link => {
+      const href = link.getAttribute("href");
+      if (!href) return;
+      const targetPage = href.split("/").pop();
+      if (permitted.includes(targetPage)) {
+        link.style.display = "";
+      } else {
+        link.style.display = "none";
+      }
+    });
+
+    document.querySelectorAll(".nav-group").forEach(group => {
+      const visibleLinks = Array.from(group.querySelectorAll(".side-nav a")).filter(a => a.style.display !== "none");
+      group.style.display = visibleLinks.length > 0 ? "" : "none";
+    });
+
     const nameEl = document.querySelector(".user-profile div div:first-child");
     const roleEl = document.querySelector(".user-profile div div:last-child");
     const avatarEl = document.querySelector(".user-profile .avatar");
-    if (nameEl) nameEl.textContent = currentStaff.full_name || currentStaff.first_name;
-    if (roleEl) roleEl.textContent = currentStaff.role || "Active Staff";
-    if (avatarEl) avatarEl.textContent = (currentStaff.first_name || "A")[0].toUpperCase();
+    if (nameEl) nameEl.textContent = staff.full_name || staff.first_name || "Staff Member";
+    if (roleEl) roleEl.textContent = staff.role || "Active Staff";
+    if (avatarEl) avatarEl.textContent = (staff.first_name || "A")[0].toUpperCase();
   }
+
+  applyRoleNavVisibility();
 
   if (ENT[cur]) init(true);
   if (cur === "dashboard") initDashboard();
