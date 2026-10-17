@@ -21,6 +21,8 @@ exports.getAllOrders = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
+                MAX(oi.service_id) AS service_id,
+                COALESCE(SUM(oi.weight_kg), 1.00) AS weight_kg,
                 COALESCE(SUM(oi.subtotal), 0) AS total_amount,
                 COALESCE(SUM(oi.subtotal), 0) AS total,
                 COALESCE(pay.total_paid, 0) AS total_paid,
@@ -313,8 +315,16 @@ exports.updateOrder = async (req, res) => {
             }
         }
 
-        // Update item total if specified
-        if (total !== undefined) {
+        // Update order items if specified
+        if (Array.isArray(req.body.items) && req.body.items.length > 0) {
+            await conn.query('DELETE FROM order_items WHERE order_id = ?', [id]);
+            for (const item of req.body.items) {
+                await conn.query(
+                    'INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES (?, ?, ?, ?)',
+                    [id, item.service_id, item.weight_kg, item.subtotal]
+                );
+            }
+        } else if (total !== undefined) {
             await conn.query(
                 'UPDATE order_items SET subtotal = ? WHERE order_id = ? LIMIT 1',
                 [Number(total), id]

@@ -234,7 +234,7 @@ const db = {
 document.addEventListener("DOMContentLoaded", () => {
   const cur = document.body.dataset.page;
   const M = $("#view") ? $("#view").dataset : {};
-  const S = { rows: [], orders: [], riders: [] };
+  const S = { rows: [], orders: [], riders: [], services: [] };
   let EDIT = null, feeTouched = false;
 
   const orderOf = (id) => S.orders.find((o) => o.order_id == id) || {};
@@ -245,8 +245,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function fillSelects() {
     document.querySelectorAll("select[data-fill]").forEach((sel) => {
       const k = sel.dataset.fill;
-      const opts = k === "riders" ? S.riders.map((r) => [r.full_name, r.full_name]) : S.orders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
-      sel.innerHTML = `<option value="">Choose ${k.includes('riders') ? 'rider' : 'order'}</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+      if (k === "services") {
+        const active = (S.services || []).filter(s => (s.status || "Active").toLowerCase() === "active");
+        sel.innerHTML = `<option value="">Choose service</option>` + active.map(s => `<option value="${s.service_id}" data-price="${s.price || s.price_per_kg}" data-unit="${esc(s.unit || 'kg')}">${esc(s.service_name)} (${peso(s.price || s.price_per_kg)}/${esc(s.unit || 'kg')})</option>`).join("");
+      } else {
+        const opts = k === "riders" ? S.riders.map((r) => [r.full_name, r.full_name]) : S.orders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
+        sel.innerHTML = `<option value="">Choose ${k.includes('riders') ? 'rider' : 'order'}</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+      }
     });
   }
 
@@ -254,7 +259,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!ENT[cur]) return;
     try {
       S.rows = await db.list(ENT[cur].name);
-      if (first) { [S.orders, S.riders] = await Promise.all([db.list("orders"), db.list("riders")]); fillSelects(); }
+      if (first) {
+        [S.orders, S.riders, S.services] = await Promise.all([
+          db.list("orders"),
+          db.list("riders"),
+          db.list("services").catch(() => [])
+        ]);
+        fillSelects();
+      }
       draw();
     } catch (err) {
       toast("Error loading data: " + err.message, 1);
@@ -422,10 +434,67 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     orders: {
       name: "orders", id: "order_id",
+      defaults: () => ({ order_date: today(), weight_kg: "1.0", release_type: "Pickup", order_status: "Received" }),
+      init: (f) => {
+        fillSelects();
+        if (EDIT) {
+          if (f.elements.service_id && EDIT.service_id) f.elements.service_id.value = EDIT.service_id;
+          if (f.elements.weight_kg) f.elements.weight_kg.value = EDIT.weight_kg || "1.0";
+          if (f.elements.release_type && EDIT.release_type) f.elements.release_type.value = EDIT.release_type;
+        } else {
+          if (f.elements.service_id && !f.elements.service_id.value) {
+            const firstOpt = f.elements.service_id.options[1];
+            if (firstOpt) f.elements.service_id.value = firstOpt.value;
+          }
+        }
+        ENT.orders.calcTotal();
+      },
+      change(e) {
+        if (e.target.name === "service_id" || e.target.name === "weight_kg") {
+          ENT.orders.calcTotal();
+        }
+      },
+      calcTotal() {
+        const f = $("#form");
+        if (!f || !f.elements.service_id || !f.elements.weight_kg || !f.elements.total) return;
+        const sel = f.elements.service_id;
+        const opt = sel.selectedOptions ? sel.selectedOptions[0] : null;
+        const price = opt && opt.dataset.price ? Number(opt.dataset.price) : 0;
+        const unit = opt && opt.dataset.unit ? opt.dataset.unit : "kg";
+        const unitLbl = $("#serviceUnitLabel");
+        if (unitLbl) unitLbl.innerHTML = `Quantity / Weight (${esc(unit)}) <span class="req">*</span>`;
+        const weight = Number(f.elements.weight_kg.value) || 0;
+        const total = Math.round(price * weight * 100) / 100;
+        if (price > 0 && weight > 0) {
+          f.elements.total.value = total.toFixed(2);
+        } else if (!EDIT) {
+          f.elements.total.value = "0.00";
+        }
+      },
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
       draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button></div></td></tr>`).join(""),
-      validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
-      payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received" }),
+      validate(d) {
+        const e = {};
+        if (!d.customer_name) e.customer_name = "Required";
+        if (!d.service_id) e.service_id = "Please select a service";
+        if (!d.weight_kg || Number(d.weight_kg) <= 0) e.weight_kg = "Valid weight/quantity required";
+        return e;
+      },
+      payload: (d) => {
+        const svcId = Number(d.service_id) || 1;
+        const weight = Number(d.weight_kg) || 1.0;
+        const totalVal = Number(d.total) || 0;
+        return {
+          customer_name: d.customer_name,
+          contact: d.contact,
+          address: d.address,
+          release_type: d.release_type || "Pickup",
+          total: totalVal,
+          order_date: d.order_date || today(),
+          order_status: d.order_status || "Received",
+          items: [{ service_id: svcId, weight_kg: weight, subtotal: totalVal }]
+        };
+      },
       delMsg: (r) => `Archive order ${ord(r.order_id)}?`,
       async act(a, r) {
         if (a === "archive") {
@@ -572,6 +641,11 @@ document.addEventListener("DOMContentLoaded", () => {
   if($("#cancel")) $("#cancel").addEventListener("click", () => closeModal($("#dlg")));
   if($("#form")) {
     $("#form").addEventListener("change", (ev) => ENT[cur]?.change && ENT[cur].change(ev));
+    $("#form").addEventListener("input", (ev) => {
+      if (cur === "orders" && (ev.target.name === "weight_kg" || ev.target.name === "service_id")) {
+        ENT.orders.calcTotal();
+      }
+    });
     $("#form").addEventListener("submit", async (ev) => {
       ev.preventDefault(); const e = ENT[cur], d = Object.fromEntries(new FormData(ev.target));
       ev.target.querySelectorAll("[data-lock]").forEach((i) => { if (EDIT) d[i.name] = EDIT[i.name]; });
