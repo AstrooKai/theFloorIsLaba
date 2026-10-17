@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS orders (
     order_date   DATE NOT NULL,
     release_type VARCHAR(10) NOT NULL,
     release_date DATE NULL,
+    is_archived  BOOLEAN DEFAULT FALSE,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) 
         REFERENCES customers(customer_id) ON DELETE RESTRICT ON UPDATE CASCADE,

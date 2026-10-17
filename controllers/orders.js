@@ -2,12 +2,16 @@ const pool = require('../config/db');
 
 exports.getAllOrders = async (req, res) => {
     try {
+        const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
+        const archiveFilter = includeArchived ? '' : 'WHERE (o.is_archived IS NULL OR o.is_archived = FALSE)';
+
         const [rows] = await pool.query(`
             SELECT 
                 o.order_id,
                 o.order_date,
                 o.release_type,
                 o.release_date,
+                COALESCE(o.is_archived, FALSE) AS is_archived,
                 o.customer_id,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS customer_phone,
@@ -35,7 +39,8 @@ exports.getAllOrders = async (req, res) => {
                 FROM payments 
                 GROUP BY order_id
             ) pay ON o.order_id = pay.order_id
-            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.customer_id, c.first_name, c.last_name, c.phone, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
+            ${archiveFilter}
+            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.is_archived, o.customer_id, c.first_name, c.last_name, c.phone, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
             ORDER BY o.order_id DESC
         `);
         res.json(rows);
@@ -272,6 +277,10 @@ exports.updateOrder = async (req, res) => {
             updates.push('release_date = ?');
             params.push(release_date);
         }
+        if (typeof req.body.is_archived !== 'undefined') {
+            updates.push('is_archived = ?');
+            params.push(Boolean(req.body.is_archived));
+        }
 
         if (updates.length > 0) {
             params.push(id);
@@ -326,6 +335,28 @@ exports.updateOrder = async (req, res) => {
         res.status(500).json({ error: error.message });
     } finally {
         conn.release();
+    }
+};
+
+exports.archiveOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query('UPDATE orders SET is_archived = TRUE WHERE order_id = ?', [id]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
+        res.json({ success: true, message: 'Order archived successfully', order_id: Number(id) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unarchiveOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query('UPDATE orders SET is_archived = FALSE WHERE order_id = ?', [id]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
+        res.json({ success: true, message: 'Order unarchived successfully', order_id: Number(id) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };
 

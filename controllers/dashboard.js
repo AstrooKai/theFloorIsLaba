@@ -13,21 +13,21 @@ exports.getDashboardSummary = async (req, res) => {
             serviceBreakdown
         ] = await Promise.all([
             pool.query('SELECT COUNT(*) AS total FROM customers'),
-            pool.query('SELECT COUNT(*) AS total FROM orders'),
+            pool.query('SELECT COUNT(*) AS total FROM orders WHERE (is_archived IS NULL OR is_archived = FALSE)'),
             pool.query(`
                 SELECT COUNT(*) AS total 
                 FROM orders o 
                 JOIN order_statuses os ON o.status_id = os.status_id 
-                WHERE os.status_name = 'Completed'
+                WHERE os.status_name = 'Completed' AND (o.is_archived IS NULL OR o.is_archived = FALSE)
             `),
             pool.query(`
                 SELECT COUNT(*) AS total 
                 FROM orders o 
                 JOIN order_statuses os ON o.status_id = os.status_id 
-                WHERE os.status_name != 'Completed'
+                WHERE os.status_name != 'Completed' AND (o.is_archived IS NULL OR o.is_archived = FALSE)
             `),
             pool.query('SELECT COALESCE(SUM(amount_paid), 0) AS total FROM payments'),
-            pool.query("SELECT COUNT(*) AS total FROM orders WHERE release_type = 'Delivery'"),
+            pool.query("SELECT COUNT(*) AS total FROM orders WHERE release_type = 'Delivery' AND (is_archived IS NULL OR is_archived = FALSE)"),
             pool.query(`
                 SELECT 
                     o.order_id,
@@ -40,6 +40,7 @@ exports.getDashboardSummary = async (req, res) => {
                 JOIN customers c ON o.customer_id = c.customer_id
                 JOIN order_statuses os ON o.status_id = os.status_id
                 LEFT JOIN order_items oi ON o.order_id = oi.order_id
+                WHERE (o.is_archived IS NULL OR o.is_archived = FALSE)
                 GROUP BY o.order_id, c.first_name, c.last_name, o.order_date, os.status_name
                 ORDER BY o.order_id DESC
                 LIMIT 5

@@ -401,7 +401,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if($("#dlg")) openModal($("#dlg"));
   }
 
-  async function patch(r, ch, msg) { await db.save(ENT[cur].name, r[ENT[cur].id], { ...r, ...ch }); toast(msg); await init(); }
+  async function patch(r, ch, msg) {
+    const resourceName = ENT[cur].name.split("?")[0];
+    await db.save(resourceName, r[ENT[cur].id], { ...r, ...ch });
+    toast(msg);
+    await init();
+  }
   const balance = (oid) => Math.round((orderOf(oid).total - S.rows.filter((p) => p.order_id == oid && p.status !== "Refunded" && p.payment_id != EDIT?.payment_id).reduce((s, p) => s + Number(p.amount), 0)) * 100) / 100;
   const hrs = (h) => h < 24 ? `${h} hr${h === 1 ? "" : "s"}` : `${Math.round(h / 24)} day${Math.round(h / 24) === 1 ? "" : "s"}`;
 
@@ -417,10 +422,48 @@ document.addEventListener("DOMContentLoaded", () => {
     orders: {
       name: "orders", id: "order_id",
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
       payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received" }),
-      delMsg: (r) => `Delete order ${ord(r.order_id)}?`
+      delMsg: (r) => `Archive order ${ord(r.order_id)}?`,
+      async act(a, r) {
+        if (a === "archive") {
+          if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}? It can be viewed or restored in Order History.`, "Archive")) {
+            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to archive order");
+            toast(`Order #${ord(r.order_id)} archived successfully.`);
+            await init();
+          }
+        }
+      }
+    },
+    history: {
+      name: "orders?include_archived=true", id: "order_id",
+      filter: (rows, f) => rows.filter((r) => {
+        const qMatch = !f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q);
+        const stMatch = !f.st || (r.order_status || "Received").toLowerCase() === f.st;
+        const isArchived = Boolean(r.is_archived);
+        const archMatch = !f.arch || (f.arch === "archived" ? isArchived : !isArchived);
+        return qMatch && stMatch && archMatch;
+      }),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`}</div></td></tr>`).join(""),
+      async act(a, r) {
+        if (a === "archive") {
+          if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}?`, "Archive")) {
+            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to archive order");
+            toast(`Order #${ord(r.order_id)} archived successfully.`);
+            await init();
+          }
+        } else if (a === "unarchive") {
+          if (await ask("Restore Order?", `Restore Order #${ord(r.order_id)} back to active orders?`, "Restore")) {
+            const res = await fetch(`/api/orders/${r.order_id}/unarchive`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to restore order");
+            toast(`Order #${ord(r.order_id)} restored to active orders.`);
+            await init();
+          }
+        }
+      }
     },
     services: {
       name: "services", id: "service_id",
@@ -500,7 +543,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           return;
         }
-        if (cur === "orders") {
+        if (cur === "orders" || cur === "history") {
           const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
           const curr = r.order_status || "Received";
           const idx = steps.indexOf(curr);
