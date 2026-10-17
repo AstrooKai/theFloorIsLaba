@@ -34,9 +34,14 @@ CREATE TABLE IF NOT EXISTS staff (
 
 -- Service types table
 CREATE TABLE IF NOT EXISTS service_types (
-    service_id   INT AUTO_INCREMENT PRIMARY KEY,
-    service_name VARCHAR(50)  NOT NULL,
-    price_per_kg DECIMAL(8,2) NOT NULL
+    service_id       INT AUTO_INCREMENT PRIMARY KEY,
+    service_name     VARCHAR(50)   NOT NULL,
+    price_per_kg     DECIMAL(8,2)  NOT NULL,
+    unit             VARCHAR(20)   DEFAULT 'kg',
+    category         VARCHAR(50)   DEFAULT 'Wash & fold',
+    turnaround_hours INT           DEFAULT 24,
+    status           ENUM('Active', 'Inactive') DEFAULT 'Active',
+    description      VARCHAR(255)  NULL
 );
 
 -- Order statuses table

@@ -591,11 +591,42 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     services: {
       name: "services", id: "service_id",
-      filter: (rows, f) => rows.filter((r) => (!f.q || (r.service_name + " " + r.description).toLowerCase().includes(f.q)) && (!f.cat || r.category.toLowerCase() === f.cat) && (!f.st || r.status.toLowerCase() === f.st)).sort((a, b) => a.service_name.localeCompare(b.service_name)),
-      draw: (list) => list.map((r) => `<tr><td><strong>${esc(r.service_name)}</strong>${r.description ? `<span class="sub">${esc(r.description)}</span>` : ""}</td><td>${esc(r.category)}</td><td class="num">${peso(r.price)}<span class="sub">per ${esc(r.unit)}</span></td><td class="num">${hrs(r.turnaround_hours)}</td><td>${badge(r.status, r.status === "Active" ? "ok" : "mute")}</td><td>${std(r, "service_id")}</td></tr>`).join(""),
-      validate(d) { const e = {}; if (!d.service_name) e.service_name = "Required"; return e; },
-      payload: (d) => ({ service_name: d.service_name, category: d.category, unit: d.unit, price: +d.price, turnaround_hours: +d.turnaround_hours, status: d.status, description: d.description }),
-      delMsg: (r) => `Delete ${r.service_name}?`
+      filter: (rows, f) => rows.filter((r) => (!f.q || (r.service_name + " " + (r.description || '')).toLowerCase().includes(f.q)) && (!f.cat || (r.category || '').toLowerCase() === f.cat) && (!f.st || (r.status || '').toLowerCase() === f.st)).sort((a, b) => a.service_name.localeCompare(b.service_name)),
+      draw: (list) => list.map((r) => {
+        const toggleBtn = (r.status || "Active") === "Active"
+          ? `<button class="btn sm btn-outline-danger" data-act="toggle-status" data-id="${r.service_id}" type="button">Disable</button>`
+          : `<button class="btn sm btn-outline-success" data-act="toggle-status" data-id="${r.service_id}" type="button">Enable</button>`;
+        return `<tr><td><strong>${esc(r.service_name)}</strong>${r.description ? `<span class="sub">${esc(r.description)}</span>` : ""}</td><td>${esc(r.category || 'Wash & fold')}</td><td class="num">${peso(r.price || r.price_per_kg)}<span class="sub">per ${esc(r.unit || 'kg')}</span></td><td class="num">${hrs(r.turnaround_hours || 24)}</td><td><span class="badge status-clickable ${(r.status || "Active") === "Active" ? "ok" : "mute"}" data-act="quick-status" data-id="${r.service_id}" data-current="${esc(r.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(r.status || "Active")}</span></td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${r.service_id}" type="button">Edit</button>${toggleBtn}</div></td></tr>`;
+      }).join(""),
+      validate(d) {
+        const e = {};
+        if (!d.service_name || !d.service_name.trim()) e.service_name = "Service name is required";
+        if (!d.price || Number(d.price) <= 0) e.price = "Valid price is required";
+        return e;
+      },
+      payload: (d) => ({
+        service_name: (d.service_name || "").trim(),
+        category: d.category || "Wash & fold",
+        unit: d.unit || "kg",
+        price: +d.price,
+        price_per_kg: +d.price,
+        turnaround_hours: d.turnaround_hours === "" ? 24 : +d.turnaround_hours,
+        status: d.status || "Active",
+        description: (d.description || "").trim()
+      }),
+      delMsg: (r) => `Deactivate ${r.service_name}?`,
+      async act(a, r) {
+        if (a === "toggle-status") {
+          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
+          const actWord = next === "Inactive" ? "Disable" : "Enable";
+          if (await ask(`${actWord} Service?`, `${actWord} laundry service "${r.service_name}"? ${next === 'Inactive' ? 'It will be hidden from new order creation.' : 'It will be available for new orders.'}`, actWord)) {
+            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to toggle service status");
+            toast(`Service "${r.service_name}" status updated to ${next}.`);
+            await init();
+          }
+        }
+      }
     },
     payments: {
       name: "payments", id: "payment_id", defaults: () => ({ paid_at: today(), method: "Cash", status: "Paid" }),
@@ -779,6 +810,17 @@ document.addEventListener("DOMContentLoaded", () => {
       if(a === "clear") { document.querySelectorAll("[data-flt]").forEach((i) => (i.value = "")); return draw(); }
       const r = S.rows.find((x) => x[e.id] == b.dataset.id);
       if (a === "quick-status" && r) {
+        if (cur === "services") {
+          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
+          const actWord = next === "Inactive" ? "Disable" : "Enable";
+          if (await ask(`${actWord} Service?`, `${actWord} laundry service "${r.service_name}"?`, actWord)) {
+            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to toggle service status");
+            toast(`Service "${r.service_name}" status updated to ${next}.`);
+            await init();
+          }
+          return;
+        }
         if (cur === "customers") {
           const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
           if (await ask("Change Customer Status", `Update status for "${r.full_name}" to "${next}"?`, "Update Status")) {
