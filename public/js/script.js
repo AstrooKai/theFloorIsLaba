@@ -8,11 +8,14 @@ const fmt = (s) => { if(!s) return ""; const [y, m, d] = s.split("-"); return ne
 const ord = (id) => "ORD-" + String(id).padStart(4, "0");
 const pay = (id) => "PAY-" + String(id).padStart(4, "0");
 const badge = (t, c) => `<span class="badge ${c}">${esc(t)}</span>`;
-const orderStatusBadge = (st) => {
+const orderStatusBadge = (st, id) => {
   const s = String(st || "Received").trim();
   const cls = (s === "Completed") ? "ok"
     : (s === "Washing" || s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
     : "mute";
+  if (id) {
+    return `<span class="badge status-clickable ${cls}" data-act="quick-status" data-id="${id}" data-current="${esc(s)}" role="button" tabindex="0" title="Click to advance status">${esc(s)}</span>`;
+  }
   return badge(s, cls);
 };
 const btn = (act, id, label, cls = "") => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}" type="button">${label}</button>`;
@@ -375,7 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
     customers: {
       name: "customers", id: "customer_id",
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.address||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
-      draw: (list) => list.map((c) => `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact)}</td><td>${esc(c.address)}</td><td>${badge(c.status || "Active", "ok")}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${c.customer_id}" type="button">Delete</button></div></td></tr>`).join(""),
+      draw: (list) => list.map((c) => `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact)}</td><td>${esc(c.address)}</td><td><span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span></td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${c.customer_id}" type="button">Delete</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.full_name) e.full_name = "Required"; return e; },
       payload: (d) => ({ full_name: d.full_name, contact: d.contact, address: d.address, status: d.status || "Active" }),
       delMsg: (r) => `Delete customer ${r.full_name}?`
@@ -383,7 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
     orders: {
       name: "orders", id: "order_id",
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
       payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received" }),
       delMsg: (r) => `Delete order ${ord(r.order_id)}?`
@@ -458,6 +461,25 @@ document.addEventListener("DOMContentLoaded", () => {
       const e = ENT[cur], a = b.dataset.act;
       if(a === "clear") { document.querySelectorAll("[data-flt]").forEach((i) => (i.value = "")); return draw(); }
       const r = S.rows.find((x) => x[e.id] == b.dataset.id);
+      if (a === "quick-status" && r) {
+        if (cur === "customers") {
+          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
+          if (await ask("Change Customer Status", `Update status for "${r.full_name}" to "${next}"?`, "Update Status")) {
+            await patch(r, { status: next }, `Customer status updated to ${next}.`);
+          }
+          return;
+        }
+        if (cur === "orders") {
+          const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
+          const curr = r.order_status || "Received";
+          const idx = steps.indexOf(curr);
+          const next = steps[(idx + 1) % steps.length];
+          if (await ask("Update Order Status", `Advance Order #${ord(r.order_id)} from "${curr}" to "${next}"?`, "Update Status")) {
+            await patch(r, { order_status: next }, `Order #${ord(r.order_id)} status updated to ${next}.`);
+          }
+          return;
+        }
+      }
       if (a === "add") return openForm();
       if (a === "edit") return openForm(r);
       if (a === "del" && await ask("Delete?", e.delMsg(r))) { await db.del(e.name, r[e.id]); await init(); }
@@ -503,10 +525,37 @@ document.addEventListener("DOMContentLoaded", () => {
               <td><strong>${ord(o.order_id)}</strong></td>
               <td>${esc(o.customer_name)}</td>
               <td>${o.formatted_date || o.order_date}</td>
-              <td>${orderStatusBadge(o.order_status)}</td>
+              <td>${orderStatusBadge(o.order_status, o.order_id)}</td>
               <td class="num">${peso(o.total)}</td>
             </tr>
           `).join("");
+
+          if (!tbody._quickStatusInit) {
+            tbody._quickStatusInit = true;
+            tbody.addEventListener("click", async (ev) => {
+              const b = ev.target.closest('[data-act="quick-status"]');
+              if (!b) return;
+              const orderId = b.dataset.id;
+              const curr = b.dataset.current || "Received";
+              const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
+              const idx = steps.indexOf(curr);
+              const next = steps[(idx + 1) % steps.length];
+              if (await ask("Update Order Status", `Advance Order #${ord(orderId)} from "${curr}" to "${next}"?`, "Update Status")) {
+                try {
+                  const res = await fetch(`/api/orders/${orderId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ order_status: next })
+                  });
+                  if (!res.ok) throw new Error("Failed to update status");
+                  toast(`Order #${ord(orderId)} status updated to ${next}.`);
+                  await initDashboard();
+                } catch (err) {
+                  toast(err.message, 1);
+                }
+              }
+            });
+          }
         }
         initTablesSorting();
       }
