@@ -27,12 +27,79 @@ function toast(m, err) {
   setTimeout(() => t.remove(), 3500);
 }
 
+function openModal(el) {
+  if (!el) return;
+  if (window.bootstrap && bootstrap.Modal) {
+    const m = bootstrap.Modal.getOrCreateInstance(el);
+    m.show();
+  } else if (typeof el.showModal === "function") {
+    el.showModal();
+  } else {
+    el.classList.add("show");
+    el.style.display = "block";
+  }
+}
+
+function closeModal(el) {
+  if (!el) return;
+  if (window.bootstrap && bootstrap.Modal) {
+    const m = bootstrap.Modal.getInstance(el);
+    if (m) m.hide();
+  } else if (typeof el.close === "function") {
+    el.close();
+  } else {
+    el.classList.remove("show");
+    el.style.display = "none";
+  }
+}
+
 function ask(title, msg, ok = "Delete") {
   return new Promise((res) => {
-    const d = $("#confirm"); if(!d) return res(true);
-    $("#cT").textContent = title; $("#cM").textContent = msg; $("#cOk").textContent = ok;
-    d.returnValue = ""; d.onclick = (e) => { const b = e.target.closest("button"); if (b) d.close(b.value); };
-    d.onclose = () => res(d.returnValue === "1"); d.showModal();
+    const d = $("#confirm");
+    if (!d) return res(true);
+    $("#cT").textContent = title;
+    $("#cM").textContent = msg;
+    const okBtn = $("#cOk");
+    if (okBtn) okBtn.textContent = ok;
+
+    if (window.bootstrap && bootstrap.Modal) {
+      const modal = bootstrap.Modal.getOrCreateInstance(d);
+      let settled = false;
+
+      const onConfirm = () => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          modal.hide();
+          res(true);
+        }
+      };
+
+      const onDismiss = () => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          res(false);
+        }
+      };
+
+      const cleanup = () => {
+        if (okBtn) okBtn.removeEventListener("click", onConfirm);
+        d.removeEventListener("hidden.bs.modal", onDismiss);
+      };
+
+      if (okBtn) okBtn.addEventListener("click", onConfirm);
+      d.addEventListener("hidden.bs.modal", onDismiss, { once: true });
+      modal.show();
+    } else {
+      d.returnValue = "";
+      d.onclick = (e) => {
+        const b = e.target.closest("button");
+        if (b) d.close(b.value);
+      };
+      d.onclose = () => res(d.returnValue === "1");
+      d.showModal();
+    }
   });
 }
 
@@ -40,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const signOutBtn = $("#signOutBtn");
   const signOutModal = $("#signOutModal");
   if (signOutBtn && signOutModal) {
-    signOutBtn.addEventListener("click", () => signOutModal.showModal());
+    signOutBtn.addEventListener("click", () => openModal(signOutModal));
   }
   const confirmSignOut = $("#confirmSignOut");
   if (confirmSignOut) {
@@ -51,7 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   const cancelSignOut = $("#cancelSignOut");
   if (cancelSignOut && signOutModal) {
-    cancelSignOut.addEventListener("click", () => signOutModal.close());
+    cancelSignOut.addEventListener("click", () => closeModal(signOutModal));
   }
 });
 
@@ -150,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (row) Object.entries(row).forEach(([k, v]) => { if (f.elements[k]) f.elements[k].value = v ?? ""; });
     else if (e.defaults) Object.entries(e.defaults()).forEach(([k, v]) => { if(f.elements[k]) f.elements[k].value = v; });
     e.init && e.init(f);
-    if($("#dlg")) $("#dlg").showModal();
+    if($("#dlg")) openModal($("#dlg"));
   }
 
   async function patch(r, ch, msg) { await db.save(ENT[cur].name, r[ENT[cur].id], { ...r, ...ch }); toast(msg); await init(); }
@@ -160,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ENT = {
     customers: {
       name: "customers", id: "customer_id",
-      filter: (rows, f) => rows.filter((r) => !f.q || (r.full_name + " " + r.contact + " " + r.address).toLowerCase().includes(f.q)),
+      filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.address||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
       draw: (list) => list.map((c) => `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact)}</td><td>${esc(c.address)}</td><td>${badge(c.status || "Active", "ok")}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${c.customer_id}" type="button">Delete</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.full_name) e.full_name = "Required"; return e; },
       payload: (d) => ({ full_name: d.full_name, contact: d.contact, address: d.address, status: d.status || "Active" }),
@@ -168,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     orders: {
       name: "orders", id: "order_id",
-      filter: (rows, f) => rows.filter((r) => !f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)),
+      filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
       draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td>${orderStatusBadge(o.order_status)}</td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-danger" data-act="del" data-id="${o.order_id}" type="button">Delete</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
       payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received" }),
@@ -253,7 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("#view").addEventListener("change", (ev) => { if (ev.target.dataset.flt) draw(); });
   }
 
-  if($("#cancel")) $("#cancel").addEventListener("click", () => $("#dlg").close());
+  if($("#cancel")) $("#cancel").addEventListener("click", () => closeModal($("#dlg")));
   if($("#form")) {
     $("#form").addEventListener("change", (ev) => ENT[cur]?.change && ENT[cur].change(ev));
     $("#form").addEventListener("submit", async (ev) => {
@@ -261,7 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ev.target.querySelectorAll("[data-lock]").forEach((i) => { if (EDIT) d[i.name] = EDIT[i.name]; });
       if (!setErrors(e.validate(d))) return;
       await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
-      $("#dlg").close(); toast("Saved."); await init();
+      closeModal($("#dlg")); toast("Saved."); await init();
     });
   }
 

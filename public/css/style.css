@@ -258,7 +258,19 @@ td .sub { display: block; font-size: 12px; color: #786962; margin-top: 2px; }
 .mute { background: #F2EBE9; color: var(--text-muted); }
 .mute::before { background: var(--text-muted); }
 
-/* Modals */
+/* Modals (Bootstrap & Dialog compatibility) */
+.modal-content {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-lg);
+  background: #fff;
+  color: var(--text-main);
+  overflow: hidden;
+}
+.modal-backdrop.show {
+  opacity: 0.6;
+  background-color: var(--volcanic-100);
+}
 dialog.modal { border: 0; border-radius: var(--radius-lg); padding: 0; width: min(620px, calc(100vw - 32px)); box-shadow: var(--shadow-lg); background: #fff; color: var(--text-main); }
 dialog.sm-dlg { width: min(420px, calc(100vw - 32px)); }
 dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px); }
@@ -267,6 +279,14 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 .mh p { color: var(--text-muted); font-size: 14px; margin-top: 8px; }
 .mb { padding: 24px 32px; }
 .mf { display: flex; justify-content: flex-end; gap: 12px; padding: 24px 32px; background: var(--paper); border-top: 1px solid #EAE5E3; }
+.form-control:focus, .form-select:focus {
+  border-color: var(--magma-500);
+  box-shadow: 0 0 0 0.25rem rgba(232, 93, 4, 0.25);
+}
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-hover-bg: #F3ECE8;
+}
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .full { grid-column: 1/-1; }
 .field { display: flex; flex-direction: column; gap: 8px; }

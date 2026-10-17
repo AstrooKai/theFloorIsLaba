@@ -3,6 +3,7 @@
 <head>   
   <meta charset="utf-8">   
   <title>Pickup & Delivery | The Floor Is Laba</title>   
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css"> 
 </head> 
 <body data-page="deliveries">   
@@ -54,37 +55,69 @@
       </div>   
       <p class="count" id="count" aria-live="polite"></p>   
       <div id="list"><div id="out"></div></div>   
-      <dialog class="modal" id="dlg">     
-        <form id="form" novalidate>       
-          <div class="mh"><h2 id="dlgT"></h2></div>       
-          <div class="mb">         
-            <div class="grid">           
-              <div class="field full" data-f="order_id"><label>Order <span class="req">*</span></label><select name="order_id" data-fill="orders" data-lock><option value="">Choose an order</option></select></div>           
-              <div class="field full" data-f="type"><div class="seg"><label><input type="radio" name="type" value="Pickup" checked> Pickup</label><label><input type="radio" name="type" value="Delivery"> Delivery</label></div></div>           
-              <div class="field full" data-f="address"><label id="addrLbl">Address <span class="req">*</span></label><textarea name="address"></textarea></div>           
-              <div class="field" data-f="contact"><label>Contact number <span class="req">*</span></label><input name="contact" type="tel"></div>           
-              <div class="field" data-f="rider"><label>Rider</label><select name="rider" data-fill="riders"><option value="">Not assigned</option></select></div>           
-              <div class="field" data-f="scheduled_date"><label>Date <span class="req">*</span></label><input name="scheduled_date" type="date"></div>           
-              <div class="field" data-f="time_slot"><label>Time window <span class="req">*</span></label><select name="time_slot" id="f_time_slot"><option value="">Choose window</option><option>8:00 - 10:00 AM</option><option>10:00 AM - 12:00 PM</option><option>1:00 - 3:00 PM</option></select></div>           
-              <div class="field" data-f="fee"><label>Fee (₱)</label><input name="fee" type="number"></div>           
-              <div class="field" data-f="status"><label>Status</label><select name="status"><option>Scheduled</option><option>On the way</option><option>Completed</option><option>Cancelled</option></select></div>         
-            </div>       
-          </div>       
-          <div class="mf"><button class="btn" type="button" id="cancel">Cancel</button><button class="btn btn-primary" id="save">Save</button></div>     
-        </form>   
-      </dialog>   
-      <dialog class="modal sm-dlg" id="confirm"><div class="mh"><h2 id="cT"></h2></div><div class="mb"><p id="cM"></p></div><div class="mf"><button class="btn" value="0">Keep it</button><button class="btn btn-solid" value="1" id="cOk">Delete</button></div></dialog>   
+      <div class="modal fade" id="dlg" tabindex="-1" aria-labelledby="dlgT" aria-hidden="true">     
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content">
+            <form id="form" novalidate>       
+              <div class="modal-header border-0 pb-0">
+                <h2 class="modal-title fs-4 fw-bold" id="dlgT"></h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>       
+              <div class="modal-body py-4">         
+                <div class="grid">           
+                  <div class="field full" data-f="order_id"><label>Order <span class="req">*</span></label><select name="order_id" data-fill="orders" class="form-select" data-lock><option value="">Choose an order</option></select></div>           
+                  <div class="field full" data-f="type"><div class="seg"><label><input type="radio" name="type" value="Pickup" checked> Pickup</label><label><input type="radio" name="type" value="Delivery"> Delivery</label></div></div>           
+                  <div class="field full" data-f="address"><label id="addrLbl">Address <span class="req">*</span></label><textarea name="address" class="form-control"></textarea></div>           
+                  <div class="field" data-f="contact"><label>Contact number <span class="req">*</span></label><input name="contact" type="tel" class="form-control"></div>           
+                  <div class="field" data-f="rider"><label>Rider</label><select name="rider" data-fill="riders" class="form-select"><option value="">Not assigned</option></select></div>           
+                  <div class="field" data-f="scheduled_date"><label>Date <span class="req">*</span></label><input name="scheduled_date" type="date" class="form-control"></div>           
+                  <div class="field" data-f="time_slot"><label>Time window <span class="req">*</span></label><select name="time_slot" id="f_time_slot" class="form-select"><option value="">Choose window</option><option>8:00 - 10:00 AM</option><option>10:00 AM - 12:00 PM</option><option>1:00 - 3:00 PM</option></select></div>           
+                  <div class="field" data-f="fee"><label>Fee (₱)</label><input name="fee" type="number" class="form-control"></div>           
+                  <div class="field" data-f="status"><label>Status</label><select name="status" class="form-select"><option>Scheduled</option><option>On the way</option><option>Completed</option><option>Cancelled</option></select></div>         
+                </div>       
+              </div>       
+              <div class="modal-footer border-0 pt-0">
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal" id="cancel">Cancel</button>
+                <button class="btn btn-primary" type="submit" id="save">Save</button>
+              </div>     
+            </form>   
+          </div>
+        </div>
+      </div>   
+      <div class="modal fade" id="confirm" tabindex="-1" aria-labelledby="cT" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+              <h2 class="modal-title fs-5 fw-bold" id="cT"></h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
+            <div class="modal-footer border-0 pt-0">
+              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Keep it</button>
+              <button class="btn btn-danger" value="1" type="button" id="cOk">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>   
       <div class="toasts" id="toasts"></div> 
     </main>          
-    <dialog class="modal sm-dlg" id="signOutModal">       
-      <div class="mh"><h2>Confirm Sign Out</h2></div>       
-      <div class="mb"><p>Are you sure you want to sign out?</p></div>       
-      <div class="mf">         
-        <button class="btn" id="cancelSignOut">Cancel</button>         
-        <button class="btn btn-danger" id="confirmSignOut">Sign Out</button>       
-      </div>     
-    </dialog>        
+    <div class="modal fade" id="signOutModal" tabindex="-1" aria-hidden="true">       
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header border-0 pb-0">
+            <h2 class="modal-title fs-5 fw-bold">Confirm Sign Out</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>       
+          <div class="modal-body py-3"><p class="mb-0">Are you sure you want to sign out?</p></div>       
+          <div class="modal-footer border-0 pt-0">         
+            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>         
+            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>       
+          </div>     
+        </div>
+      </div>
+    </div>        
   </div>   
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/script.js"></script> 
 </body> 
 </html>
