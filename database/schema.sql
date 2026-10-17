@@ -5,17 +5,8 @@ COLLATE utf8mb4_unicode_ci;
 
 USE laundry_shop_db;
 
--- Drop tables in order of dependencies to avoid foreign key constraints
-DROP TABLE IF EXISTS payments;
-DROP TABLE IF EXISTS order_items;
-DROP TABLE IF EXISTS orders;
-DROP TABLE IF EXISTS order_statuses;
-DROP TABLE IF EXISTS service_types;
-DROP TABLE IF EXISTS staff;
-DROP TABLE IF EXISTS customers;
-
 -- Customers table
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name  VARCHAR(50)  NOT NULL,
     last_name   VARCHAR(50)  NOT NULL,
@@ -25,7 +16,7 @@ CREATE TABLE customers (
 );
 
 -- Staff table
-CREATE TABLE staff (
+CREATE TABLE IF NOT EXISTS staff (
     staff_id   INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50)  NOT NULL,
     last_name  VARCHAR(50)  NOT NULL,
@@ -38,20 +29,20 @@ CREATE TABLE staff (
 
 
 -- Service types table
-CREATE TABLE service_types (
+CREATE TABLE IF NOT EXISTS service_types (
     service_id   INT AUTO_INCREMENT PRIMARY KEY,
     service_name VARCHAR(50)  NOT NULL,
     price_per_kg DECIMAL(8,2) NOT NULL
 );
 
 -- Order statuses table
-CREATE TABLE order_statuses (
+CREATE TABLE IF NOT EXISTS order_statuses (
     status_id   INT AUTO_INCREMENT PRIMARY KEY,
     status_name VARCHAR(30) NOT NULL
 );
 
 -- Orders table
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     order_id     INT AUTO_INCREMENT PRIMARY KEY,
     customer_id  INT NOT NULL,
     staff_id     INT NOT NULL,
@@ -69,7 +60,7 @@ CREATE TABLE orders (
 );
 
 -- Order items table
-CREATE TABLE order_items (
+CREATE TABLE IF NOT EXISTS order_items (
     order_item_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id      INT NOT NULL,
     service_id    INT NOT NULL,
@@ -82,7 +73,7 @@ CREATE TABLE order_items (
 );
 
 -- Payments table
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     payment_id     INT AUTO_INCREMENT PRIMARY KEY,
     order_id       INT NOT NULL,
     amount_paid    DECIMAL(10,2) NOT NULL,

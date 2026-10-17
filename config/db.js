@@ -33,15 +33,10 @@ async function initDB() {
 
         if (tables[0].count === 0) {
             const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
-            const seedPath = path.join(__dirname, '..', 'database', 'seed.sql');
-
             if (fs.existsSync(schemaPath)) {
                 await rootConn.query(fs.readFileSync(schemaPath, 'utf8'));
+                console.log(`Database [${dbName}] tables initialized.`);
             }
-            if (fs.existsSync(seedPath)) {
-                await rootConn.query(fs.readFileSync(seedPath, 'utf8'));
-            }
-            console.log(`Database [${dbName}] created and seeded automatically.`);
         }
 
         await rootConn.end();
