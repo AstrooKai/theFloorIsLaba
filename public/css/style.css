@@ -637,7 +637,7 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 .day { margin-bottom: 32px; }
 .day h2 { font-size: 18px; margin-bottom: 16px; color: var(--text-main); border-bottom: 2px solid #EAE5E3; padding-bottom: 12px; font-family: var(--font-serif); }
 .day h2 small { font-family: var(--font-sans); font-size: 13px; color: var(--text-muted); margin-left: 12px; font-weight: 500; }
-.ticket { display: grid; grid-template-columns: 160px minmax(0, 1fr); background: #fff; border: 1px solid #EAE5E3; border-left: 6px solid var(--st, var(--magma-500)); border-radius: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); overflow: hidden; }
+.ticket { display: grid; grid-template-columns: 195px minmax(0, 1fr); background: #fff; border: 1px solid #EAE5E3; border-left: 6px solid var(--st, var(--magma-500)); border-radius: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); overflow: hidden; }
 .ticket.Scheduled { --st: #FFB020; }
 .ticket.On { --st: #0066B2; }
 .ticket.Completed { --st: var(--safe); }

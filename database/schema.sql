@@ -91,3 +91,27 @@ CREATE TABLE IF NOT EXISTS payments (
     CONSTRAINT fk_payments_order FOREIGN KEY (order_id) 
         REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+-- Deliveries table (Decoupled transport runs)
+CREATE TABLE IF NOT EXISTS deliveries (
+    delivery_id    INT AUTO_INCREMENT PRIMARY KEY,
+    order_id       INT NOT NULL,
+    type           VARCHAR(20) NOT NULL DEFAULT 'Delivery',
+    rider_id       INT NULL,
+    scheduled_date DATE NOT NULL,
+    time_slot      VARCHAR(50) NOT NULL DEFAULT '10 AM - 12 PM',
+    fee            DECIMAL(10,2) NOT NULL DEFAULT 50.00,
+    status         VARCHAR(30) NOT NULL DEFAULT 'Scheduled',
+    street         VARCHAR(100) NULL,
+    barangay       VARCHAR(50) NULL,
+    address        VARCHAR(150) NOT NULL,
+    contact        VARCHAR(20) NOT NULL,
+    notes          TEXT NULL,
+    is_archived    BOOLEAN DEFAULT FALSE,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_deliveries_order FOREIGN KEY (order_id)
+        REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_deliveries_rider FOREIGN KEY (rider_id)
+        REFERENCES staff(staff_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+

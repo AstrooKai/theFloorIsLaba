@@ -666,31 +666,108 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     },
     deliveries: {
-      name: "deliveries", id: "delivery_id", defaults: () => ({ scheduled_date: today() }),
-      init: (f) => { if(f.elements.scheduled_date) f.elements.scheduled_date.min = EDIT ? "" : today(); if(f.elements.type) ENT.deliveries.change({ target: f.elements.type[0] || f.elements.type }); },
+      name: "deliveries", id: "delivery_id", defaults: () => ({ scheduled_date: today(), time_slot: "10 AM - 12 PM", type: "Pickup", fee: "0.00" }),
+      init: (f) => {
+        if(f.elements.scheduled_date) f.elements.scheduled_date.min = EDIT ? "" : today();
+        fillSelects();
+        if (EDIT) {
+          if (EDIT.street) f.elements.street.value = EDIT.street;
+          if (EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
+          if (EDIT.contact) f.elements.contact.value = EDIT.contact;
+          if (EDIT.time_slot) f.elements.time_slot.value = EDIT.time_slot;
+          if (EDIT.fee !== undefined) f.elements.fee.value = EDIT.fee;
+          if (EDIT.rider) f.elements.rider.value = EDIT.rider;
+        }
+        ENT.deliveries.updateRiderVisibility(f);
+      },
+      updateRiderVisibility(f) {
+        const type = f.elements.type ? f.elements.type.value : "Pickup";
+        const riderField = $("#riderField");
+        const riderSel = f.elements.rider;
+        if (type === "Delivery") {
+          if (riderField) riderField.style.display = "";
+          if (riderSel) riderSel.setAttribute("required", "required");
+        } else {
+          if (riderField) riderField.style.display = "none";
+          if (riderSel) {
+            riderSel.removeAttribute("required");
+            riderSel.value = "";
+          }
+        }
+      },
       change(e) {
         const f = $("#form");
-        if (e.target.name === "type") { const t = f.elements.type.value; if($("#addrLbl")) $("#addrLbl").innerHTML = `${t} address <span class="req">*</span>`; if (!feeTouched && f.elements.fee) f.elements.fee.value = t === "Pickup" ? "0.00" : "50.00"; }
+        if (e.target.name === "type") {
+          const t = f.elements.type.value;
+          if ($("#streetLbl")) $("#streetLbl").innerHTML = `${t} Street Address <span class="req">*</span>`;
+          if (!feeTouched && f.elements.fee) f.elements.fee.value = t === "Pickup" ? "0.00" : "50.00";
+          ENT.deliveries.updateRiderVisibility(f);
+        }
         if (e.target.name === "fee") feeTouched = true;
-        if (e.target.name === "order_id" && e.target.value) { const o = orderOf(e.target.value); if (f.elements.contact && !f.elements.contact.value) f.elements.contact.value = o.contact || ""; if (f.elements.address && !f.elements.address.value) f.elements.address.value = o.address || ""; }
+        if (e.target.name === "order_id" && e.target.value) {
+          const o = orderOf(e.target.value);
+          if (f.elements.contact && (!f.elements.contact.value || !EDIT)) f.elements.contact.value = o.contact || o.customer_phone || "";
+          if (f.elements.street && (!f.elements.street.value || !EDIT)) f.elements.street.value = o.street || o.address || "";
+          if (f.elements.barangay && (!f.elements.barangay.value || !EDIT) && o.barangay) f.elements.barangay.value = o.barangay;
+        }
       },
-      filter: (rows, f) => rows.filter((r) => (!f.q || `${nameOf(r)} ${ord(r.order_id)} ${r.address} ${r.rider}`.toLowerCase().includes(f.q)) && (!f.type || r.type.toLowerCase() === f.type) && (!f.rider || r.rider.toLowerCase() === f.rider) && (!f.st || r.status.toLowerCase() === f.st) && (!f.date || r.scheduled_date === f.date)).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date) || slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot)),
+      filter: (rows, f) => rows.filter((r) => (!f.q || `${nameOf(r)} ${ord(r.order_id)} ${r.address} ${r.rider}`.toLowerCase().includes(f.q)) && (!f.type || r.type.toLowerCase() === f.type) && (!f.rider || (r.rider && r.rider.toLowerCase() === f.rider)) && (!f.st || r.status.toLowerCase() === f.st) && (!f.date || r.scheduled_date === f.date)).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date) || slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot)),
       stats() { const all = ENT.deliveries.filter(S.rows, { ...flt(), st: "" }); return Object.fromEntries(["Scheduled", "On the way", "Completed", "Cancelled"].map((s) => [s, all.filter((r) => r.status === s).length])); },
       draw(list) {
         const g = {}; list.forEach((r) => (g[r.scheduled_date] ||= []).push(r));
         const label = (d) => d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
         return Object.keys(g).sort().map((d) => `<section class="day"><h2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
           const act = r.status === "Scheduled" || r.status === "On the way";
-          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${r.type}</span></div><div class="tm"><div class="tt"><strong>${esc(nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(r.address)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b></span></div><div class="acts" style="justify-content:flex-start">${r.status === "Scheduled" ? btn("start", r.delivery_id, "Start run", "btn-primary") : r.status === "On the way" ? btn("done", r.delivery_id, "Mark completed", "btn-primary") : ""}${btn("edit", r.delivery_id, "Edit")}${act ? btn("cancel", r.delivery_id, "Cancel run") : ""}${btn("del", r.delivery_id, "Delete", "btn-danger")}</div></div></article>`;
+          const startBtn = r.status === "Scheduled" ? btn("start", r.delivery_id, "Start run", "btn-warning") : "";
+          const doneBtn = r.status === "On the way" ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
+          const editBtn = (r.status !== "Completed" && r.status !== "Cancelled") ? btn("edit", r.delivery_id, "Edit") : "";
+          const cancelBtn = act ? btn("cancel", r.delivery_id, "Cancel run", "btn-danger") : "";
+          const archiveBtn = r.status === "Completed" ? btn("archive", r.delivery_id, "Archive", "btn-outline-secondary") : "";
+          const displayAddress = r.street && r.barangay ? `${r.street}, ${r.barangay}` : (r.address || "Cabuyao, Laguna");
+          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${esc(r.type)}</span></div><div class="tm"><div class="tt"><strong>${esc(r.customer_name || nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(displayAddress)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b></span></div><div class="acts" style="justify-content:flex-start">${startBtn}${doneBtn}${editBtn}${cancelBtn}${archiveBtn}</div></div></article>`;
         }).join("")}</section>`).join("");
       },
-      validate(d) { const e = {}; if (!d.order_id) e.order_id = "Required"; return e; },
-      payload: (d) => ({ order_id: +d.order_id, type: d.type, address: d.address.trim(), contact: d.contact, scheduled_date: d.scheduled_date, time_slot: d.time_slot, rider: d.rider, fee: d.fee === "" ? 0 : +d.fee, status: d.status, notes: d.notes }),
-      delMsg: () => "Delete run?",
+      validate(d) {
+        const e = {};
+        if (!d.order_id) e.order_id = "Order is required";
+        if (!d.street || !d.street.trim()) e.street = "Street address is required";
+        if (!d.barangay) e.barangay = "Barangay is required";
+        if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
+        if (d.type === "Delivery" && !d.rider) e.rider = "Rider is required for delivery";
+        return e;
+      },
+      payload: (d) => {
+        const street = (d.street || "").trim();
+        const barangay = (d.barangay || "").trim();
+        const address = street && barangay ? `${street}, ${barangay}` : (street || barangay || (d.address || "").trim());
+        return {
+          order_id: +d.order_id,
+          type: d.type,
+          street,
+          barangay,
+          address,
+          contact: (d.contact || "").trim(),
+          scheduled_date: d.scheduled_date,
+          time_slot: d.time_slot,
+          rider: d.type === "Pickup" ? "" : d.rider,
+          fee: d.fee === "" ? 0 : +d.fee,
+          status: "Scheduled",
+          notes: (d.notes || "").trim()
+        };
+      },
+      delMsg: () => "Archive run?",
       async act(a, r) {
         if (a === "start") return r.rider ? patch(r, { status: "On the way" }, "Run started.") : toast("Please assign a rider before starting the run.", 1);
         if (a === "done") return patch(r, { status: "Completed" }, "Run completed.");
-        if (a === "cancel" && (await ask("Cancel run?", `Cancel this run?`))) return patch(r, { status: "Cancelled" }, "Run cancelled.");
+        if (a === "cancel" && (await ask("Cancel run?", `Cancel this run?`, "Cancel run"))) return patch(r, { status: "Cancelled" }, "Run cancelled.");
+        if (a === "archive") {
+          if (await ask("Archive Transport Run?", `Archive completed run for Order #${ord(r.order_id)}? It will be safely stored and removed from the active schedule.`, "Archive")) {
+            const res = await fetch(`/api/deliveries/${r.delivery_id}/archive`, { method: "PUT" });
+            if (!res.ok) throw new Error("Failed to archive delivery");
+            toast(`Transport run archived successfully.`);
+            await init();
+          }
+        }
       }
     }
   };

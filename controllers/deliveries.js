@@ -2,30 +2,33 @@ const pool = require('../config/db');
 
 exports.getAllDeliveries = async (req, res) => {
     try {
+        const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
+        const archiveFilter = includeArchived ? '' : 'WHERE (d.is_archived IS NULL OR d.is_archived = FALSE)';
+
         const [rows] = await pool.query(`
             SELECT 
-                o.order_id AS delivery_id,
-                o.order_id,
-                o.release_type AS type,
-                c.address,
-                c.phone AS contact,
-                COALESCE(DATE_FORMAT(o.release_date, '%Y-%m-%d'), DATE_FORMAT(o.order_date, '%Y-%m-%d')) AS scheduled_date,
-                '10:00 AM - 12:00 PM' AS time_slot,
-                CONCAT(s.first_name, ' ', s.last_name) AS rider,
-                s.staff_id,
-                CASE WHEN o.release_type = 'Delivery' THEN 50.00 ELSE 0.00 END AS fee,
-                CASE 
-                    WHEN os.status_name = 'Completed' THEN 'Completed'
-                    WHEN os.status_name = 'Out for Delivery' THEN 'On the way'
-                    ELSE 'Scheduled'
-                END AS status,
-                CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
-                '' AS notes
-            FROM orders o
+                d.delivery_id,
+                d.order_id,
+                d.type,
+                d.rider_id,
+                DATE_FORMAT(d.scheduled_date, '%Y-%m-%d') AS scheduled_date,
+                d.time_slot,
+                d.fee,
+                d.status,
+                d.street,
+                d.barangay,
+                d.address,
+                d.contact,
+                d.notes,
+                COALESCE(d.is_archived, FALSE) AS is_archived,
+                CONCAT(r.first_name, ' ', r.last_name) AS rider,
+                CONCAT(c.first_name, ' ', c.last_name) AS customer_name
+            FROM deliveries d
+            JOIN orders o ON d.order_id = o.order_id
             JOIN customers c ON o.customer_id = c.customer_id
-            JOIN staff s ON o.staff_id = s.staff_id
-            JOIN order_statuses os ON o.status_id = os.status_id
-            ORDER BY scheduled_date DESC, o.order_id DESC
+            LEFT JOIN staff r ON d.rider_id = r.staff_id
+            ${archiveFilter}
+            ORDER BY d.scheduled_date DESC, d.delivery_id DESC
         `);
         res.json(rows);
     } catch (error) {
@@ -38,28 +41,27 @@ exports.getDeliveryById = async (req, res) => {
         const { id } = req.params;
         const [rows] = await pool.query(`
             SELECT 
-                o.order_id AS delivery_id,
-                o.order_id,
-                o.release_type AS type,
-                c.address,
-                c.phone AS contact,
-                COALESCE(DATE_FORMAT(o.release_date, '%Y-%m-%d'), DATE_FORMAT(o.order_date, '%Y-%m-%d')) AS scheduled_date,
-                '10:00 AM - 12:00 PM' AS time_slot,
-                CONCAT(s.first_name, ' ', s.last_name) AS rider,
-                s.staff_id,
-                CASE WHEN o.release_type = 'Delivery' THEN 50.00 ELSE 0.00 END AS fee,
-                CASE 
-                    WHEN os.status_name = 'Completed' THEN 'Completed'
-                    WHEN os.status_name = 'Out for Delivery' THEN 'On the way'
-                    ELSE 'Scheduled'
-                END AS status,
-                CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
-                '' AS notes
-            FROM orders o
+                d.delivery_id,
+                d.order_id,
+                d.type,
+                d.rider_id,
+                DATE_FORMAT(d.scheduled_date, '%Y-%m-%d') AS scheduled_date,
+                d.time_slot,
+                d.fee,
+                d.status,
+                d.street,
+                d.barangay,
+                d.address,
+                d.contact,
+                d.notes,
+                COALESCE(d.is_archived, FALSE) AS is_archived,
+                CONCAT(r.first_name, ' ', r.last_name) AS rider,
+                CONCAT(c.first_name, ' ', c.last_name) AS customer_name
+            FROM deliveries d
+            JOIN orders o ON d.order_id = o.order_id
             JOIN customers c ON o.customer_id = c.customer_id
-            JOIN staff s ON o.staff_id = s.staff_id
-            JOIN order_statuses os ON o.status_id = os.status_id
-            WHERE o.order_id = ?
+            LEFT JOIN staff r ON d.rider_id = r.staff_id
+            WHERE d.delivery_id = ?
         `, [id]);
 
         if (rows.length === 0) {
@@ -73,38 +75,51 @@ exports.getDeliveryById = async (req, res) => {
 
 exports.createDelivery = async (req, res) => {
     try {
-        const { order_id, type = 'Delivery', scheduled_date, rider, status = 'Scheduled' } = req.body;
+        const { order_id, type = 'Delivery', scheduled_date, time_slot = '10 AM - 12 PM', fee, rider, rider_id, street, barangay, address, contact, notes } = req.body;
         if (!order_id) {
             return res.status(400).json({ error: 'order_id is required' });
         }
 
-        let riderStaffId = null;
-        if (rider) {
+        let resolvedRiderId = rider_id || null;
+        if (!resolvedRiderId && rider && type === 'Delivery') {
             const [riderRows] = await pool.query(
                 "SELECT staff_id FROM staff WHERE CONCAT(first_name, ' ', last_name) = ? OR first_name = ? LIMIT 1",
                 [rider, rider]
             );
-            if (riderRows.length > 0) riderStaffId = riderRows[0].staff_id;
+            if (riderRows.length > 0) resolvedRiderId = riderRows[0].staff_id;
+        }
+        if (type === 'Pickup') {
+            resolvedRiderId = null;
         }
 
-        let statusId = 4;
-        if (status === 'Completed') statusId = 5;
-        else if (status === 'Scheduled') statusId = (type === 'Delivery') ? 4 : 3;
-
         const dateVal = scheduled_date || new Date().toISOString().split('T')[0];
+        const finalFee = fee !== undefined ? Number(fee) : (type === 'Delivery' ? 50.00 : 0.00);
+        const finalStreet = (street || '').trim();
+        const finalBarangay = (barangay || '').trim();
+        const finalAddress = address || (finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : (finalStreet || finalBarangay || 'Cabuyao, Laguna'));
+        const finalContact = contact || '09170000000';
 
-        await pool.query(
-            'UPDATE orders SET release_type = ?, release_date = ?, status_id = ?, staff_id = COALESCE(?, staff_id) WHERE order_id = ?',
-            [type, dateVal, statusId, riderStaffId, order_id]
-        );
+        const [result] = await pool.query(`
+            INSERT INTO deliveries (order_id, type, rider_id, scheduled_date, time_slot, fee, status, street, barangay, address, contact, notes, is_archived)
+            VALUES (?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, ?, ?, FALSE)
+        `, [order_id, type, resolvedRiderId, dateVal, time_slot, finalFee, finalStreet, finalBarangay, finalAddress, finalContact, notes || '']);
 
         res.status(201).json({
-            delivery_id: Number(order_id),
+            delivery_id: result.insertId,
             order_id: Number(order_id),
             type,
+            rider_id: resolvedRiderId,
+            rider: rider || (type === 'Delivery' ? 'Assigned Rider' : null),
             scheduled_date: dateVal,
-            rider: rider || 'Assigned Rider',
-            status
+            time_slot,
+            fee: finalFee,
+            status: 'Scheduled',
+            address: finalAddress,
+            street: finalStreet,
+            barangay: finalBarangay,
+            contact: finalContact,
+            notes: notes || '',
+            is_archived: false
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -114,48 +129,103 @@ exports.createDelivery = async (req, res) => {
 exports.updateDelivery = async (req, res) => {
     try {
         const { id } = req.params;
-        const { type, scheduled_date, rider, status } = req.body;
+        const { type, scheduled_date, time_slot, fee, rider, rider_id, status, street, barangay, address, contact, notes, is_archived } = req.body;
 
         const updates = [];
         const params = [];
 
         if (type) {
-            updates.push('release_type = ?');
+            updates.push('type = ?');
             params.push(type);
         }
         if (scheduled_date) {
-            updates.push('release_date = ?');
+            updates.push('scheduled_date = ?');
             params.push(scheduled_date);
         }
-        if (status) {
-            let statusId = 4;
-            if (status === 'Completed') statusId = 5;
-            else if (status === 'Scheduled') statusId = (type === 'Delivery') ? 4 : 3;
-            else if (status === 'On the way') statusId = 4;
-            updates.push('status_id = ?');
-            params.push(statusId);
+        if (time_slot) {
+            updates.push('time_slot = ?');
+            params.push(time_slot);
         }
-        if (rider) {
+        if (fee !== undefined) {
+            updates.push('fee = ?');
+            params.push(Number(fee));
+        }
+        if (status) {
+            updates.push('status = ?');
+            params.push(status);
+        }
+        if (rider_id !== undefined) {
+            updates.push('rider_id = ?');
+            params.push(rider_id);
+        } else if (rider) {
             const [riderRows] = await pool.query(
                 "SELECT staff_id FROM staff WHERE CONCAT(first_name, ' ', last_name) = ? OR first_name = ? LIMIT 1",
                 [rider, rider]
             );
             if (riderRows.length > 0) {
-                updates.push('staff_id = ?');
+                updates.push('rider_id = ?');
                 params.push(riderRows[0].staff_id);
             }
+        }
+        if (type === 'Pickup') {
+            updates.push('rider_id = NULL');
+        }
+        if (street !== undefined) {
+            updates.push('street = ?');
+            params.push(street);
+        }
+        if (barangay !== undefined) {
+            updates.push('barangay = ?');
+            params.push(barangay);
+        }
+        if (address !== undefined) {
+            updates.push('address = ?');
+            params.push(address);
+        }
+        if (contact !== undefined) {
+            updates.push('contact = ?');
+            params.push(contact);
+        }
+        if (notes !== undefined) {
+            updates.push('notes = ?');
+            params.push(notes);
+        }
+        if (is_archived !== undefined) {
+            updates.push('is_archived = ?');
+            params.push(Boolean(is_archived));
         }
 
         if (updates.length > 0) {
             params.push(id);
-            await pool.query(`UPDATE orders SET ${updates.join(', ')} WHERE order_id = ?`, params);
+            await pool.query(`UPDATE deliveries SET ${updates.join(', ')} WHERE delivery_id = ?`, params);
         }
 
         res.json({
             delivery_id: Number(id),
-            order_id: Number(id),
             status: status || 'Scheduled'
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.archiveDelivery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query('UPDATE deliveries SET is_archived = TRUE WHERE delivery_id = ?', [id]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Delivery not found' });
+        res.json({ success: true, message: 'Delivery run archived successfully', delivery_id: Number(id) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.unarchiveDelivery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query('UPDATE deliveries SET is_archived = FALSE WHERE delivery_id = ?', [id]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Delivery not found' });
+        res.json({ success: true, message: 'Delivery run unarchived successfully', delivery_id: Number(id) });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -164,8 +234,8 @@ exports.updateDelivery = async (req, res) => {
 exports.deleteDelivery = async (req, res) => {
     try {
         const { id } = req.params;
-        await pool.query('UPDATE orders SET release_date = NULL WHERE order_id = ?', [id]);
-        res.json({ message: 'Delivery run cleared successfully', delivery_id: Number(id) });
+        const [result] = await pool.query('UPDATE deliveries SET is_archived = TRUE WHERE delivery_id = ?', [id]);
+        res.json({ message: 'Delivery run archived successfully', delivery_id: Number(id) });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

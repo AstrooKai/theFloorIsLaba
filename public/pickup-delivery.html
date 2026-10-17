@@ -88,15 +88,35 @@
               </div>       
               <div class="modal-body py-4">         
                 <div class="grid">           
-                  <div class="field full" data-f="order_id"><label>Order <span class="req">*</span></label><select name="order_id" data-fill="orders" class="form-select" data-lock><option value="">Choose an order</option></select></div>           
+                  <div class="field full" data-f="order_id"><label>Order <span class="req">*</span></label><select name="order_id" data-fill="orders" class="form-select" data-lock required><option value="">Choose an order</option></select></div>           
                   <div class="field full" data-f="type"><div class="seg"><label><input type="radio" name="type" value="Pickup" checked> Pickup</label><label><input type="radio" name="type" value="Delivery"> Delivery</label></div></div>           
-                  <div class="field full" data-f="address"><label id="addrLbl">Address <span class="req">*</span></label><textarea name="address" class="form-control"></textarea></div>           
-                  <div class="field" data-f="contact"><label>Contact number <span class="req">*</span></label><input name="contact" type="tel" class="form-control"></div>           
-                  <div class="field" data-f="rider"><label>Rider</label><select name="rider" data-fill="riders" class="form-select"><option value="">Not assigned</option></select></div>           
-                  <div class="field" data-f="scheduled_date"><label>Date <span class="req">*</span></label><input name="scheduled_date" type="date" class="form-control"></div>           
-                  <div class="field" data-f="time_slot"><label>Time window <span class="req">*</span></label><select name="time_slot" id="f_time_slot" class="form-select"><option value="">Choose window</option><option>8:00 - 10:00 AM</option><option>10:00 AM - 12:00 PM</option><option>1:00 - 3:00 PM</option></select></div>           
-                  <div class="field" data-f="fee"><label>Fee (₱)</label><input name="fee" type="number" class="form-control"></div>           
-                  <div class="field" data-f="status"><label>Status</label><select name="status" class="form-select"><option>Scheduled</option><option>On the way</option><option>Completed</option><option>Cancelled</option></select></div>         
+                  <div class="field" data-f="street"><label id="streetLbl">Street Address <span class="req">*</span></label><input name="street" id="f_street" type="text" class="form-control" placeholder="House/Unit #, Street, Subdivision" required></div>
+                  <div class="field" data-f="barangay"><label>Barangay <span class="req">*</span></label><select name="barangay" id="f_barangay" class="form-select" required>
+                    <option value="">Select Barangay</option>
+                    <option value="Baclaran">Baclaran</option>
+                    <option value="Banay-Banay">Banay-Banay</option>
+                    <option value="Banlic">Banlic</option>
+                    <option value="Bigaa">Bigaa</option>
+                    <option value="Butong">Butong</option>
+                    <option value="Casile">Casile</option>
+                    <option value="Diezmo">Diezmo</option>
+                    <option value="Gulod">Gulod</option>
+                    <option value="Mamatid">Mamatid</option>
+                    <option value="Marinig">Marinig</option>
+                    <option value="Niugan">Niugan</option>
+                    <option value="Pittland">Pittland</option>
+                    <option value="Poblacion I">Poblacion I</option>
+                    <option value="Poblacion II">Poblacion II</option>
+                    <option value="Poblacion III">Poblacion III</option>
+                    <option value="Pulo">Pulo</option>
+                    <option value="Sala">Sala</option>
+                    <option value="San Isidro">San Isidro</option>
+                  </select></div>
+                  <div class="field" data-f="contact"><label>Contact number <span class="req">*</span></label><input name="contact" id="f_contact" type="tel" class="form-control" required></div>           
+                  <div class="field" data-f="rider" id="riderField" style="display: none;"><label>Rider <span class="req" id="riderReq">*</span></label><select name="rider" data-fill="riders" class="form-select" id="f_rider"><option value="">Choose a rider</option></select></div>           
+                  <div class="field" data-f="scheduled_date"><label>Date <span class="req">*</span></label><input name="scheduled_date" type="date" class="form-control" required></div>           
+                  <div class="field" data-f="time_slot"><label>Time window <span class="req">*</span></label><select name="time_slot" id="f_time_slot" class="form-select" required><option value="">Choose window</option><option>8 - 10 AM</option><option>10 AM - 12 PM</option><option>1 - 3 PM</option><option>3 - 5 PM</option></select></div>           
+                  <div class="field" data-f="fee"><label>Fee (₱)</label><input name="fee" type="number" step="0.01" class="form-control"></div>           
                 </div>       
               </div>       
               <div class="modal-footer border-0 pt-0">
