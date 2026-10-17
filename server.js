@@ -29,6 +29,25 @@ app.use('/api/staff', require('./routes/staff'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
+// 404 Fallback Handler
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: true, message: `API route ${req.method} ${req.originalUrl} not found` });
+    }
+    res.status(404).sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Centralized Error Handling Middleware
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err);
+    const statusCode = err.status || err.statusCode || 500;
+    res.status(statusCode).json({
+        error: true,
+        message: err.message || 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' ? { stack: err.stack } : {})
+    });
+});
+
 // Start server
 app.listen(PORT, async () => {
     console.log(`Server running at http://localhost:${PORT}`);

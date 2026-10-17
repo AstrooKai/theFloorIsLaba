@@ -47,7 +47,7 @@ async function initDB() {
         await rootConn.end();
         return true;
     } catch (error) {
-        console.error('Database initialization error:', error.message);
+        console.error('Database initialization error:', error.code || error.message || error);
         return false;
     }
 }
@@ -60,7 +60,7 @@ async function testConnection() {
         connection.release();
         return true;
     } catch (error) {
-        console.error('Database connection error:', error.message);
+        console.error('Database connection error:', error.code || error.message || error);
         return false;
     }
 }
