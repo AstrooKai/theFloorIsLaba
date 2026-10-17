@@ -371,7 +371,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .table-header h3 { font-size: 18px; margin-bottom: 4px; font-family: var(--font-sans); font-weight: 700; color: var(--text-main); }
 .table-header .sub { font-size: 13px; color: var(--text-muted); }
-.table-header a { font-size: 13px; font-weight: 700; color: var(--magma-500); display: flex; align-items: center; gap: 4px; }
+.table-header a {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--magma-500);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  transition: all 0.2s ease;
+}
+.table-header a:hover {
+  color: var(--magma-600);
+  background: rgba(232, 93, 4, 0.08);
+  text-decoration: underline;
+}
+.table-header a:focus-visible {
+  outline: 2px solid var(--magma-500);
+  outline-offset: 2px;
+}
 
 table { width: 100%; border-collapse: collapse; min-width: 720px; background: #FFFFFF; }
 th {
