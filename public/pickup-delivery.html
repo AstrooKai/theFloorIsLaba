@@ -53,9 +53,27 @@
         <div><button class="btn btn-primary" id="addBtn" data-act="add" type="button">Schedule a run</button></div>   
       </div>   
       <div class="stats">     
-        <div class="stat pending"><div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div><span>Scheduled</span><strong data-stat="Scheduled">0</strong></div>     
-        <div class="stat"><div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></div><span>On the way</span><strong data-stat="On the way">0</strong></div>     
-        <div class="stat collected"><div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div><span>Completed</span><strong data-stat="Completed">0</strong></div>   
+        <div class="stat pending">
+          <div class="stat-header">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+            <span class="stat-title">Scheduled</span>
+          </div>
+          <strong data-stat="Scheduled">0</strong>
+        </div>     
+        <div class="stat">
+          <div class="stat-header">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></div>
+            <span class="stat-title">On the way</span>
+          </div>
+          <strong data-stat="On the way">0</strong>
+        </div>     
+        <div class="stat collected">
+          <div class="stat-header">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+            <span class="stat-title">Completed</span>
+          </div>
+          <strong data-stat="Completed">0</strong>
+        </div>   
       </div>   
       <p class="count" id="count" aria-live="polite"></p>   
       <div id="list"><div id="out"></div></div>   
