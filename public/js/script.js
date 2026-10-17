@@ -226,12 +226,126 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function sortTableRows(table, colIdx, dir = "asc") {
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    if (rows.length <= 1) return;
+
+    const parseVal = (str) => {
+      const s = String(str || "").trim();
+      if (s.startsWith("₱") || /^\₱?\s*[\d,]+(\.\d+)?$/.test(s)) {
+        const n = Number(s.replace(/[^0-9.-]+/g, ""));
+        if (!isNaN(n)) return { type: "num", val: n };
+      }
+      const idMatch = s.match(/^(?:ORD|PAY)-(\d+)$/i);
+      if (idMatch) return { type: "num", val: Number(idMatch[1]) };
+
+      const hrsMatch = s.match(/^(\d+)\s*hrs?$/i);
+      if (hrsMatch) return { type: "num", val: Number(hrsMatch[1]) };
+
+      if (/^-?\d+(\.\d+)?$/.test(s)) return { type: "num", val: Number(s) };
+
+      const d = Date.parse(s);
+      if (!isNaN(d) && !/^\d+$/.test(s) && (s.includes("-") || s.includes(",") || s.includes(" "))) {
+        return { type: "date", val: d };
+      }
+
+      return { type: "str", val: s.toLowerCase() };
+    };
+
+    rows.sort((a, b) => {
+      const cellA = a.children[colIdx];
+      const cellB = b.children[colIdx];
+      const textA = cellA ? cellA.innerText.trim() : "";
+      const textB = cellB ? cellB.innerText.trim() : "";
+
+      const parsedA = parseVal(textA);
+      const parsedB = parseVal(textB);
+
+      let cmp = 0;
+      if (parsedA.type === "num" && parsedB.type === "num") {
+        cmp = parsedA.val - parsedB.val;
+      } else if (parsedA.type === "date" && parsedB.type === "date") {
+        cmp = parsedA.val - parsedB.val;
+      } else {
+        cmp = String(parsedA.val).localeCompare(String(parsedB.val), undefined, { numeric: true, sensitivity: "base" });
+      }
+
+      return dir === "asc" ? cmp : -cmp;
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  function setupTableSorting(table) {
+    if (!table || table._sortInit) return;
+    table._sortInit = true;
+
+    const ths = table.querySelectorAll("thead th");
+    ths.forEach((th, idx) => {
+      const text = th.textContent.trim().toLowerCase();
+      if (text === "actions") return;
+
+      th.classList.add("sortable-th");
+      th.setAttribute("role", "button");
+      th.setAttribute("tabindex", "0");
+      th.setAttribute("title", `Sort by ${th.textContent.trim()}`);
+
+      let indicator = th.querySelector(".sort-indicator");
+      if (!indicator) {
+        indicator = document.createElement("span");
+        indicator.className = "sort-indicator";
+        indicator.innerHTML = '<span class="sort-neutral">↕</span>';
+        th.appendChild(indicator);
+      }
+
+      const triggerSort = () => {
+        const currentDir = th.dataset.sortDir;
+        const newDir = currentDir === "asc" ? "desc" : "asc";
+
+        ths.forEach(otherTh => {
+          delete otherTh.dataset.sortDir;
+          const ind = otherTh.querySelector(".sort-indicator");
+          if (ind) ind.innerHTML = '<span class="sort-neutral">↕</span>';
+        });
+
+        th.dataset.sortDir = newDir;
+        const ind = th.querySelector(".sort-indicator");
+        if (ind) ind.innerHTML = newDir === "asc" ? '<span class="sort-active">▲</span>' : '<span class="sort-active">▼</span>';
+
+        sortTableRows(table, idx, newDir);
+      };
+
+      th.addEventListener("click", triggerSort);
+      th.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          triggerSort();
+        }
+      });
+    });
+  }
+
+  function initTablesSorting() {
+    document.querySelectorAll("table").forEach(table => {
+      setupTableSorting(table);
+      const activeTh = table.querySelector("thead th[data-sort-dir]");
+      if (activeTh) {
+        const ths = Array.from(table.querySelectorAll("thead th"));
+        const idx = ths.indexOf(activeTh);
+        if (idx !== -1) sortTableRows(table, idx, activeTh.dataset.sortDir);
+      }
+    });
+  }
+
   function draw() {
     const e = ENT[cur], list = e.filter(S.rows, flt());
     if($("#count")) $("#count").textContent = `Showing ${list.length} of ${S.rows.length} ${M.noun || ''}`;
     if (e.stats) { const st = e.stats(list); document.querySelectorAll("[data-stat]").forEach((el) => (el.textContent = st[el.dataset.stat] || 0)); }
     if($("#out")) $("#out").innerHTML = e.draw(list);
     if($("#list")) $("#list").hidden = !list.length;
+    initTablesSorting();
   }
 
   function setErrors(errs) {
@@ -394,6 +508,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </tr>
           `).join("");
         }
+        initTablesSorting();
       }
     } catch (err) {
       toast("Error loading dashboard: " + err.message, 1);
@@ -471,4 +586,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (ENT[cur]) init(true);
   if (cur === "dashboard") initDashboard();
+  initTablesSorting();
 });

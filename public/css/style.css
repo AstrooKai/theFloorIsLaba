@@ -405,6 +405,37 @@ th {
   background: #F4EFEB;
   border-bottom: 2px solid #E2DAD6;
 }
+th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+th.sortable-th:hover {
+  background: #E8DFD8;
+  color: var(--magma-600);
+}
+.sort-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.5;
+  vertical-align: middle;
+}
+th[data-sort-dir] .sort-indicator {
+  opacity: 1;
+}
+.sort-active {
+  font-weight: 900;
+  color: var(--magma-500);
+}
+.sort-neutral {
+  opacity: 0.4;
+}
+[data-bs-theme="dark"] th.sortable-th:hover {
+  background: #2D1B15;
+  color: var(--glow);
+}
 td {
   padding: 18px 24px;
   border-bottom: 1px solid #EAE5E3;
