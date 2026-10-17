@@ -5,6 +5,7 @@ const iso = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), 
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
 const today = () => addDays(0);
 const fmt = (s) => { if(!s) return ""; const [y, m, d] = s.split("-"); return new Date(y, m - 1, d).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); };
+const formatDate = (val) => { const d = val ? new Date(val) : new Date(); return isNaN(d.getTime()) ? String(val || "") : d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); };
 const ord = (id) => "ORD-" + String(id).padStart(4, "0");
 const pay = (id) => "PAY-" + String(id).padStart(4, "0");
 const badge = (t, c) => `<span class="badge ${c}">${esc(t)}</span>`;
@@ -422,7 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
     orders: {
       name: "orders", id: "order_id",
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button></div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts"><button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button><button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button></div></td></tr>`).join(""),
       validate(d) { const e = {}; if (!d.customer_name) e.customer_name = "Required"; return e; },
       payload: (d) => ({ customer_name: d.customer_name, contact: d.contact, address: d.address, total: +d.total || 0, order_date: d.order_date || today(), order_status: d.order_status || "Received" }),
       delMsg: (r) => `Archive order ${ord(r.order_id)}?`,
@@ -446,7 +447,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const archMatch = !f.arch || (f.arch === "archived" ? isArchived : !isArchived);
         return qMatch && stMatch && archMatch;
       }),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${o.order_date || 'Oct 07, 2026'}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`}</div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`}</div></td></tr>`).join(""),
       async act(a, r) {
         if (a === "archive") {
           if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}?`, "Archive")) {
@@ -607,7 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <tr>
               <td><strong>${ord(o.order_id)}</strong></td>
               <td>${esc(o.customer_name)}</td>
-              <td>${o.formatted_date || o.order_date}</td>
+              <td>${formatDate(o.order_date || o.formatted_date)}</td>
               <td>${orderStatusBadge(o.order_status, o.order_id)}</td>
               <td class="num">${peso(o.total)}</td>
             </tr>
