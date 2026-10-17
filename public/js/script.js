@@ -192,10 +192,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id" };
 
+const getAuthHeaders = () => {
+  const staff = JSON.parse(sessionStorage.getItem("current_staff") || "{}");
+  const headers = {};
+  if (staff.role) headers["x-staff-role"] = staff.role;
+  else headers["x-staff-role"] = "Manager";
+  if (staff.staff_id) headers["x-staff-id"] = staff.staff_id;
+  return headers;
+};
+
 const db = {
   async list(resource) {
     const endpoint = resource === "riders" ? "/api/staff/riders" : `/api/${resource}`;
-    const res = await fetch(endpoint);
+    const res = await fetch(endpoint, { headers: getAuthHeaders() });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `Failed to fetch ${resource}`);
@@ -208,7 +217,7 @@ const db = {
     const url = id ? `/api/${resource}/${id}` : `/api/${resource}`;
     const res = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -220,7 +229,8 @@ const db = {
 
   async del(resource, id) {
     const res = await fetch(`/api/${resource}/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -465,7 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
       async act(a, r) {
         if (a === "archive") {
           if (await ask("Archive Customer?", `Archive customer "${r.full_name}"? Their profile will be deactivated.`, "Archive")) {
-            const res = await fetch(`/api/customers/${r.customer_id}/archive`, { method: "PUT" });
+            const res = await fetch(`/api/customers/${r.customer_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to archive customer");
             toast(`Customer "${r.full_name}" archived successfully.`);
             await init();
@@ -553,7 +563,7 @@ document.addEventListener("DOMContentLoaded", () => {
       async act(a, r) {
         if (a === "archive") {
           if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}? It can be viewed or restored in Order History.`, "Archive")) {
-            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT" });
+            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to archive order");
             toast(`Order #${ord(r.order_id)} archived successfully.`);
             await init();
@@ -574,14 +584,14 @@ document.addEventListener("DOMContentLoaded", () => {
       async act(a, r) {
         if (a === "archive") {
           if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}?`, "Archive")) {
-            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT" });
+            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to archive order");
             toast(`Order #${ord(r.order_id)} archived successfully.`);
             await init();
           }
         } else if (a === "unarchive") {
           if (await ask("Restore Order?", `Restore Order #${ord(r.order_id)} back to active orders?`, "Restore")) {
-            const res = await fetch(`/api/orders/${r.order_id}/unarchive`, { method: "PUT" });
+            const res = await fetch(`/api/orders/${r.order_id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to restore order");
             toast(`Order #${ord(r.order_id)} restored to active orders.`);
             await init();
@@ -620,7 +630,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
           const actWord = next === "Inactive" ? "Disable" : "Enable";
           if (await ask(`${actWord} Service?`, `${actWord} laundry service "${r.service_name}"? ${next === 'Inactive' ? 'It will be hidden from new order creation.' : 'It will be available for new orders.'}`, actWord)) {
-            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT" });
+            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to toggle service status");
             toast(`Service "${r.service_name}" status updated to ${next}.`);
             await init();
@@ -688,7 +698,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (a === "paid") return patch(r, { status: "Paid" }, `Marked as paid.`);
         if (a === "archive") {
           if (await ask("Archive Payment?", `Archive payment #${pay(r.payment_id)} of ${peso(r.amount)}? It will be hidden while preserving financial audit trails.`, "Archive")) {
-            const res = await fetch(`/api/payments/${r.payment_id}/archive`, { method: "PUT" });
+            const res = await fetch(`/api/payments/${r.payment_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to archive payment");
             toast(`Payment #${pay(r.payment_id)} archived successfully.`);
             await init();
@@ -793,7 +803,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (a === "cancel" && (await ask("Cancel run?", `Cancel this run?`, "Cancel run"))) return patch(r, { status: "Cancelled" }, "Run cancelled.");
         if (a === "archive") {
           if (await ask("Archive Transport Run?", `Archive completed run for Order #${ord(r.order_id)}? It will be safely stored and removed from the active schedule.`, "Archive")) {
-            const res = await fetch(`/api/deliveries/${r.delivery_id}/archive`, { method: "PUT" });
+            const res = await fetch(`/api/deliveries/${r.delivery_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to archive delivery");
             toast(`Transport run archived successfully.`);
             await init();
@@ -814,7 +824,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
           const actWord = next === "Inactive" ? "Disable" : "Enable";
           if (await ask(`${actWord} Service?`, `${actWord} laundry service "${r.service_name}"?`, actWord)) {
-            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT" });
+            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to toggle service status");
             toast(`Service "${r.service_name}" status updated to ${next}.`);
             await init();

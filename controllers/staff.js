@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const bcrypt = require('bcryptjs');
 
 exports.getAllStaff = async (req, res) => {
     try {
@@ -82,10 +83,11 @@ exports.createStaff = async (req, res) => {
         }
 
         const finalEmail = (email || `${first_name.toLowerCase()}.${(last_name || 'staff').toLowerCase()}@laba.ph`).trim().toLowerCase();
+        const hashedPassword = await bcrypt.hash(password || 'password123', 10);
 
         const [result] = await pool.query(
             'INSERT INTO staff (first_name, last_name, role, email, password, phone) VALUES (?, ?, ?, ?, ?, ?)',
-            [first_name, last_name || '', role, finalEmail, password, phone || '']
+            [first_name, last_name || '', role, finalEmail, hashedPassword, phone || '']
         );
 
         res.status(201).json({
@@ -132,8 +134,9 @@ exports.updateStaff = async (req, res) => {
             params.push(email.trim().toLowerCase());
         }
         if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
             updates.push('password = ?');
-            params.push(password);
+            params.push(hashedPassword);
         }
         if (phone !== undefined) {
             updates.push('phone = ?');
@@ -198,16 +201,34 @@ exports.loginStaff = async (req, res) => {
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 role,
                 email,
+                password,
                 phone
             FROM staff
-            WHERE LOWER(email) = LOWER(?) AND password = ?
-        `, [email.trim(), password]);
+            WHERE LOWER(email) = LOWER(?)
+        `, [email.trim()]);
 
         if (rows.length === 0) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
         const staffMember = rows[0];
+        let isMatch = false;
+
+        if (staffMember.password.startsWith('$2a$') || staffMember.password.startsWith('$2b$')) {
+            isMatch = await bcrypt.compare(password, staffMember.password);
+        } else {
+            isMatch = (password === staffMember.password);
+            if (isMatch) {
+                const newHash = await bcrypt.hash(password, 10);
+                await pool.query('UPDATE staff SET password = ? WHERE staff_id = ?', [newHash, staffMember.staff_id]);
+            }
+        }
+
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        delete staffMember.password;
 
         res.json({
             success: true,

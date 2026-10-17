@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const staff = require('../controllers/staff');
+const { authorizeRoles } = require('../middleware/auth');
 
 router.get('/riders', staff.getRiders);
 router.post('/login', staff.loginStaff);
-router.get('/', staff.getAllStaff);
-router.get('/:id', staff.getStaffById);
-router.post('/', staff.createStaff);
-router.put('/:id', staff.updateStaff);
-router.delete('/:id', staff.deleteStaff);
+router.get('/', authorizeRoles('Manager'), staff.getAllStaff);
+router.get('/:id', authorizeRoles('Manager'), staff.getStaffById);
+router.post('/', authorizeRoles('Manager'), staff.createStaff);
+router.put('/:id', authorizeRoles('Manager'), staff.updateStaff);
+router.delete('/:id', authorizeRoles('Manager'), staff.deleteStaff);
 
 module.exports = router;

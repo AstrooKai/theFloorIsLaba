@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const services = require('../controllers/services');
+const { authorizeRoles } = require('../middleware/auth');
 
 router.get('/', services.getAllServices);
 router.get('/:id', services.getServiceById);
-router.post('/', services.createService);
-router.put('/:id', services.updateService);
-router.put('/:id/toggle-status', services.toggleServiceStatus);
-router.delete('/:id', services.deleteService);
+router.post('/', authorizeRoles('Manager'), services.createService);
+router.put('/:id', authorizeRoles('Manager'), services.updateService);
+router.put('/:id/toggle-status', authorizeRoles('Manager'), services.toggleServiceStatus);
+router.delete('/:id', authorizeRoles('Manager'), services.deleteService);
 
 module.exports = router;

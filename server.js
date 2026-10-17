@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(require('./middleware/auth').authenticate);
 
 // Redirect old /staff-login.html to clean route /login
 app.get('/staff-login.html', (req, res) => {

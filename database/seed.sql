@@ -8,13 +8,13 @@ INSERT INTO customers (first_name, last_name, phone, address) VALUES
 ('Janine', 'Gonzales',     '09171234504', '23 Luna St., Cabuyao, Laguna'),
 ('Eugene', 'Reyes',        '09171234505', '67 Del Pilar St., Binan, Laguna');
 
--- Insert sample staff
+-- Insert sample staff (Password: admin123)
 INSERT INTO staff (first_name, last_name, role, email, password, phone) VALUES
-('Maria', 'Santos',    'Cashier', 'maria.santos@laba.ph',   'admin123', '09181112201'),
-('Jose',  'Dela Cruz', 'Washer',  'jose.delacruz@laba.ph', 'admin123', '09181112202'),
-('Ana',   'Lopez',     'Folder',  'ana.lopez@laba.ph',     'admin123', '09181112203'),
-('Pedro', 'Ramos',     'Rider',   'pedro.ramos@laba.ph',   'admin123', '09181112204'),
-('Rosa',  'Mendoza',   'Manager', 'rosa.mendoza@laba.ph',  'admin123', '09181112205');
+('Maria', 'Santos',    'Cashier', 'maria.santos@laba.ph',   '$2b$10$AYStZPBMESfGf2PwG0MHCeEmKflNO4FQ4XLBrh94h1/CEvoCxE5Ba', '09181112201'),
+('Jose',  'Dela Cruz', 'Washer',  'jose.delacruz@laba.ph', '$2b$10$AYStZPBMESfGf2PwG0MHCeEmKflNO4FQ4XLBrh94h1/CEvoCxE5Ba', '09181112202'),
+('Ana',   'Lopez',     'Folder',  'ana.lopez@laba.ph',     '$2b$10$AYStZPBMESfGf2PwG0MHCeEmKflNO4FQ4XLBrh94h1/CEvoCxE5Ba', '09181112203'),
+('Pedro', 'Ramos',     'Rider',   'pedro.ramos@laba.ph',   '$2b$10$AYStZPBMESfGf2PwG0MHCeEmKflNO4FQ4XLBrh94h1/CEvoCxE5Ba', '09181112204'),
+('Rosa',  'Mendoza',   'Manager', 'rosa.mendoza@laba.ph',  '$2b$10$AYStZPBMESfGf2PwG0MHCeEmKflNO4FQ4XLBrh94h1/CEvoCxE5Ba', '09181112205');
 
 
 -- Insert sample service types
