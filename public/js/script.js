@@ -1544,19 +1544,21 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
             </div>
 
-            <table class="invoice-table">
-              <thead>
-                <tr>
-                  <th class="text-center" style="width: 45px;">#</th>
-                  <th>Service Description</th>
-                  <th class="text-center" style="width: 140px;">Quantity / Weight</th>
-                  <th class="text-end" style="width: 130px;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsHtml}
-              </tbody>
-            </table>
+            <div class="invoice-table-wrap">
+              <table class="invoice-table">
+                <thead>
+                  <tr>
+                    <th class="text-center" style="width: 45px;">#</th>
+                    <th>Service Description</th>
+                    <th class="text-center" style="width: 140px;">Quantity / Weight</th>
+                    <th class="text-end" style="width: 130px;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHtml}
+                </tbody>
+              </table>
+            </div>
 
             <div class="invoice-summary-wrapper">
               <div class="invoice-summary-card">

@@ -734,7 +734,8 @@ body.sidebar-collapsed .btn-signout span {
   outline-offset: 2px;
 }
 
-table { width: 100%; border-collapse: collapse; min-width: 720px; background: #FFFFFF; }
+table { width: 100%; border-collapse: collapse; background: #FFFFFF; }
+.tw table { min-width: 720px; }
 th, thead th, .table thead th, .tw table th {
   text-align: left;
   font-size: 12px;
@@ -1296,12 +1297,15 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   background: #ffffff;
   color: #160D0A;
   width: 100%;
-  padding: 32px 36px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 30px 32px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   border: 1px solid #EAE5E3;
   font-family: var(--font-sans);
   line-height: 1.5;
+  overflow: hidden;
 }
 
 [data-bs-theme="dark"] .invoice-paper {
@@ -1309,6 +1313,10 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   color: var(--text-main);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: var(--shadow-lg);
+}
+
+#receiptModal .modal-body {
+  overflow-x: hidden;
 }
 
 .invoice-header {
@@ -1384,18 +1392,30 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   margin-bottom: 8px;
 }
 
-.invoice-table {
+.invoice-table-wrap {
   width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
   margin-bottom: 24px;
-  border-collapse: separate;
-  border-spacing: 0;
   border: 1px solid #EAE5E3;
   border-radius: var(--radius-sm);
-  overflow: hidden;
+  box-sizing: border-box;
 }
 
-[data-bs-theme="dark"] .invoice-table {
+[data-bs-theme="dark"] .invoice-table-wrap {
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+.invoice-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-bottom: 0 !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  border: none !important;
+  table-layout: auto;
+  box-sizing: border-box;
 }
 
 .invoice-table th {
@@ -1405,8 +1425,9 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 10px 16px;
+  padding: 10px 14px;
   border-bottom: 1px solid #EAE5E3;
+  box-sizing: border-box;
 }
 
 [data-bs-theme="dark"] .invoice-table th {
@@ -1416,10 +1437,11 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 }
 
 .invoice-table td {
-  padding: 12px 16px;
+  padding: 12px 14px;
   font-size: 13px;
   border-bottom: 1px solid #F3EFEF;
   vertical-align: middle;
+  box-sizing: border-box;
 }
 
 [data-bs-theme="dark"] .invoice-table td {
