@@ -423,7 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!indicator) {
         indicator = document.createElement("span");
         indicator.className = "sort-indicator";
-        indicator.innerHTML = '<span class="sort-neutral">↕</span>';
+        indicator.innerHTML = '<i class="bi bi-arrow-down-up sort-neutral"></i>';
         th.appendChild(indicator);
       }
 
@@ -434,12 +434,12 @@ document.addEventListener("DOMContentLoaded", () => {
         ths.forEach(otherTh => {
           delete otherTh.dataset.sortDir;
           const ind = otherTh.querySelector(".sort-indicator");
-          if (ind) ind.innerHTML = '<span class="sort-neutral">↕</span>';
+          if (ind) ind.innerHTML = '<i class="bi bi-arrow-down-up sort-neutral"></i>';
         });
 
         th.dataset.sortDir = newDir;
         const ind = th.querySelector(".sort-indicator");
-        if (ind) ind.innerHTML = newDir === "asc" ? '<span class="sort-active">▲</span>' : '<span class="sort-active">▼</span>';
+        if (ind) ind.innerHTML = newDir === "asc" ? '<i class="bi bi-arrow-up sort-active"></i>' : '<i class="bi bi-arrow-down sort-active"></i>';
 
         sortTableRows(table, idx, newDir);
       };
