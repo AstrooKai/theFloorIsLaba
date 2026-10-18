@@ -65,9 +65,38 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border: 1px solid #EAE5E3; background: #fff; color: var(--text-main);
   cursor: pointer; font-weight: 600; transition: all 0.2s ease; font-size: 14px;
 }
-.btn:hover { border-color: var(--text-muted); background: #F9F7F6; }
+.btn:hover { border-color: var(--text-muted); background: #F9F7F6; color: var(--text-main); }
 .btn-primary { background: var(--magma-500); border-color: var(--magma-500); color: #fff; box-shadow: var(--shadow-glow); }
-.btn-primary:hover { background: var(--magma-600); border-color: var(--magma-600); transform: translateY(-1px); }
+.btn-primary:hover { background: var(--magma-600); border-color: var(--magma-600); transform: translateY(-1px); color: #fff; }
+.btn-secondary,
+.btn-outline-secondary {
+  background: #fff;
+  border-color: #D9D2CE;
+  color: var(--text-main);
+}
+.btn-secondary:hover,
+.btn-secondary:focus,
+.btn-secondary:active,
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active {
+  background-color: #EAE3DF;
+  border-color: #B5A49D;
+  color: var(--text-main);
+}
+:root:not([data-bs-theme="dark"]) .btn-secondary:hover,
+:root:not([data-bs-theme="dark"]) .btn-secondary:focus,
+:root:not([data-bs-theme="dark"]) .btn-secondary:active,
+:root:not([data-bs-theme="dark"]) .btn-outline-secondary:hover,
+:root:not([data-bs-theme="dark"]) .btn-outline-secondary:focus,
+:root:not([data-bs-theme="dark"]) .btn-outline-secondary:active,
+:root:not([data-bs-theme="dark"]) #cancel:hover,
+:root:not([data-bs-theme="dark"]) #cancel:focus,
+:root:not([data-bs-theme="dark"]) #cancel:active {
+  background-color: #EAE3DF !important;
+  border-color: #B5A49D !important;
+  color: #160D0A !important;
+}
 .btn-danger { color: var(--hazard); border-color: transparent; }
 .btn-danger:hover { background: rgba(255, 74, 74, 0.1); }
 .btn-solid { background: var(--magma-600); color: #fff; border: none; }
