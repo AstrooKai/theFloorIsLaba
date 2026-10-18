@@ -53,9 +53,17 @@ INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES
 (5, 4, 1.00,  35.00);
 
 -- Insert sample payments
-INSERT INTO payments (order_id, amount_paid, payment_method, payment_date) VALUES
-(1, 250.00, 'Cash',  '2026-10-03'),
-(2, 275.00, 'GCash', '2026-10-04'),
-(3, 100.00, 'Cash',  '2026-10-05'),
-(4, 225.00, 'GCash', '2026-10-06'),
-(5, 150.00, 'Cash',  '2026-10-07');
+INSERT INTO payments (order_id, amount_paid, payment_method, reference_no, payment_date, status) VALUES
+(1, 250.00, 'Cash',     NULL,          '2026-10-03', 'Paid'),
+(2, 275.00, 'E-Wallet', 'GCASH-98214', '2026-10-04', 'Paid'),
+(3, 100.00, 'Cash',     NULL,          '2026-10-05', 'Paid'),
+(4, 225.00, 'E-Wallet', 'MAYA-44102',  '2026-10-06', 'Paid'),
+(5, 150.00, 'Cash',     NULL,          '2026-10-07', 'Paid');
+
+-- Insert sample deliveries (decoupled transport runs)
+INSERT INTO deliveries (order_id, type, rider_id, scheduled_date, time_slot, fee, status, street, barangay, contact) VALUES
+(1, 'Pickup',   NULL, '2026-10-01', '10 AM - 12 PM', 0.00,  'Completed', '12 Rizal Street',       'Poblacion I', '09171234501'),
+(2, 'Delivery', 4,    '2026-10-02', '10 AM - 12 PM', 50.00, 'Completed', '45 Mabini Avenue',      'Mamatid',     '09171234502'),
+(3, 'Pickup',   NULL, '2026-10-05', '10 AM - 12 PM', 0.00,  'Scheduled', '8 Bonifacio Boulevard', 'Pulo',        '09171234503'),
+(4, 'Delivery', 4,    '2026-10-06', '10 AM - 12 PM', 50.00, 'Scheduled', '23 Luna Street',        'Banay-banay', '09171234504'),
+(5, 'Pickup',   NULL, '2026-10-07', '10 AM - 12 PM', 0.00,  'Scheduled', '67 Del Pilar Street',   'Sala',        '09171234505');

@@ -79,3 +79,25 @@ FROM service_types st
 LEFT JOIN order_items oi ON st.service_id = oi.service_id
 GROUP BY st.service_id, st.service_name
 ORDER BY total_revenue DESC;
+
+-- Active Deliveries & Transport Runs (Decoupled & Normalized)
+SELECT 
+    d.delivery_id,
+    d.order_id,
+    d.type,
+    d.scheduled_date,
+    d.time_slot,
+    d.fee,
+    d.status,
+    d.street,
+    d.barangay,
+    CONCAT_WS(', ', d.street, d.barangay) AS full_destination,
+    d.contact,
+    CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+    CONCAT(r.first_name, ' ', r.last_name) AS rider_name
+FROM deliveries d
+JOIN orders o ON d.order_id = o.order_id
+JOIN customers c ON o.customer_id = c.customer_id
+LEFT JOIN staff r ON d.rider_id = r.staff_id
+WHERE (d.is_archived IS NULL OR d.is_archived = FALSE)
+ORDER BY d.scheduled_date DESC, d.delivery_id DESC;

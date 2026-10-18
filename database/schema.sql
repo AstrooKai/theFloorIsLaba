@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS service_types (
     unit             VARCHAR(20)   DEFAULT 'kg',
     category         VARCHAR(50)   DEFAULT 'Wash & fold',
     turnaround_hours INT           DEFAULT 24,
-    status           ENUM('Active', 'Inactive') DEFAULT 'Active',
+    status           VARCHAR(20)   DEFAULT 'Active',
     description      VARCHAR(255)  NULL
 );
 
