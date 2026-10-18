@@ -90,6 +90,12 @@ const orderStatusBadge = (st, id) => {
   }
   return badge(s, cls);
 };
+const orderTypeBadge = (t) => {
+  const type = String(t || "Pickup").trim();
+  const isDelivery = type.toLowerCase() === "delivery";
+  const cls = isDelivery ? "type-delivery" : "type-pickup";
+  return `<span class="badge ${cls}">${esc(type)}</span>`;
+};
 const btn = (act, id, label, cls = "") => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}" type="button">${label}</button>`;
 const std = (r, k, extra = "") => `<div class="acts">${extra}${btn("edit", r[k], "Edit")}${btn("del", r[k], "Delete", "btn-danger")}</div>`;
 const debounce = (f, ms = 150) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
@@ -737,7 +743,11 @@ document.addEventListener("DOMContentLoaded", () => {
           f.elements.total.value = "0.00";
         }
       },
-      filter: (rows, f) => rows.filter((r) => (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) && (!f.st || (r.order_status || "Received").toLowerCase() === f.st)),
+      filter: (rows, f) => rows.filter((r) =>
+        (!f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q)) &&
+        (!f.type || (r.release_type || "Pickup").toLowerCase() === f.type) &&
+        (!f.st || (r.order_status || "Received").toLowerCase() === f.st)
+      ),
       draw: (list) => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
@@ -745,7 +755,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
           const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
           const actsHtml = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">Production</span>`;
-          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
+          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
       validate(d) {
@@ -794,12 +804,13 @@ document.addEventListener("DOMContentLoaded", () => {
       name: "orders?include_archived=true", id: "order_id",
       filter: (rows, f) => rows.filter((r) => {
         const qMatch = !f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q);
+        const typeMatch = !f.type || (r.release_type || "Pickup").toLowerCase() === f.type;
         const stMatch = !f.st || (r.order_status || "Received").toLowerCase() === f.st;
         const isArchived = Boolean(r.is_archived);
         const archMatch = !f.arch || (f.arch === "archived" ? isArchived : !isArchived);
-        return qMatch && stMatch && archMatch;
+        return qMatch && typeMatch && stMatch && archMatch;
       }),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td><span class="badge mute">${esc(o.release_type || "Pickup")}</span></td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`}</div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`}</div></td></tr>`).join(""),
       async act(a, r) {
         if (a === "archive") {
           if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}?`, "Archive")) {

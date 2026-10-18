@@ -657,8 +657,59 @@ tbody tr.empty-row:hover > *,
 .warn::before { background: #B25E00; }
 .bad { background: #FBE5E2; color: #D32F2F; }
 .bad::before { background: #D32F2F; }
+.info { background: #E8F0FE; color: #1967D2; }
+.info::before { background: #1967D2; }
 .mute { background: #F2EBE9; color: var(--text-muted); }
 .mute::before { background: var(--text-muted); }
+
+/* Order & Delivery Type Badges */
+.badge.type-pickup,
+.badge.badge-pickup {
+  background: #E8F0FE;
+  color: #1A73E8;
+}
+.badge.type-pickup::before,
+.badge.badge-pickup::before {
+  background: #1A73E8;
+}
+
+.badge.type-delivery,
+.badge.badge-delivery {
+  background: #FFF0E5;
+  color: #C44500;
+}
+.badge.type-delivery::before,
+.badge.badge-delivery::before {
+  background: #E85D04;
+}
+
+[data-bs-theme="dark"] .badge.type-pickup,
+[data-bs-theme="dark"] .badge.badge-pickup {
+  background: rgba(66, 133, 244, 0.2);
+  color: #8AB4F8;
+}
+[data-bs-theme="dark"] .badge.type-pickup::before,
+[data-bs-theme="dark"] .badge.badge-pickup::before {
+  background: #8AB4F8;
+}
+
+[data-bs-theme="dark"] .badge.type-delivery,
+[data-bs-theme="dark"] .badge.badge-delivery {
+  background: rgba(232, 93, 4, 0.22);
+  color: #FF9E66;
+}
+[data-bs-theme="dark"] .badge.type-delivery::before,
+[data-bs-theme="dark"] .badge.badge-delivery::before {
+  background: #FF9E66;
+}
+
+[data-bs-theme="dark"] .info {
+  background: rgba(66, 133, 244, 0.2);
+  color: #8AB4F8;
+}
+[data-bs-theme="dark"] .info::before {
+  background: #8AB4F8;
+}
 
 .badge.status-clickable {
   cursor: pointer;
