@@ -97,7 +97,29 @@ const orderTypeBadge = (t) => {
   return `<span class="badge ${cls}">${esc(type)}</span>`;
 };
 const btn = (act, id, label, cls = "") => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}" type="button">${label}</button>`;
-const std = (r, k, extra = "") => `<div class="acts">${extra}${btn("edit", r[k], "Edit")}${btn("del", r[k], "Delete", "btn-danger")}</div>`;
+const actionsDropdown = (items = [], emptyText = "View only") => {
+  const valid = items.filter(Boolean);
+  if (valid.length === 0) {
+    return `<div class="acts"><span class="text-muted small">${emptyText}</span></div>`;
+  }
+  return `
+    <div class="acts">
+      <div class="dropdown">
+        <button class="btn sm btn-outline-secondary dropdown-toggle action-dropdown-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-popper-config='{"strategy":"fixed"}'>
+          Actions
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+          ${valid.map(it => `<li>${it}</li>`).join("")}
+        </ul>
+      </div>
+    </div>
+  `;
+};
+const std = (r, k, extra = "") => actionsDropdown([
+  extra,
+  `<button class="dropdown-item" data-act="edit" data-id="${r[k]}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`,
+  `<button class="dropdown-item text-danger" data-act="del" data-id="${r[k]}" type="button"><i class="bi bi-trash me-2"></i>Delete</button>`
+]);
 const debounce = (f, ms = 150) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 
 function toast(m, err) {
@@ -694,9 +716,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         return list.map((c) => {
-          const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${c.customer_id}" type="button">Edit</button>` : "";
-          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${c.customer_id}" type="button">Archive</button>` : "";
-          const acts = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">View only</span>`;
+          const items = [];
+          if (isCashierMgr) {
+            items.push(`<button class="dropdown-item" data-act="edit" data-id="${c.customer_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
+          }
+          if (isMgr) {
+            items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${c.customer_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
+          }
+          const acts = actionsDropdown(items, "View only");
           const statusBadge = isCashierMgr
             ? `<span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span>`
             : `<span class="badge ${c.status === "Inactive" ? "mute" : "ok"}">${esc(c.status || "Active")}</span>`;
@@ -788,10 +815,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         return list.map((o) => {
-          const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>Invoice</button>`;
-          const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
-          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
-          const actsHtml = `<div class="acts">${invoiceBtn}${editBtn}${archiveBtn}</div>`;
+          const items = [
+            `<button class="dropdown-item" data-act="invoice" data-id="${o.order_id}" type="button"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Invoice</button>`
+          ];
+          if (isCashierMgr) {
+            items.push(`<button class="dropdown-item" data-act="edit" data-id="${o.order_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
+          }
+          if (isMgr) {
+            items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${o.order_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
+          }
+          const actsHtml = actionsDropdown(items);
           const payStatusCls = o.payment_status === "Paid" ? "ok" : (o.payment_status === "Refunded" ? "bad" : "mute");
           return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
@@ -849,10 +882,17 @@ document.addEventListener("DOMContentLoaded", () => {
         return qMatch && typeMatch && stMatch && archMatch;
       }),
       draw: (list) => list.map((o) => {
-        const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>Invoice</button>`;
-        const archBtn = o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`;
+        const items = [
+          `<button class="dropdown-item" data-act="invoice" data-id="${o.order_id}" type="button"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Invoice</button>`
+        ];
+        if (o.is_archived) {
+          items.push(`<button class="dropdown-item text-success" data-act="unarchive" data-id="${o.order_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Unarchive</button>`);
+        } else {
+          items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${o.order_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
+        }
+        const actsHtml = actionsDropdown(items);
         const payStatusCls = o.payment_status === "Paid" ? "ok" : (o.payment_status === "Refunded" ? "bad" : "mute");
-        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${invoiceBtn}${archBtn}</div></td></tr>`;
+        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
       }).join(""),
       async act(a, r) {
         if (a === "archive") {
@@ -878,13 +918,17 @@ document.addEventListener("DOMContentLoaded", () => {
       draw: (list) => {
         const isMgr = isManager();
         return list.map((r) => {
-          const toggleBtn = isMgr
-            ? ((r.status || "Active") === "Active"
-              ? `<button class="btn sm btn-outline-danger" data-act="toggle-status" data-id="${r.service_id}" type="button">Disable</button>`
-              : `<button class="btn sm btn-outline-success" data-act="toggle-status" data-id="${r.service_id}" type="button">Enable</button>`)
-            : "";
-          const editBtn = isMgr ? `<button class="btn sm" data-act="edit" data-id="${r.service_id}" type="button">Edit</button>` : "";
-          const actsHtml = (editBtn || toggleBtn) ? `<div class="acts">${editBtn}${toggleBtn}</div>` : `<span class="text-muted small">Read only</span>`;
+          const items = [];
+          if (isMgr) {
+            items.push(`<button class="dropdown-item" data-act="edit" data-id="${r.service_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
+            const isActive = (r.status || "Active") === "Active";
+            if (isActive) {
+              items.push(`<button class="dropdown-item text-danger" data-act="toggle-status" data-id="${r.service_id}" type="button"><i class="bi bi-slash-circle me-2"></i>Disable</button>`);
+            } else {
+              items.push(`<button class="dropdown-item text-success" data-act="toggle-status" data-id="${r.service_id}" type="button"><i class="bi bi-check-circle me-2"></i>Enable</button>`);
+            }
+          }
+          const actsHtml = actionsDropdown(items, "Read only");
           const badgeHtml = isMgr
             ? `<span class="badge status-clickable ${(r.status || "Active") === "Active" ? "ok" : "mute"}" data-act="quick-status" data-id="${r.service_id}" data-current="${esc(r.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(r.status || "Active")}</span>`
             : `<span class="badge ${(r.status || "Active") === "Active" ? "ok" : "mute"}">${esc(r.status || "Active")}</span>`;
@@ -976,14 +1020,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const isCashierMgr = isCashierOrManager();
         const isProdOrRider = isProductionStaff() || isRider();
         return list.map((p) => {
-          const receiptBtn = `<button class="btn sm btn-outline-primary" data-act="receipt" data-id="${p.payment_id}" title="View Receipt" type="button"><i class="bi bi-receipt"></i> Receipt</button>`;
-          if (isProdOrRider) {
-            return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "bad" }[p.status] || "mute")}</td><td><div class="acts">${receiptBtn}</div></td></tr>`;
+          const items = [];
+          if (p.status === "Pending" && isCashierMgr) {
+            items.push(`<button class="dropdown-item text-success fw-semibold" data-act="paid" data-id="${p.payment_id}" type="button"><i class="bi bi-check2-circle me-2"></i>Mark Paid</button>`);
           }
-          const paidBtn = (p.status === "Pending" && isCashierMgr) ? btn("paid", p.payment_id, "Mark paid", "btn-success") : "";
-          const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${p.payment_id}" type="button">Edit</button>` : "";
-          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${p.payment_id}" type="button">Archive</button>` : "";
-          const actsHtml = `<div class="acts">${paidBtn}${receiptBtn}${editBtn}${archiveBtn}</div>`;
+          items.push(`<button class="dropdown-item" data-act="receipt" data-id="${p.payment_id}" type="button"><i class="bi bi-receipt me-2 text-primary"></i>Receipt</button>`);
+          if (!isProdOrRider && isCashierMgr) {
+            items.push(`<button class="dropdown-item" data-act="edit" data-id="${p.payment_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
+          }
+          if (!isProdOrRider && isMgr) {
+            items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${p.payment_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
+          }
+          const actsHtml = actionsDropdown(items, "View only");
           return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "bad" }[p.status] || "mute")}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
@@ -1207,9 +1255,12 @@ document.addEventListener("DOMContentLoaded", () => {
           const statusBadge = isMgr
             ? `<span class="badge status-clickable ${statusCls}" data-act="quick-status" data-id="${s.staff_id}" data-current="${esc(s.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(s.status || "Active")}</span>`
             : `<span class="badge ${statusCls}">${esc(s.status || "Active")}</span>`;
-          const editBtn = isMgr ? `<button class="btn sm" data-act="edit" data-id="${s.staff_id}" type="button">Edit</button>` : "";
-          const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${s.staff_id}" type="button">Archive</button>` : "";
-          const acts = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">View only</span>`;
+          const items = [];
+          if (isMgr) {
+            items.push(`<button class="dropdown-item" data-act="edit" data-id="${s.staff_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
+            items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${s.staff_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
+          }
+          const acts = actionsDropdown(items, "View only");
           return `<tr><td><strong>#${s.staff_id}</strong></td><td><strong>${esc(s.full_name || `${s.first_name} ${s.last_name || ''}`)}</strong></td><td><span class="badge ${roleBadgeCls}">${esc(s.role)}</span></td><td>${esc(s.email)}</td><td>${esc(s.phone || '—')}</td><td>${statusBadge}</td><td>${acts}</td></tr>`;
         }).join("");
       },
