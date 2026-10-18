@@ -241,11 +241,35 @@ function updateThemeToggleUI(theme) {
 
 initTheme();
 
+// Sidebar Collapse Management
+function initSidebar() {
+  const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
+  if (isCollapsed && document.body) {
+    document.body.classList.add("sidebar-collapsed");
+  }
+}
+initSidebar();
+
 document.addEventListener("DOMContentLoaded", () => {
   const themeBtn = $("#themeToggleBtn");
   if (themeBtn) {
     themeBtn.addEventListener("click", toggleTheme);
     updateThemeToggleUI(document.documentElement.getAttribute("data-bs-theme") || "light");
+  }
+
+  const sidebarToggle = $("#sidebarToggleBtn");
+  if (sidebarToggle) {
+    const syncToggleBtn = () => {
+      const isCollapsed = document.body.classList.contains("sidebar-collapsed");
+      sidebarToggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+      sidebarToggle.setAttribute("title", isCollapsed ? "Expand sidebar" : "Collapse sidebar");
+    };
+    syncToggleBtn();
+    sidebarToggle.addEventListener("click", () => {
+      const isCollapsed = document.body.classList.toggle("sidebar-collapsed");
+      localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
+      syncToggleBtn();
+    });
   }
 
   const signOutBtn = $("#signOutBtn");
@@ -1741,9 +1765,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const nameEl = document.querySelector(".user-profile div div:first-child");
     const roleEl = document.querySelector(".user-profile div div:last-child");
     const avatarEl = document.querySelector(".user-profile .avatar");
+    const profileEl = document.querySelector(".user-profile");
     if (nameEl) nameEl.textContent = staff.full_name || staff.first_name || "Staff Member";
     if (roleEl) roleEl.textContent = staff.role || "Active Staff";
     if (avatarEl) avatarEl.textContent = (staff.first_name || "A")[0].toUpperCase();
+    if (profileEl) profileEl.setAttribute("title", `${staff.full_name || staff.first_name || "Staff Member"} (${staff.role || "Active Staff"})`);
   }
 
   applyRoleNavVisibility();
