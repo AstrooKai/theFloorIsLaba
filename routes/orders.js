@@ -8,6 +8,7 @@ router.get('/', orders.getAllOrders);
 router.get('/:id', orders.getOrderById);
 router.post('/', authorizeRoles('Cashier', 'Manager'), orders.createOrder);
 router.put('/:id', authorizeRoles('Washer', 'Folder', 'Cashier', 'Manager'), orders.updateOrder);
+router.put('/:id/toggle-payment', authorizeRoles('Cashier', 'Manager'), orders.togglePaymentStatus);
 router.put('/:id/archive', authorizeRoles('Manager'), orders.archiveOrder);
 router.put('/:id/unarchive', authorizeRoles('Manager'), orders.unarchiveOrder);
 router.delete('/:id', authorizeRoles('Manager'), orders.deleteOrder);

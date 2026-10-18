@@ -201,7 +201,20 @@ function ask(title, msg, ok = "Delete") {
     const msgEl = $("#cM");
     if (msgEl) msgEl.innerHTML = msg;
     const okBtn = $("#cOk");
-    if (okBtn) okBtn.textContent = ok;
+    if (okBtn) {
+      okBtn.textContent = ok;
+      const lowerOk = ok.toLowerCase();
+      okBtn.className = "btn";
+      if (lowerOk.includes("delete") || lowerOk.includes("archive") || lowerOk.includes("discontinue") || lowerOk.includes("deactivate")) {
+        okBtn.classList.add("btn-danger");
+      } else if (lowerOk.includes("paid") || lowerOk.includes("reactivate") || lowerOk.includes("activate") || lowerOk.includes("restore")) {
+        okBtn.classList.add("btn-success");
+      } else if (lowerOk.includes("pending") || lowerOk.includes("unpaid")) {
+        okBtn.classList.add("btn-warning");
+      } else {
+        okBtn.classList.add("btn-primary");
+      }
+    }
 
     if (window.bootstrap && bootstrap.Modal) {
       const modal = bootstrap.Modal.getOrCreateInstance(d);
@@ -851,8 +864,13 @@ document.addEventListener("DOMContentLoaded", () => {
             items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${o.order_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
           }
           const actsHtml = actionsDropdown(items);
-          const payStatusCls = o.payment_status === "Paid" ? "ok" : (o.payment_status === "Refunded" ? "bad" : "mute");
-          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
+          const payStatus = o.payment_status || "Unpaid";
+          const payStatusCls = payStatus === "Paid" ? "ok" : (payStatus === "Refunded" ? "bad" : "mute");
+          const nextPayStatus = payStatus === "Paid" ? "Unpaid" : "Paid";
+          const payBadgeHtml = isCashierMgr
+            ? `<span class="badge status-clickable ${payStatusCls}" data-act="quick-payment" data-id="${o.order_id}" data-current="${esc(payStatus)}" role="button" tabindex="0" title="Click to mark as ${nextPayStatus}">${esc(payStatus)}</span>`
+            : `<span class="badge ${payStatusCls}">${esc(payStatus)}</span>`;
+          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td>${payBadgeHtml}</td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
       validate(d) {
@@ -1089,7 +1107,13 @@ document.addEventListener("DOMContentLoaded", () => {
             items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${p.payment_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
           }
           const actsHtml = actionsDropdown(items, "View only");
-          return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "bad" }[p.status] || "mute")}</td><td>${actsHtml}</td></tr>`;
+          const pStatus = p.status || "Paid";
+          const pStatusCls = { Paid: "ok", Pending: "warn", Refunded: "bad" }[pStatus] || "mute";
+          const nextPStatus = pStatus === "Paid" ? "Pending" : "Paid";
+          const statusBadgeHtml = isCashierMgr
+            ? `<span class="badge status-clickable ${pStatusCls}" data-act="quick-payment-status" data-id="${p.payment_id}" data-current="${esc(pStatus)}" role="button" tabindex="0" title="Click to mark as ${nextPStatus}">${esc(pStatus)}</span>`
+            : `<span class="badge ${pStatusCls}">${esc(pStatus)}</span>`;
+          return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${statusBadgeHtml}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
       validate(d) {
@@ -1448,6 +1472,68 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
       }
+      if (a === "quick-payment" && r) {
+        if (!isCashierOrManager()) {
+          return toast("Only Cashiers and Managers can update payment status.", 1);
+        }
+        const curr = r.payment_status || "Unpaid";
+        const isPaid = curr === "Paid";
+        const next = isPaid ? "Unpaid" : "Paid";
+        const modalTitle = isPaid ? "Mark Payment as Unpaid?" : "Mark Payment as Paid?";
+        const modalMsg = isPaid
+          ? `Change payment status for Order <strong>#${ord(r.order_id)}</strong> (${peso(r.total)}) to <strong>Unpaid</strong>? Existing payment will be marked as pending.`
+          : `Mark payment for Order <strong>#${ord(r.order_id)}</strong> (${peso(r.total)}) as <strong>Paid</strong>?`;
+        const confirmBtn = isPaid ? "Mark Unpaid" : "Mark Paid";
+
+        if (await ask(modalTitle, modalMsg, confirmBtn)) {
+          try {
+            const res = await fetch(`/api/orders/${r.order_id}/toggle-payment`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", ...getAuthHeaders() }
+            });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || "Failed to update payment status");
+            }
+            toast(`Order #${ord(r.order_id)} payment marked as ${next}.`);
+            await init();
+          } catch (err) {
+            toast(err.message, 1);
+          }
+        }
+        return;
+      }
+      if (a === "quick-payment-status" && r) {
+        if (!isCashierOrManager()) {
+          return toast("Only Cashiers and Managers can update payment status.", 1);
+        }
+        const curr = r.status || "Paid";
+        const isPaid = curr === "Paid";
+        const next = isPaid ? "Pending" : "Paid";
+        const modalTitle = isPaid ? "Mark Payment as Pending?" : "Confirm Payment as Paid?";
+        const modalMsg = isPaid
+          ? `Change status of payment <strong>#${pay(r.payment_id)} of ${peso(r.amount || r.amount_paid)}</strong> for Order <strong>#${ord(r.order_id)}</strong> to <strong>Pending</strong>?`
+          : `Mark payment <strong>#${pay(r.payment_id)} of ${peso(r.amount || r.amount_paid)}</strong> for Order <strong>#${ord(r.order_id)}</strong> as <strong>Paid</strong>?`;
+        const confirmBtn = isPaid ? "Mark Pending" : "Mark Paid";
+
+        if (await ask(modalTitle, modalMsg, confirmBtn)) {
+          try {
+            const res = await fetch(`/api/payments/${r.payment_id}/toggle-status`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", ...getAuthHeaders() }
+            });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || "Failed to update payment status");
+            }
+            toast(`Payment #${pay(r.payment_id)} marked as ${next}.`);
+            await init();
+          } catch (err) {
+            toast(err.message, 1);
+          }
+        }
+        return;
+      }
       if (a === "invoice" || a === "receipt") {
         const isInvoice = a === "invoice" || cur === "orders" || cur === "history";
         if (cur === "payments") return openReceipt({ paymentId: b.dataset.id, isInvoice: false });
@@ -1465,6 +1551,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     $("#view").addEventListener("input", debounce((ev) => { if (ev.target.dataset.flt) draw(); }));
     $("#view").addEventListener("change", (ev) => { if (ev.target.dataset.flt) draw(); });
+    $("#view").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        const b = ev.target.closest(".status-clickable, [role='button'][tabindex='0']");
+        if (b && b.dataset.act) {
+          ev.preventDefault();
+          b.click();
+        }
+      }
+    });
   }
 
   async function openReceipt({ paymentId, orderId, isInvoice } = {}) {

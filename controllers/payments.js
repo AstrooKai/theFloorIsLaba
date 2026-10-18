@@ -200,6 +200,28 @@ exports.unarchivePayment = async (req, res) => {
     }
 };
 
+exports.togglePaymentStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [rows] = await pool.query('SELECT payment_id, order_id, amount_paid, status FROM payments WHERE payment_id = ?', [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        const current = rows[0].status || 'Paid';
+        const next = (current === 'Paid') ? 'Pending' : 'Paid';
+
+        await pool.query('UPDATE payments SET status = ? WHERE payment_id = ?', [next, id]);
+
+        res.json({
+            success: true,
+            payment_id: Number(id),
+            status: next
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.deletePayment = async (req, res) => {
     try {
         const { id } = req.params;
