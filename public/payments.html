@@ -56,19 +56,21 @@
         <div><button class="btn btn-primary" id="addBtn" data-act="add" type="button">Record payment</button></div>   
       </div>   
       <div class="stats">     
-        <div class="stat collected">
+        <div class="stat stat-primary">
           <div class="stat-header">
             <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
-            <span class="stat-title">Collected</span>
+            <span class="stat-title">Total Collected</span>
           </div>
           <strong data-stat="Paid">₱0.00</strong>
+          <span class="stat-desc" data-stat="PaidCount">0 paid transactions</span>
         </div>     
         <div class="stat pending">
           <div class="stat-header">
             <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
-            <span class="stat-title">Pending confirmation</span>
+            <span class="stat-title">Pending Confirmation</span>
           </div>
           <strong data-stat="Pending">₱0.00</strong>
+          <span class="stat-desc" data-stat="PendingCount">0 pending confirmation</span>
         </div>     
         <div class="stat">
           <div class="stat-header">
@@ -76,7 +78,16 @@
             <span class="stat-title">Refunded</span>
           </div>
           <strong data-stat="Refunded">₱0.00</strong>
+          <span class="stat-desc" data-stat="RefundedCount">0 refunded</span>
         </div>   
+        <div class="stat">
+          <div class="stat-header">
+            <div class="stat-icon"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
+            <span class="stat-title">Total Payments</span>
+          </div>
+          <strong data-stat="TotalTransactions">0</strong>
+          <span class="stat-desc" data-stat="TransactionsDesc">Recorded transactions</span>
+        </div>
       </div>   
       <section class="toolbar" role="search">
         <div class="tf grow"><label>Search Payments</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by customer, payment ID, order ID, or reference #..."></div>

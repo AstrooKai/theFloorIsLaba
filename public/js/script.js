@@ -497,11 +497,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (cur === "customers" && !isCashierMgr) addBtn.style.display = "none";
       if (cur === "staff" && !isMgr) addBtn.style.display = "none";
     }
-
-    if (cur === "payments" && !isMgr) {
-      const statsEl = $(".stats");
-      if (statsEl) statsEl.style.display = "none";
-    }
   }
 
   function draw() {
@@ -752,9 +747,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         return list.map((o) => {
+          const receiptBtn = `<button class="btn sm btn-outline-primary" data-act="receipt" data-id="${o.order_id}" title="View Receipt" type="button"><i class="bi bi-receipt"></i> Receipt</button>`;
           const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
           const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
-          const actsHtml = (editBtn || archiveBtn) ? `<div class="acts">${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">Production</span>`;
+          const actsHtml = `<div class="acts">${receiptBtn}${editBtn}${archiveBtn}</div>`;
           return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
@@ -810,7 +806,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const archMatch = !f.arch || (f.arch === "archived" ? isArchived : !isArchived);
         return qMatch && typeMatch && stMatch && archMatch;
       }),
-      draw: (list) => list.map((o) => `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`}</div></td></tr>`).join(""),
+      draw: (list) => list.map((o) => {
+        const receiptBtn = `<button class="btn sm btn-outline-primary" data-act="receipt" data-id="${o.order_id}" title="View Receipt" type="button"><i class="bi bi-receipt"></i> Receipt</button>`;
+        const archBtn = o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`;
+        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${receiptBtn}${archBtn}</div></td></tr>`;
+      }).join(""),
       async act(a, r) {
         if (a === "archive") {
           if (await ask("Archive Order?", `Archive Order #${ord(r.order_id)}?`, "Archive")) {
@@ -910,19 +910,37 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
       filter: (rows, f) => rows.filter((p) => (!f.q || `${p.customer_name || nameOf(p)} ${pay(p.payment_id)} PAY-${p.payment_id} ${p.payment_id} ${ord(p.order_id)} ORD-${p.order_id} ${p.order_id} ${p.reference_no || ''}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
-      stats: (list) => Object.fromEntries(["Paid", "Pending", "Refunded"].map((s) => [s, peso(list.filter((p) => p.status === s).reduce((n, p) => n + Number(p.amount), 0))])),
+      stats: (list) => {
+        const paid = list.filter((p) => p.status === "Paid");
+        const pending = list.filter((p) => p.status === "Pending");
+        const refunded = list.filter((p) => p.status === "Refunded");
+        const paidTotal = paid.reduce((n, p) => n + Number(p.amount), 0);
+        const pendingTotal = pending.reduce((n, p) => n + Number(p.amount), 0);
+        const refundedTotal = refunded.reduce((n, p) => n + Number(p.amount), 0);
+        return {
+          Paid: peso(paidTotal),
+          PaidCount: `${paid.length} paid transaction${paid.length === 1 ? '' : 's'}`,
+          Pending: peso(pendingTotal),
+          PendingCount: `${pending.length} pending confirmation`,
+          Refunded: peso(refundedTotal),
+          RefundedCount: `${refunded.length} refunded`,
+          TotalTransactions: String(list.length),
+          TransactionsDesc: `${paid.length} paid · ${pending.length} pending`
+        };
+      },
       draw: (list) => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         const isProdOrRider = isProductionStaff() || isRider();
         return list.map((p) => {
+          const receiptBtn = `<button class="btn sm btn-outline-primary" data-act="receipt" data-id="${p.payment_id}" title="View Receipt" type="button"><i class="bi bi-receipt"></i> Receipt</button>`;
           if (isProdOrRider) {
-            return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td><span class="text-muted small">View only</span></td></tr>`;
+            return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td><div class="acts">${receiptBtn}</div></td></tr>`;
           }
           const paidBtn = (p.status === "Pending" && isCashierMgr) ? btn("paid", p.payment_id, "Mark paid", "btn-success") : "";
           const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${p.payment_id}" type="button">Edit</button>` : "";
           const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${p.payment_id}" type="button">Archive</button>` : "";
-          const actsHtml = (paidBtn || editBtn || archiveBtn) ? `<div class="acts">${paidBtn}${editBtn}${archiveBtn}</div>` : `<span class="text-muted small">View only</span>`;
+          const actsHtml = `<div class="acts">${paidBtn}${receiptBtn}${editBtn}${archiveBtn}</div>`;
           return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${badge(p.status, { Paid: "ok", Pending: "warn", Refunded: "mute" }[p.status])}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
@@ -1215,6 +1233,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
       }
+      if (a === "receipt") {
+        if (cur === "payments") return openReceipt({ paymentId: b.dataset.id });
+        return openReceipt({ orderId: b.dataset.id });
+      }
       if (a === "add") return openForm();
       if (a === "edit") return openForm(r);
       if (a === "del" && await ask("Delete?", e.delMsg(r))) {
@@ -1227,6 +1249,190 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     $("#view").addEventListener("input", debounce((ev) => { if (ev.target.dataset.flt) draw(); }));
     $("#view").addEventListener("change", (ev) => { if (ev.target.dataset.flt) draw(); });
+  }
+
+  async function openReceipt({ paymentId, orderId } = {}) {
+    try {
+      let payment = null;
+      let order = null;
+
+      if (paymentId) {
+        payment = await db.list(`payments/${paymentId}`).catch(() => null);
+        if (!payment) payment = S.rows.find((p) => p.payment_id == paymentId);
+        if (payment && payment.order_id) {
+          order = await db.list(`orders/${payment.order_id}`).catch(() => null);
+          if (!order) order = orderOf(payment.order_id);
+        }
+      } else if (orderId) {
+        order = await db.list(`orders/${orderId}`).catch(() => null);
+        if (!order) order = orderOf(orderId);
+        if (order && order.payments && order.payments.length > 0) {
+          payment = order.payments[order.payments.length - 1];
+        }
+      }
+
+      if (!payment && !order) {
+        return toast("Receipt data could not be found.", 1);
+      }
+
+      const payId = payment ? pay(payment.payment_id) : "REC-" + ord(order?.order_id || 0).replace("ORD-", "");
+      const ordId = order ? ord(order.order_id) : (payment ? ord(payment.order_id) : "ORD-0000");
+      const rawDate = payment ? (payment.paid_at || payment.payment_date) : (order ? order.order_date : today());
+      const receiptDate = formatDate(rawDate);
+      const staffName = (order && order.staff_name) || (JSON.parse(sessionStorage.getItem("current_staff") || "{}").full_name) || "Staff on duty";
+      const customerName = (payment && payment.customer_name) || (order && order.customer_name) || (order && nameOf(order)) || "Valued Customer";
+      const contact = (payment && payment.contact) || (order && order.contact) || (order && order.customer_phone) || "N/A";
+      const releaseType = (order && order.release_type) || "Pickup";
+      const address = (order && (order.street || order.barangay || order.address)) ? `${order.street ? order.street + ', ' : ''}${order.barangay ? order.barangay + ', ' : ''}${order.address || ''}`.replace(/,\s*,/g, ', ').replace(/^,\s*|,\s*$/g, '').trim() : "";
+
+      const orderTotal = Number((order && (order.total || order.total_amount)) || (payment && payment.amount) || 0);
+      const amountPaid = Number(payment ? (payment.amount_paid || payment.amount) : orderTotal);
+      const paymentMethod = (payment && (payment.payment_method || payment.method)) || "Cash";
+      const refNo = payment ? payment.reference_no : "";
+      const pStatus = (payment && payment.status) || (order && order.payment_status) || "Paid";
+      const pStatusCls = pStatus === "Paid" ? "stamp-paid" : pStatus === "Pending" ? "stamp-pending" : "stamp-refunded";
+
+      let items = (order && Array.isArray(order.items) && order.items.length > 0) ? order.items : [];
+      let itemsHtml = "";
+      if (items.length > 0) {
+        itemsHtml = items.map((it) => `
+          <tr>
+            <td><strong>${esc(it.service_name || 'Laundry Service')}</strong></td>
+            <td class="text-center">${Number(it.weight_kg || 1).toFixed(2)} kg</td>
+            <td class="text-end">${peso(it.subtotal || 0)}</td>
+          </tr>
+        `).join("");
+      } else {
+        itemsHtml = `
+          <tr>
+            <td><strong>Standard Laundry Service</strong></td>
+            <td class="text-center">1 load</td>
+            <td class="text-end">${peso(orderTotal)}</td>
+          </tr>
+        `;
+      }
+
+      let balance = 0;
+      if (order && order.payments && order.payments.length > 0) {
+        const allPaid = order.payments.reduce((s, p) => s + Number(p.amount_paid || p.amount || 0), 0);
+        balance = Math.max(0, orderTotal - allPaid);
+      } else if (orderTotal > amountPaid) {
+        balance = Math.max(0, orderTotal - amountPaid);
+      }
+
+      let modalEl = $("#receiptModal");
+      if (!modalEl) {
+        modalEl = document.createElement("div");
+        modalEl.id = "receiptModal";
+        modalEl.className = "modal fade";
+        modalEl.tabIndex = -1;
+        modalEl.setAttribute("aria-labelledby", "receiptModalTitle");
+        modalEl.setAttribute("aria-hidden", "true");
+        modalEl.innerHTML = `
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+              <div class="modal-header border-0 pb-0">
+                <h2 class="modal-title fs-5 fw-bold" id="receiptModalTitle"><i class="bi bi-receipt me-2 text-primary"></i>Official Receipt</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body p-3 p-md-4" id="receiptModalBody">
+              </div>
+              <div class="modal-footer border-0 pt-0 justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-primary" id="receiptPrintBtn"><i class="bi bi-printer me-1"></i> Print Receipt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modalEl);
+
+        modalEl.querySelector("#receiptPrintBtn").addEventListener("click", () => {
+          window.print();
+        });
+      }
+
+      const typeBadgeCls = releaseType.toLowerCase() === "delivery" ? "type-delivery" : "type-pickup";
+
+      $("#receiptModalBody").innerHTML = `
+        <div class="receipt-container">
+          <div class="receipt-paper" id="receiptPrintArea">
+            <div class="receipt-header">
+              <div class="receipt-logo">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--magma-500)" stroke-width="2.5" class="receipt-icon"><path d="M2 12h4l2-9 5 18 3-10h6"></path></svg>
+                <div class="receipt-brand">The Floor Is <b>Laba.</b></div>
+              </div>
+              <div class="receipt-sub">Professional Laundry & Dry Cleaning</div>
+              <div class="receipt-address">Poblacion, Cabuyao, Laguna</div>
+              <div class="receipt-contact">Tel: 0917-123-4567 • VAT Reg. TIN: 432-891-000</div>
+            </div>
+            
+            <div class="receipt-divider-dashed"></div>
+            
+            <div class="receipt-title-row">
+              <span class="receipt-title">OFFICIAL RECEIPT</span>
+              <span class="receipt-stamp ${pStatusCls}">${esc(pStatus)}</span>
+            </div>
+
+            <div class="receipt-meta-grid">
+              <div><span class="lbl text-muted">Receipt #:</span> <strong>${esc(payId)}</strong></div>
+              <div><span class="lbl text-muted">Order #:</span> <strong>${esc(ordId)}</strong></div>
+              <div><span class="lbl text-muted">Date:</span> <span>${esc(receiptDate)}</span></div>
+              <div><span class="lbl text-muted">Cashier:</span> <span>${esc(staffName)}</span></div>
+            </div>
+
+            <div class="receipt-divider-dashed"></div>
+
+            <div class="receipt-section">
+              <div class="receipt-row"><span class="lbl text-muted">Customer:</span> <strong>${esc(customerName)}</strong></div>
+              <div class="receipt-row"><span class="lbl text-muted">Contact:</span> <span>${esc(contact)}</span></div>
+              <div class="receipt-row"><span class="lbl text-muted">Type:</span> <span class="badge ${typeBadgeCls}">${esc(releaseType)}</span></div>
+              ${address ? `<div class="receipt-row"><span class="lbl text-muted">Address:</span> <span style="font-size:11.5px; max-width:230px; text-align:right;">${esc(address)}</span></div>` : ''}
+            </div>
+
+            <div class="receipt-divider-dashed"></div>
+
+            <table class="receipt-items-table">
+              <thead>
+                <tr>
+                  <th>Service / Item</th>
+                  <th class="text-center">Qty / Wt</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div class="receipt-divider-dashed"></div>
+
+            <div class="receipt-totals">
+              <div class="receipt-row"><span class="lbl text-muted">Order Total:</span> <strong>${peso(orderTotal)}</strong></div>
+              <div class="receipt-row"><span class="lbl text-muted">Method:</span> <span>${esc(paymentMethod)}</span></div>
+              ${refNo ? `<div class="receipt-row"><span class="lbl text-muted">Ref #:</span> <span class="font-monospace">${esc(refNo)}</span></div>` : ''}
+              <div class="receipt-row highlight"><span class="lbl">Amount Paid:</span> <strong style="font-size:15px; color:var(--magma-600);">${peso(amountPaid)}</strong></div>
+              <div class="receipt-row ${balance > 0 ? 'text-danger' : 'text-success'}"><span class="lbl">${balance > 0 ? 'Balance Due:' : 'Remaining Balance:'}</span> <strong>${peso(balance)}</strong></div>
+            </div>
+
+            <div class="receipt-divider-dashed"></div>
+
+            <div class="receipt-footer">
+              <div class="receipt-barcode">
+                <div class="barcode-lines"></div>
+                <div class="barcode-num">*${esc(ordId)}-${esc(payId)}*</div>
+              </div>
+              <p class="receipt-notes">Thank you for choosing The Floor Is Laba!<br>Please present this receipt upon claiming your laundry.<br>All claims must be made within 30 days.</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      openModal(modalEl);
+    } catch (err) {
+      toast("Failed to generate receipt: " + err.message, 1);
+    }
   }
 
   if($("#cancel")) $("#cancel").addEventListener("click", () => closeModal($("#dlg")));
@@ -1262,12 +1468,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (firstInvalid) firstInvalid.focus();
         return;
       }
-      await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
+      const saved = await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
       closeModal($("#dlg"));
       const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
       const msg = EDIT ? `${entityLabel} updated successfully.` : `New ${M.one || 'record'} created successfully.`;
       toast(msg);
       await init();
+      if (cur === "payments" && !EDIT && saved && (saved.payment_id || saved.id)) {
+        openReceipt({ paymentId: saved.payment_id || saved.id });
+      }
     });
   }
 
