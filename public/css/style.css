@@ -972,6 +972,19 @@ tbody tr.empty-row:hover > *,
   color: var(--text-main);
   overflow: hidden;
 }
+#confirm .modal-body strong,
+#confirm strong,
+#cM strong,
+.modal-body strong {
+  font-weight: 700;
+  color: var(--text-main);
+}
+[data-bs-theme="dark"] #confirm .modal-body strong,
+[data-bs-theme="dark"] #confirm strong,
+[data-bs-theme="dark"] #cM strong,
+[data-bs-theme="dark"] .modal-body strong {
+  color: #FFFFFF;
+}
 .modal-backdrop.show {
   opacity: 0.6;
   background-color: var(--volcanic-100);
