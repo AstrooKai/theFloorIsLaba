@@ -45,6 +45,13 @@ SELECT
     COALESCE(pay.total_paid, 0) AS total_paid,
     CASE 
         WHEN COALESCE(pay.total_paid, 0) >= COALESCE(SUM(oi.subtotal), 0) AND COALESCE(SUM(oi.subtotal), 0) > 0 THEN 'Paid'
+        WHEN (
+            SELECT COUNT(*) 
+            FROM payments 
+            WHERE order_id = o.order_id 
+              AND (is_archived IS NULL OR is_archived = FALSE) 
+              AND status = 'Refunded'
+        ) > 0 AND COALESCE(pay.total_paid, 0) <= 0 THEN 'Refunded'
         ELSE 'Unpaid'
     END AS payment_status
 FROM orders o
@@ -55,6 +62,8 @@ LEFT JOIN order_items oi ON o.order_id = oi.order_id
 LEFT JOIN (
     SELECT order_id, SUM(amount_paid) AS total_paid 
     FROM payments 
+    WHERE (is_archived IS NULL OR is_archived = FALSE)
+      AND (status IS NULL OR status = 'Paid')
     GROUP BY order_id
 ) pay ON o.order_id = pay.order_id
 GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, c.first_name, c.last_name, c.phone, s.first_name, s.last_name, os.status_name, pay.total_paid

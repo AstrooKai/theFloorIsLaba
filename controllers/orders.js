@@ -32,6 +32,13 @@ exports.getAllOrders = async (req, res) => {
                 COALESCE(pay.total_paid, 0) AS total_paid,
                 CASE 
                     WHEN COALESCE(pay.total_paid, 0) >= COALESCE(SUM(oi.subtotal), 0) AND COALESCE(SUM(oi.subtotal), 0) > 0 THEN 'Paid'
+                    WHEN (
+                        SELECT COUNT(*) 
+                        FROM payments 
+                        WHERE order_id = o.order_id 
+                          AND (is_archived IS NULL OR is_archived = FALSE) 
+                          AND status = 'Refunded'
+                    ) > 0 AND COALESCE(pay.total_paid, 0) <= 0 THEN 'Refunded'
                     ELSE 'Unpaid'
                 END AS payment_status
             FROM orders o
@@ -42,6 +49,8 @@ exports.getAllOrders = async (req, res) => {
             LEFT JOIN (
                 SELECT order_id, SUM(amount_paid) AS total_paid 
                 FROM payments 
+                WHERE (is_archived IS NULL OR is_archived = FALSE)
+                  AND (status IS NULL OR status = 'Paid')
                 GROUP BY order_id
             ) pay ON o.order_id = pay.order_id
             ${archiveFilter}
@@ -66,19 +75,41 @@ exports.getOrderById = async (req, res) => {
                 o.customer_id,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS contact,
+                c.street,
+                c.barangay,
                 c.address,
                 o.staff_id,
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
-                COALESCE(SUM(oi.subtotal), 0) AS total
+                COALESCE(SUM(oi.subtotal), 0) AS total,
+                COALESCE(SUM(oi.subtotal), 0) AS total_amount,
+                COALESCE(pay.total_paid, 0) AS total_paid,
+                CASE 
+                    WHEN COALESCE(pay.total_paid, 0) >= COALESCE(SUM(oi.subtotal), 0) AND COALESCE(SUM(oi.subtotal), 0) > 0 THEN 'Paid'
+                    WHEN (
+                        SELECT COUNT(*) 
+                        FROM payments 
+                        WHERE order_id = o.order_id 
+                          AND (is_archived IS NULL OR is_archived = FALSE) 
+                          AND status = 'Refunded'
+                    ) > 0 AND COALESCE(pay.total_paid, 0) <= 0 THEN 'Refunded'
+                    ELSE 'Unpaid'
+                END AS payment_status
             FROM orders o
             JOIN customers c ON o.customer_id = c.customer_id
             JOIN staff s ON o.staff_id = s.staff_id
             JOIN order_statuses os ON o.status_id = os.status_id
             LEFT JOIN order_items oi ON o.order_id = oi.order_id
+            LEFT JOIN (
+                SELECT order_id, SUM(amount_paid) AS total_paid 
+                FROM payments 
+                WHERE (is_archived IS NULL OR is_archived = FALSE)
+                  AND (status IS NULL OR status = 'Paid')
+                GROUP BY order_id
+            ) pay ON o.order_id = pay.order_id
             WHERE o.order_id = ?
-            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.customer_id, c.first_name, c.last_name, c.phone, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name
+            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.customer_id, c.first_name, c.last_name, c.phone, c.street, c.barangay, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
         `, [id]);
 
         if (orders.length === 0) {
@@ -100,9 +131,20 @@ exports.getOrderById = async (req, res) => {
         `, [id]);
 
         const [payments] = await pool.query(`
-            SELECT payment_id, amount_paid, payment_method, payment_date
+            SELECT 
+                payment_id, 
+                amount_paid, 
+                amount_paid AS amount,
+                payment_method, 
+                payment_method AS method,
+                DATE_FORMAT(payment_date, '%Y-%m-%d') AS payment_date,
+                DATE_FORMAT(payment_date, '%Y-%m-%d') AS paid_at,
+                COALESCE(status, 'Paid') AS status,
+                COALESCE(reference_no, '') AS reference_no,
+                COALESCE(is_archived, FALSE) AS is_archived
             FROM payments
             WHERE order_id = ?
+            ORDER BY payment_date DESC, payment_id DESC
         `, [id]);
 
         order.items = items;
