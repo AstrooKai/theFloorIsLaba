@@ -80,6 +80,21 @@ exports.createDelivery = async (req, res) => {
             return res.status(400).json({ error: 'order_id is required' });
         }
 
+        const [orderRows] = await pool.query(`
+            SELECT o.order_id, o.status_id, os.status_name 
+            FROM orders o 
+            JOIN order_statuses os ON o.status_id = os.status_id 
+            WHERE o.order_id = ?
+        `, [order_id]);
+
+        if (orderRows.length === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (orderRows[0].status_id === 5 || (orderRows[0].status_name || '').toLowerCase() === 'completed') {
+            return res.status(400).json({ error: 'Completed orders cannot be scheduled for pickup or delivery runs' });
+        }
+
         let resolvedRiderId = rider_id || null;
         if (!resolvedRiderId && rider && type === 'Delivery') {
             const [riderRows] = await pool.query(

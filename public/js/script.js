@@ -416,8 +416,18 @@ document.addEventListener("DOMContentLoaded", () => {
           const label = isBusy ? `${r.full_name} (Occupied on delivery)` : `${r.full_name} (Available)`;
           return `<option value="${esc(r.full_name)}">${esc(label)}</option>`;
         }).join("");
+      } else if (k === "orders") {
+        // In Pickups & Deliveries, completed orders should not be selectable when creating a new run
+        const availableOrders = (S.orders || []).filter((o) => {
+          const isCompleted = String(o.order_status || "").trim().toLowerCase() === "completed" || Number(o.status_id) === 5;
+          if (EDIT && EDIT.order_id == o.order_id) return true;
+          return !isCompleted;
+        });
+        const defaultPrompt = (!EDIT && availableOrders.length === 0) ? "No active orders available" : "Choose order";
+        const opts = availableOrders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}`]);
+        sel.innerHTML = `<option value="">${defaultPrompt}</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
       } else {
-        const opts = S.orders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
+        const opts = (S.orders || []).map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
         sel.innerHTML = `<option value="">Choose order</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
       }
     });
@@ -710,6 +720,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     fillSelects();
+    if (cur === "deliveries" || cur === "payments") {
+      db.list("orders").then((orders) => {
+        S.orders = orders || [];
+        fillSelects();
+      }).catch(() => {});
+    }
     e.init && e.init(f);
     if($("#dlg")) openModal($("#dlg"));
   }
@@ -1194,6 +1210,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.target.name === "fee") feeTouched = true;
         if (e.target.name === "order_id" && e.target.value) {
           const o = orderOf(e.target.value);
+          const isCompleted = String(o?.order_status || "").trim().toLowerCase() === "completed" || Number(o?.status_id) === 5;
+          if (isCompleted && !EDIT) {
+            e.target.value = "";
+            toast("Completed orders cannot be scheduled for pickup or delivery runs.", 1);
+            return;
+          }
           if (f.elements.contact && (!f.elements.contact.value || !EDIT)) f.elements.contact.value = o.contact || o.customer_phone || "";
           if (f.elements.street && (!f.elements.street.value || !EDIT)) f.elements.street.value = o.street || o.address || "";
           if (f.elements.barangay && (!f.elements.barangay.value || !EDIT) && o.barangay) f.elements.barangay.value = o.barangay;
@@ -1262,6 +1284,13 @@ document.addEventListener("DOMContentLoaded", () => {
       validate(d) {
         const e = {};
         if (!d.order_id) e.order_id = "Please choose an order";
+        else if (!EDIT) {
+          const selectedOrder = orderOf(d.order_id);
+          const isCompleted = String(selectedOrder?.order_status || "").trim().toLowerCase() === "completed" || Number(selectedOrder?.status_id) === 5;
+          if (isCompleted) {
+            e.order_id = "Completed orders cannot be scheduled for pickup or delivery runs";
+          }
+        }
         if (!d.street || !d.street.trim()) e.street = "Street address is required";
         if (!d.barangay) e.barangay = "Please select a barangay";
         if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
