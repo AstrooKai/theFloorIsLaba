@@ -1576,11 +1576,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
               </div>
             </div>
-
-            <div class="invoice-footer">
-              <div style="font-weight: 600; margin-bottom: 4px;">Thank you for your business!</div>
-              <div>This is an official document issued by The Floor Is Laba. For questions or customer support, email support@floorislaba.ph or call (0917) 123-4567.</div>
-            </div>
           </div>
         </div>
       `;

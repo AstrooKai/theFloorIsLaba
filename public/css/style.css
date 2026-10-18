@@ -1454,18 +1454,19 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 }
 
 .invoice-summary-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 24px;
+  display: block;
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .invoice-summary-card {
   width: 100%;
-  max-width: 320px;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--paper);
   border: 1px solid #EAE5E3;
   border-radius: var(--radius-sm);
-  padding: 16px 20px;
+  padding: 18px 22px;
 }
 
 [data-bs-theme="dark"] .invoice-summary-card {
@@ -1477,7 +1478,7 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: 13.5px;
   margin-bottom: 8px;
 }
 
@@ -1490,18 +1491,6 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 }
 
 [data-bs-theme="dark"] .invoice-summary-row.total-row {
-  border-top-color: rgba(255, 255, 255, 0.08);
-}
-
-.invoice-footer {
-  text-align: center;
-  padding-top: 16px;
-  border-top: 1px solid #EAE5E3;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-[data-bs-theme="dark"] .invoice-footer {
   border-top-color: rgba(255, 255, 255, 0.08);
 }
 
