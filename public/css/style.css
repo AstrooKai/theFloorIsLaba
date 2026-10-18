@@ -516,8 +516,7 @@ body.sidebar-collapsed .btn-signout span {
 .dash-banner-actions { display: flex; align-items: center; gap: 24px; }
 .btn-white { background: #FFFFFF; color: #160D0A !important; padding: 14px 24px; border-radius: var(--radius-pill); font-weight: 700; border: none; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s; }
 .btn-white:hover { background: #F2EBE9; color: #160D0A !important; }
-.banner-status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); }
-.banner-status::before { content:''; width:8px; height:8px; background:var(--safe); border-radius:50%; }
+.banner-status { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); }
 .dash-graphic { position: relative; z-index: 2; margin-right: 40px; transform: scale(1.2); }
 
 /* Stats Row */
@@ -768,18 +767,12 @@ tbody tr.empty-row:hover > *,
 }
 
 /* Badges */
-.badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-.badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+.badge { display: inline-flex; align-items: center; justify-content: center; padding: 5px 12px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 .ok { background: #E2F3EA; color: #0D7A41; }
-.ok::before { background: #0D7A41; }
 .warn { background: #FFF4E5; color: #B25E00; }
-.warn::before { background: #B25E00; }
 .bad { background: #FBE5E2; color: #D32F2F; }
-.bad::before { background: #D32F2F; }
 .info { background: #E8F0FE; color: #1967D2; }
-.info::before { background: #1967D2; }
 .mute { background: #F2EBE9; color: var(--text-muted); }
-.mute::before { background: var(--text-muted); }
 
 /* Order & Delivery Type Badges */
 .badge.type-pickup,
@@ -787,19 +780,11 @@ tbody tr.empty-row:hover > *,
   background: #E8F0FE;
   color: #1A73E8;
 }
-.badge.type-pickup::before,
-.badge.badge-pickup::before {
-  background: #1A73E8;
-}
 
 .badge.type-delivery,
 .badge.badge-delivery {
   background: #FFF0E5;
   color: #C44500;
-}
-.badge.type-delivery::before,
-.badge.badge-delivery::before {
-  background: #E85D04;
 }
 
 [data-bs-theme="dark"] .badge.type-pickup,
@@ -807,27 +792,16 @@ tbody tr.empty-row:hover > *,
   background: rgba(66, 133, 244, 0.2);
   color: #8AB4F8;
 }
-[data-bs-theme="dark"] .badge.type-pickup::before,
-[data-bs-theme="dark"] .badge.badge-pickup::before {
-  background: #8AB4F8;
-}
 
 [data-bs-theme="dark"] .badge.type-delivery,
 [data-bs-theme="dark"] .badge.badge-delivery {
   background: rgba(232, 93, 4, 0.22);
   color: #FF9E66;
 }
-[data-bs-theme="dark"] .badge.type-delivery::before,
-[data-bs-theme="dark"] .badge.badge-delivery::before {
-  background: #FF9E66;
-}
 
 [data-bs-theme="dark"] .info {
   background: rgba(66, 133, 244, 0.2);
   color: #8AB4F8;
-}
-[data-bs-theme="dark"] .info::before {
-  background: #8AB4F8;
 }
 
 .badge.status-clickable {
