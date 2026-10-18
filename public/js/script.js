@@ -356,7 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function sortTableRows(table, colIdx, dir = "asc") {
     const tbody = table.querySelector("tbody");
     if (!tbody) return;
-    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const rows = Array.from(tbody.querySelectorAll("tr:not(.empty-row)"));
     if (rows.length <= 1) return;
 
     const parseVal = (str) => {
@@ -502,8 +502,47 @@ document.addEventListener("DOMContentLoaded", () => {
     const e = ENT[cur], list = e.filter(S.rows, flt());
     if($("#count")) $("#count").textContent = `Showing ${list.length} of ${S.rows.length} ${M.noun || ''}`;
     if (e.stats) { const st = e.stats(list); document.querySelectorAll("[data-stat]").forEach((el) => (el.textContent = st[el.dataset.stat] || 0)); }
-    if($("#out")) $("#out").innerHTML = e.draw(list);
-    if($("#list")) $("#list").hidden = !list.length;
+    if($("#out")) {
+      if (list.length) {
+        $("#out").innerHTML = e.draw(list);
+      } else {
+        const noun = M.noun || "records";
+        const filterVals = flt();
+        const hasFilter = Object.values(filterVals).some((v) => !!v);
+        const subMsg = hasFilter
+          ? `No ${noun} matched your search or filter criteria.`
+          : `No ${noun} available yet.`;
+        const clearBtn = hasFilter
+          ? `<button class="btn sm mt-3 btn-outline-secondary" data-act="clear" type="button"><i class="bi bi-arrow-counterclockwise me-1"></i> Clear filters</button>`
+          : "";
+
+        const isTable = !!$("#out").closest("table");
+        if (isTable) {
+          $("#out").innerHTML = `
+            <tr class="empty-row">
+              <td colspan="100%" class="text-center py-5 empty-cell">
+                <div class="empty-placeholder">
+                  <div class="empty-icon"><i class="bi bi-search"></i></div>
+                  <h5>No matching ${noun} found</h5>
+                  <p>${subMsg}</p>
+                  ${clearBtn}
+                </div>
+              </td>
+            </tr>
+          `;
+        } else {
+          $("#out").innerHTML = `
+            <div class="empty-placeholder card text-center py-5 p-4 my-2 empty-row">
+              <div class="empty-icon"><i class="bi bi-search"></i></div>
+              <h5>No matching ${noun} found</h5>
+              <p>${subMsg}</p>
+              ${clearBtn}
+            </div>
+          `;
+        }
+      }
+    }
+    if($("#list")) $("#list").hidden = false;
     applyActionPermissions();
     initTablesSorting();
   }
@@ -1206,7 +1245,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const tbody = document.querySelector(".tw tbody");
       if (tbody && Array.isArray(data.latest_orders)) {
         if (data.latest_orders.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted);">No orders recorded yet.</td></tr>';
+          tbody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="5" class="text-center py-5 empty-cell">
+                <div class="empty-placeholder">
+                  <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                  <h5>No orders recorded yet</h5>
+                  <p>When new laundry orders are placed, they will appear here.</p>
+                </div>
+              </td>
+            </tr>
+          `;
         } else {
           tbody.innerHTML = data.latest_orders.map(o => `
             <tr>
