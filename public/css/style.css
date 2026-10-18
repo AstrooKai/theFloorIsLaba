@@ -1164,11 +1164,11 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   display: flex !important;
   opacity: 1 !important;
   visibility: visible !important;
-  background: var(--volcanic-100) !important;
-  color: #fff !important;
+  background: #FFFFFF !important;
+  color: #160D0A !important;
   padding: 14px 18px !important;
   border-radius: var(--radius-sm) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+  box-shadow: 0 10px 30px rgba(22, 13, 10, 0.12), 0 2px 8px rgba(22, 13, 10, 0.06) !important;
   font-size: 14px !important;
   font-weight: 500 !important;
   align-items: center !important;
@@ -1177,9 +1177,10 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   width: auto !important;
   min-width: 320px !important;
   max-width: 440px !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid #EAE5E3 !important;
   border-left: 4px solid var(--safe) !important;
   animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   margin: 0 !important;
 }
 .toasts .toast.e,
@@ -1191,9 +1192,10 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 [data-bs-theme="dark"] .toast.show,
 [data-bs-theme="dark"] .toast {
   background: #20130E !important;
+  color: #F2EBE9 !important;
   border: 1px solid #3D251D !important;
   border-left: 4px solid var(--safe) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 [data-bs-theme="dark"] .toasts .toast.e,
 [data-bs-theme="dark"] .toast.e {
@@ -1204,6 +1206,11 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   align-items: center;
   gap: 12px;
   flex: 1;
+  min-width: 0;
+  color: inherit;
+}
+.toast-body-content span {
+  word-break: break-word;
 }
 .toast-icon {
   width: 20px;
@@ -1212,28 +1219,56 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: transparent !important;
+  border-radius: 0 !important;
 }
-.toast-icon.ok {
-  color: var(--safe);
+.toast-icon svg {
+  display: block;
+  flex-shrink: 0;
 }
-.toast-icon.err {
-  color: var(--hazard);
+.toast-icon.ok,
+.toast-icon.toast-icon-ok {
+  color: var(--safe) !important;
+  background: transparent !important;
 }
+.toast-icon.err,
+.toast-icon.toast-icon-err {
+  color: var(--hazard) !important;
+  background: transparent !important;
+}
+
+[data-bs-theme="dark"] .toast-icon,
+[data-bs-theme="dark"] .toast-icon.ok,
+[data-bs-theme="dark"] .toast-icon.toast-icon-ok,
+[data-bs-theme="dark"] .toast-icon.err,
+[data-bs-theme="dark"] .toast-icon.toast-icon-err {
+  background: transparent !important;
+}
+
 .toast-close {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted) !important;
   cursor: pointer;
   padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: color 0.15s ease;
+  border-radius: 6px;
+  transition: all 0.15s ease;
   line-height: 1;
+  flex-shrink: 0;
 }
 .toast-close:hover {
-  color: #fff;
+  color: var(--text-main) !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+[data-bs-theme="dark"] .toast-close {
+  color: rgba(242, 235, 233, 0.6) !important;
+}
+[data-bs-theme="dark"] .toast-close:hover {
+  color: #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 @keyframes toastSlideIn {
   from {
