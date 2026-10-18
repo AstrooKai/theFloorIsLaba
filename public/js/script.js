@@ -1050,10 +1050,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const label = (d) => d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
         return Object.keys(g).sort().map((d) => `<section class="day"><h2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
           const act = r.status === "Scheduled" || r.status === "On the way";
-          const startBtn = (r.status === "Scheduled" && (isCashierMgr || isR)) ? btn("start", r.delivery_id, "Start run", "btn-warning") : "";
-          const doneBtn = (r.status === "On the way" && (isCashierMgr || isR)) ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
+          const isPickup = (r.type || "").toLowerCase() === "pickup";
+          const startBtn = (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) ? btn("start", r.delivery_id, "Start run", "btn-warning") : "";
+          const doneBtn = ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
           const editBtn = ((r.status !== "Completed" && r.status !== "Cancelled") && isCashierMgr) ? btn("edit", r.delivery_id, "Edit") : "";
-          const cancelBtn = (act && isCashierMgr) ? btn("cancel", r.delivery_id, "Cancel run", "btn-danger") : "";
+          const cancelBtn = (act && isCashierMgr) ? btn("cancel", r.delivery_id, isPickup ? "Cancel pickup" : "Cancel run", "btn-danger") : "";
           const archiveBtn = (r.status === "Completed" && isMgr) ? btn("archive", r.delivery_id, "Archive", "btn-outline-secondary") : "";
           const acts = (startBtn || doneBtn || editBtn || cancelBtn || archiveBtn)
             ? `${startBtn}${doneBtn}${editBtn}${cancelBtn}${archiveBtn}`
@@ -1093,8 +1094,17 @@ document.addEventListener("DOMContentLoaded", () => {
       delMsg: () => "Archive run?",
       async act(a, r) {
         if (a === "start") return r.rider ? patch(r, { status: "On the way" }, "Run started.") : toast("Please assign a rider before starting the run.", 1);
-        if (a === "done") return patch(r, { status: "Completed" }, "Run completed.");
-        if (a === "cancel" && (await ask("Cancel run?", `Cancel this run?`, "Cancel run"))) return patch(r, { status: "Cancelled" }, "Run cancelled.");
+        if (a === "done") {
+          const isPickup = (r.type || "").toLowerCase() === "pickup";
+          return patch(r, { status: "Completed" }, isPickup ? "Pickup completed." : "Run completed.");
+        }
+        if (a === "cancel") {
+          const isPickup = (r.type || "").toLowerCase() === "pickup";
+          const label = isPickup ? "pickup" : "run";
+          if (await ask(`Cancel ${label}?`, `Cancel this ${label}?`, `Cancel ${label}`)) {
+            return patch(r, { status: "Cancelled" }, `${isPickup ? "Pickup" : "Run"} cancelled.`);
+          }
+        }
         if (a === "archive") {
           if (await ask("Archive Transport Run?", `Archive completed run for Order #${ord(r.order_id)}? It will be safely stored and removed from the active schedule.`, "Archive")) {
             const res = await fetch(`/api/deliveries/${r.delivery_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
