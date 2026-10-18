@@ -81,7 +81,8 @@ const badge = (t, c) => `<span class="badge ${c}">${esc(t)}</span>`;
 const orderStatusBadge = (st, id) => {
   const s = String(st || "Received").trim();
   const cls = (s === "Completed") ? "ok"
-    : (s === "Washing" || s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
+    : (s === "Washing") ? "info"
+    : (s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
     : "mute";
   const canAdvance = isCashierOrManager() || (isProductionStaff() && (s === "Received" || s === "Washing"));
   if (id && canAdvance) {
