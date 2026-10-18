@@ -457,11 +457,22 @@ document.addEventListener("DOMContentLoaded", () => {
   function initTablesSorting() {
     document.querySelectorAll("table").forEach(table => {
       setupTableSorting(table);
-      const activeTh = table.querySelector("thead th[data-sort-dir]");
+      const allThs = Array.from(table.querySelectorAll("thead th"));
+      let activeTh = table.querySelector("thead th[data-sort-dir]");
+
+      if (!activeTh && allThs.length > 0) {
+        const firstSortableTh = allThs.find(th => th.classList.contains("sortable-th")) || allThs[0];
+        if (firstSortableTh) {
+          firstSortableTh.dataset.sortDir = "asc";
+          const ind = firstSortableTh.querySelector(".sort-indicator");
+          if (ind) ind.innerHTML = '<i class="bi bi-arrow-up sort-active"></i>';
+          activeTh = firstSortableTh;
+        }
+      }
+
       if (activeTh) {
-        const ths = Array.from(table.querySelectorAll("thead th"));
-        const idx = ths.indexOf(activeTh);
-        if (idx !== -1) sortTableRows(table, idx, activeTh.dataset.sortDir);
+        const idx = allThs.indexOf(activeTh);
+        if (idx !== -1) sortTableRows(table, idx, activeTh.dataset.sortDir || "asc");
       }
     });
   }
