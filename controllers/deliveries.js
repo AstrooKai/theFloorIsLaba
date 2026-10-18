@@ -16,8 +16,9 @@ exports.getAllDeliveries = async (req, res) => {
                 d.fee,
                 d.status,
                 d.street,
+                d.street AS street_address,
                 d.barangay,
-                d.address,
+                CONCAT_WS(', ', d.street, d.barangay) AS address,
                 d.contact,
                 d.notes,
                 COALESCE(d.is_archived, FALSE) AS is_archived,
@@ -50,8 +51,9 @@ exports.getDeliveryById = async (req, res) => {
                 d.fee,
                 d.status,
                 d.street,
+                d.street AS street_address,
                 d.barangay,
-                d.address,
+                CONCAT_WS(', ', d.street, d.barangay) AS address,
                 d.contact,
                 d.notes,
                 COALESCE(d.is_archived, FALSE) AS is_archived,
@@ -75,7 +77,7 @@ exports.getDeliveryById = async (req, res) => {
 
 exports.createDelivery = async (req, res) => {
     try {
-        const { order_id, type = 'Delivery', scheduled_date, time_slot = '10 AM - 12 PM', fee, rider, rider_id, street, barangay, address, contact, notes } = req.body;
+        const { order_id, type = 'Delivery', scheduled_date, time_slot = '10 AM - 12 PM', fee, rider, rider_id, street, street_address, barangay, address, contact, notes } = req.body;
         if (!order_id) {
             return res.status(400).json({ error: 'order_id is required' });
         }
@@ -109,15 +111,15 @@ exports.createDelivery = async (req, res) => {
 
         const dateVal = scheduled_date || new Date().toISOString().split('T')[0];
         const finalFee = fee !== undefined ? Number(fee) : (type === 'Delivery' ? 50.00 : 0.00);
-        const finalStreet = (street || '').trim();
-        const finalBarangay = (barangay || '').trim();
-        const finalAddress = address || (finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : (finalStreet || finalBarangay || 'Cabuyao, Laguna'));
+        const finalStreet = (street || street_address || (address && address.split(',')[0]) || '').trim();
+        const finalBarangay = (barangay || (address && address.split(',')[1]) || '').trim();
         const finalContact = contact || '09170000000';
+        const displayAddress = finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : (finalStreet || finalBarangay || 'Cabuyao, Laguna');
 
         const [result] = await pool.query(`
-            INSERT INTO deliveries (order_id, type, rider_id, scheduled_date, time_slot, fee, status, street, barangay, address, contact, notes, is_archived)
-            VALUES (?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, ?, ?, FALSE)
-        `, [order_id, type, resolvedRiderId, dateVal, time_slot, finalFee, finalStreet, finalBarangay, finalAddress, finalContact, notes || '']);
+            INSERT INTO deliveries (order_id, type, rider_id, scheduled_date, time_slot, fee, status, street, barangay, contact, notes, is_archived)
+            VALUES (?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, ?, FALSE)
+        `, [order_id, type, resolvedRiderId, dateVal, time_slot, finalFee, finalStreet, finalBarangay, finalContact, notes || '']);
 
         res.status(201).json({
             delivery_id: result.insertId,
@@ -129,9 +131,10 @@ exports.createDelivery = async (req, res) => {
             time_slot,
             fee: finalFee,
             status: 'Scheduled',
-            address: finalAddress,
             street: finalStreet,
+            street_address: finalStreet,
             barangay: finalBarangay,
+            address: displayAddress,
             contact: finalContact,
             notes: notes || '',
             is_archived: false
@@ -144,7 +147,7 @@ exports.createDelivery = async (req, res) => {
 exports.updateDelivery = async (req, res) => {
     try {
         const { id } = req.params;
-        const { type, scheduled_date, time_slot, fee, rider, rider_id, status, street, barangay, address, contact, notes, is_archived } = req.body;
+        const { type, scheduled_date, time_slot, fee, rider, rider_id, status, street, street_address, barangay, contact, notes, is_archived } = req.body;
 
         const updates = [];
         const params = [];
@@ -219,17 +222,14 @@ exports.updateDelivery = async (req, res) => {
         if (type === 'Pickup') {
             updates.push('rider_id = NULL');
         }
-        if (street !== undefined) {
+        const targetStreet = street !== undefined ? street : street_address;
+        if (targetStreet !== undefined) {
             updates.push('street = ?');
-            params.push(street);
+            params.push(targetStreet);
         }
         if (barangay !== undefined) {
             updates.push('barangay = ?');
             params.push(barangay);
-        }
-        if (address !== undefined) {
-            updates.push('address = ?');
-            params.push(address);
         }
         if (contact !== undefined) {
             updates.push('contact = ?');

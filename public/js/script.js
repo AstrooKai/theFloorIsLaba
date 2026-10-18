@@ -1300,13 +1300,11 @@ document.addEventListener("DOMContentLoaded", () => {
       payload: (d) => {
         const street = (d.street || "").trim();
         const barangay = (d.barangay || "").trim();
-        const address = street && barangay ? `${street}, ${barangay}` : (street || barangay || (d.address || "").trim());
         return {
           order_id: +d.order_id,
           type: d.type,
           street,
           barangay,
-          address,
           contact: (d.contact || "").trim(),
           scheduled_date: d.scheduled_date,
           time_slot: d.time_slot,
