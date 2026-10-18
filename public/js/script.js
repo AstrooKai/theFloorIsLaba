@@ -549,8 +549,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function setErrors(errs) {
     document.querySelectorAll("#form .field").forEach((f) => {
-      const m = errs[f.dataset.f]; f.classList.toggle("invalid", !!m);
-      if($(".err", f)) $(".err", f).textContent = m || "";
+      const m = errs[f.dataset.f];
+      f.classList.toggle("invalid", !!m);
+      let errEl = f.querySelector(".err");
+      if (m) {
+        if (!errEl) {
+          errEl = document.createElement("div");
+          errEl.className = "err";
+          f.appendChild(errEl);
+        }
+        errEl.textContent = m;
+      } else if (errEl) {
+        errEl.textContent = "";
+      }
     });
     return !Object.keys(errs).length;
   }
@@ -652,11 +663,11 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.first_name) e.first_name = "First name is required";
-        if (!d.last_name) e.last_name = "Last name is required";
-        if (!d.contact) e.contact = "Contact number is required";
-        if (!d.street) e.street = "Street address is required";
-        if (!d.barangay) e.barangay = "Please select a barangay";
+        if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
+        if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
+        if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
+        if (!d.street || !d.street.trim()) e.street = "Street address is required";
+        if (!d.barangay || !d.barangay.trim()) e.barangay = "Please select a barangay";
         return e;
       },
       payload: (d) => ({
@@ -739,11 +750,11 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.first_name) e.first_name = "First name is required";
-        if (!d.last_name) e.last_name = "Last name is required";
-        if (!d.contact) e.contact = "Contact number is required";
-        if (!d.street) e.street = "Street address is required";
-        if (!d.barangay) e.barangay = "Please select a barangay";
+        if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
+        if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
+        if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
+        if (!d.street || !d.street.trim()) e.street = "Street address is required";
+        if (!d.barangay || !d.barangay.trim()) e.barangay = "Please select a barangay";
         if (!d.service_id) e.service_id = "Please select a service";
         if (!d.weight_kg || Number(d.weight_kg) <= 0) e.weight_kg = "Valid weight/quantity required";
         return e;
@@ -906,11 +917,11 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.order_id) e.order_id = "Required";
-        if (!d.amount || Number(d.amount) <= 0) e.amount = "Valid amount required";
-        if (!d.method) e.method = "Payment method required";
+        if (!d.order_id) e.order_id = "Please choose an order";
+        if (!d.amount || Number(d.amount) <= 0) e.amount = "Valid amount is required";
+        if (!d.method) e.method = "Payment method is required";
         if ((d.method === "E-Wallet" || d.method === "Card") && (!d.reference_no || !d.reference_no.trim())) {
-          e.reference_no = "Reference number is required for digital/card payments";
+          e.reference_no = "Reference number is required";
         }
         return e;
       },
@@ -1024,9 +1035,9 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.order_id) e.order_id = "Order is required";
+        if (!d.order_id) e.order_id = "Please choose an order";
         if (!d.street || !d.street.trim()) e.street = "Street address is required";
-        if (!d.barangay) e.barangay = "Barangay is required";
+        if (!d.barangay) e.barangay = "Please select a barangay";
         if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
         if (d.type === "Delivery" && !d.rider) e.rider = "Rider is required for delivery";
         return e;
@@ -1209,16 +1220,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if($("#cancel")) $("#cancel").addEventListener("click", () => closeModal($("#dlg")));
   if($("#form")) {
-    $("#form").addEventListener("change", (ev) => ENT[cur]?.change && ENT[cur].change(ev));
+    $("#form").addEventListener("change", (ev) => {
+      const field = ev.target.closest(".field");
+      if (field && field.classList.contains("invalid") && ev.target.value) {
+        field.classList.remove("invalid");
+        const errEl = field.querySelector(".err");
+        if (errEl) errEl.textContent = "";
+      }
+      ENT[cur]?.change && ENT[cur].change(ev);
+    });
     $("#form").addEventListener("input", (ev) => {
+      const field = ev.target.closest(".field");
+      if (field && field.classList.contains("invalid") && ev.target.value.trim()) {
+        field.classList.remove("invalid");
+        const errEl = field.querySelector(".err");
+        if (errEl) errEl.textContent = "";
+      }
       if (cur === "orders" && (ev.target.name === "weight_kg" || ev.target.name === "service_id")) {
         ENT.orders.calcTotal();
       }
     });
     $("#form").addEventListener("submit", async (ev) => {
-      ev.preventDefault(); const e = ENT[cur], d = Object.fromEntries(new FormData(ev.target));
+      ev.preventDefault();
+      const e = ENT[cur], d = Object.fromEntries(new FormData(ev.target));
       ev.target.querySelectorAll("[data-lock]").forEach((i) => { if (EDIT) d[i.name] = EDIT[i.name]; });
-      if (!setErrors(e.validate(d))) return;
+      const errors = e.validate ? e.validate(d) : {};
+      if (!setErrors(errors)) {
+        toast("Please fill in all required fields.", 1);
+        const firstInvalid = ev.target.querySelector(".field.invalid input, .field.invalid select, .field.invalid textarea");
+        if (firstInvalid) firstInvalid.focus();
+        return;
+      }
       await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
       closeModal($("#dlg"));
       const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";

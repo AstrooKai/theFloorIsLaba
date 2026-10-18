@@ -731,8 +731,25 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 .field input:not([type="radio"]):not([type="checkbox"]), .field select, .field textarea { padding: 14px 16px; border: 1px solid #D9D2CE; border-radius: 8px; background: #fff; font-family: inherit; font-size: 14px; transition: border-color 0.2s; }
 .field input:not([type="radio"]):not([type="checkbox"]):focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--magma-500); }
 .field textarea { resize: vertical; min-height: 100px; }
-.field.invalid input:not([type="radio"]):not([type="checkbox"]), .field.invalid select { border-color: var(--hazard); }
-.err { font-size: 12px; color: var(--hazard); font-weight: 600; }
+.field.invalid input:not([type="radio"]):not([type="checkbox"]),
+.field.invalid select,
+.field.invalid textarea,
+[data-bs-theme="dark"] .field.invalid input:not([type="radio"]):not([type="checkbox"]),
+[data-bs-theme="dark"] .field.invalid select,
+[data-bs-theme="dark"] .field.invalid textarea {
+  border-color: var(--hazard) !important;
+  box-shadow: 0 0 0 1px var(--hazard) !important;
+}
+.err {
+  font-size: 12px;
+  color: var(--hazard);
+  font-weight: 600;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+.err:empty {
+  display: none;
+}
 .hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .seg { display: flex; gap: 8px; }
 .seg label { flex: 1; display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #D9D2CE; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s ease; }
