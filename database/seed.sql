@@ -1,12 +1,12 @@
 USE laundry_shop_db;
 
 -- Insert sample customers
-INSERT INTO customers (first_name, last_name, phone, street, barangay, address) VALUES
-('Lisa',   'Delos Santos', '09171234501', '12 Rizal Street',       'Poblacion I', '12 Rizal Street, Poblacion I, Cabuyao, Laguna'),
-('Cedric', 'Garcia',       '09171234502', '45 Mabini Avenue',      'Mamatid',     '45 Mabini Avenue, Mamatid, Cabuyao, Laguna'),
-('Martin', 'Rivera',       '09171234503', '8 Bonifacio Boulevard', 'Pulo',        '8 Bonifacio Boulevard, Pulo, Cabuyao, Laguna'),
-('Janine', 'Gonzales',     '09171234504', '23 Luna Street',        'Banay-banay', '23 Luna Street, Banay-banay, Cabuyao, Laguna'),
-('Eugene', 'Reyes',        '09171234505', '67 Del Pilar Street',   'Sala',        '67 Del Pilar Street, Sala, Cabuyao, Laguna');
+INSERT INTO customers (first_name, last_name, phone, street_address, barangay) VALUES
+('Lisa',   'Delos Santos', '09171234501', '12 Rizal Street',       'Poblacion I'),
+('Cedric', 'Garcia',       '09171234502', '45 Mabini Avenue',      'Mamatid'),
+('Martin', 'Rivera',       '09171234503', '8 Bonifacio Boulevard', 'Pulo'),
+('Janine', 'Gonzales',     '09171234504', '23 Luna Street',        'Banay-banay'),
+('Eugene', 'Reyes',        '09171234505', '67 Del Pilar Street',   'Sala');
 
 -- Insert sample staff (Password: admin123)
 INSERT INTO staff (first_name, last_name, role, email, password, phone) VALUES

@@ -710,15 +710,16 @@ document.addEventListener("DOMContentLoaded", () => {
           if (EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
           if (EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
           if (EDIT.phone || EDIT.contact) f.elements.contact.value = EDIT.phone || EDIT.contact;
-          if (EDIT.street) f.elements.street.value = EDIT.street;
-          else if (EDIT.address) f.elements.street.value = EDIT.address;
+          const streetVal = EDIT.street_address || EDIT.street || EDIT.address || "";
+          if (f.elements.street_address) f.elements.street_address.value = streetVal;
+          if (f.elements.street) f.elements.street.value = streetVal;
           if (EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
           setRadioValue(f, "status", EDIT.status || "Active");
         } else {
           setRadioValue(f, "status", "Active");
         }
       },
-      filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.address||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
+      filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.street_address||r.street||r.address||"") + " " + (r.barangay||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
       draw: (list) => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
@@ -734,7 +735,9 @@ document.addEventListener("DOMContentLoaded", () => {
           const statusBadge = isCashierMgr
             ? `<span class="badge status-clickable ${c.status === "Inactive" ? "mute" : "ok"}" data-act="quick-status" data-id="${c.customer_id}" data-current="${esc(c.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(c.status || "Active")}</span>`
             : `<span class="badge ${c.status === "Inactive" ? "mute" : "ok"}">${esc(c.status || "Active")}</span>`;
-          return `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact || c.phone)}</td><td>${esc(c.address || `${c.street || ''}, ${c.barangay || ''}`)}</td><td>${statusBadge}</td><td>${acts}</td></tr>`;
+          const streetVal = c.street_address || c.street || c.address || "";
+          const displayAddr = streetVal && c.barangay ? `${streetVal}, ${c.barangay}` : (streetVal || c.barangay || '-');
+          return `<tr><td><strong>${esc(c.full_name)}</strong></td><td>${esc(c.contact || c.phone)}</td><td>${esc(displayAddr)}</td><td>${statusBadge}</td><td>${acts}</td></tr>`;
         }).join("");
       },
       validate(d) {
@@ -742,21 +745,29 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
         if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
         if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
-        if (!d.street || !d.street.trim()) e.street = "Street address is required";
+        const st = (d.street_address || d.street || "").trim();
+        if (!st) {
+          if ("street_address" in d) e.street_address = "Street address is required";
+          else e.street = "Street address is required";
+        }
         if (!d.barangay || !d.barangay.trim()) e.barangay = "Please select a barangay";
         return e;
       },
-      payload: (d) => ({
-        first_name: d.first_name,
-        last_name: d.last_name,
-        full_name: `${d.first_name || ''} ${d.last_name || ''}`.trim(),
-        phone: d.contact,
-        contact: d.contact,
-        street: d.street,
-        barangay: d.barangay,
-        address: `${d.street || ''}, ${d.barangay || ''}`.trim(),
-        status: d.status || "Active"
-      }),
+      payload: (d) => {
+        const streetVal = (d.street_address || d.street || "").trim();
+        return {
+          first_name: d.first_name,
+          last_name: d.last_name,
+          full_name: `${d.first_name || ''} ${d.last_name || ''}`.trim(),
+          phone: d.contact,
+          contact: d.contact,
+          street_address: streetVal,
+          street: streetVal,
+          barangay: d.barangay,
+          address: streetVal,
+          status: d.status || "Active"
+        };
+      },
       delMsg: (r) => `Archive customer <strong>"${esc(r.full_name)}"</strong>?`,
       async act(a, r) {
         if (a === "archive") {
@@ -778,7 +789,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (f.elements.first_name && EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
           if (f.elements.last_name && EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
           if (f.elements.contact && (EDIT.contact || EDIT.phone)) f.elements.contact.value = EDIT.contact || EDIT.phone;
-          if (f.elements.street) f.elements.street.value = EDIT.street || EDIT.address || "";
+          if (f.elements.street) f.elements.street.value = EDIT.street_address || EDIT.street || EDIT.address || "";
           if (f.elements.barangay && EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
           if (f.elements.service_id && EDIT.service_id) f.elements.service_id.value = EDIT.service_id;
           if (f.elements.weight_kg) f.elements.weight_kg.value = EDIT.weight_kg || "1.0";
@@ -856,6 +867,7 @@ document.addEventListener("DOMContentLoaded", () => {
           last_name: d.last_name,
           customer_name: `${d.first_name || ''} ${d.last_name || ''}`.trim(),
           contact: d.contact,
+          street_address: d.street,
           street: d.street,
           barangay: d.barangay,
           address: `${d.street || ''}, ${d.barangay || ''}`.trim(),
@@ -1874,7 +1886,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const filteredCustomers = allData.customers.filter(c => {
         if (!q) return true;
-        const text = `${c.full_name || `${c.first_name || ''} ${c.last_name || ''}`} ${c.contact || c.phone || ''} ${c.address || ''}`.toLowerCase();
+        const text = `${c.full_name || `${c.first_name || ''} ${c.last_name || ''}`} ${c.contact || c.phone || ''} ${c.street_address || ''} ${c.barangay || ''} ${c.address || ''}`.toLowerCase();
         return text.includes(q);
       });
 
@@ -1990,7 +2002,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const items = [
               `<button class="dropdown-item text-success" data-act="unarchive-customer" data-id="${c.customer_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Customer</button>`
             ];
-            const addr = c.address || `${c.street || ''}, ${c.barangay || ''}`.trim() || '-';
+            const streetPart = c.street_address || c.street || c.address || "";
+            const addr = streetPart && c.barangay ? `${streetPart}, ${c.barangay}` : (streetPart || c.barangay || '-');
             return `<tr>
               <td><strong>${esc(c.full_name || `${c.first_name || ''} ${c.last_name || ''}`.trim())}</strong></td>
               <td>${esc(c.contact || c.phone || '-')}</td>

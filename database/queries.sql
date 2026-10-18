@@ -1,13 +1,13 @@
 USE laundry_shop_db;
 
 -- Insert
-INSERT INTO customers (first_name, last_name, phone, address) 
-VALUES ('Sarah', 'Jenkins', '09171234506', '99 Main St., Cabuyao, Laguna');
+INSERT INTO customers (first_name, last_name, phone, street_address, barangay) 
+VALUES ('Sarah', 'Jenkins', '09171234506', '99 Main St.', 'Poblacion I');
 
 -- Select with WHERE
-SELECT customer_id, first_name, last_name, phone, address 
+SELECT customer_id, first_name, last_name, phone, street_address, barangay 
 FROM customers 
-WHERE address LIKE '%Cabuyao%';
+WHERE street_address LIKE '%Main%';
 
 -- Update
 UPDATE customers 

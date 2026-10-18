@@ -7,16 +7,15 @@ USE laundry_shop_db;
 
 -- Customers table
 CREATE TABLE IF NOT EXISTS customers (
-    customer_id INT AUTO_INCREMENT PRIMARY KEY,
-    first_name  VARCHAR(50)  NOT NULL,
-    last_name   VARCHAR(50)  NOT NULL,
-    phone       VARCHAR(15)  NOT NULL,
-    street      VARCHAR(100) NULL,
-    barangay    VARCHAR(50)  NULL,
-    address     VARCHAR(150) NOT NULL,
-    status      VARCHAR(20)  DEFAULT 'Active',
-    is_archived BOOLEAN      DEFAULT FALSE,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    customer_id    INT AUTO_INCREMENT PRIMARY KEY,
+    first_name     VARCHAR(50)  NOT NULL,
+    last_name      VARCHAR(50)  NOT NULL,
+    phone          VARCHAR(15)  NOT NULL,
+    street_address VARCHAR(150) NOT NULL,
+    barangay       VARCHAR(50)  NULL,
+    status         VARCHAR(20)  DEFAULT 'Active',
+    is_archived    BOOLEAN      DEFAULT FALSE,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Staff table

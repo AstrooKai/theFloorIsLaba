@@ -18,9 +18,10 @@ exports.getAllOrders = async (req, res) => {
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS customer_phone,
                 c.phone AS contact,
-                c.street,
+                c.street_address,
+                c.street_address AS street,
                 c.barangay,
-                c.address,
+                c.street_address AS address,
                 o.staff_id,
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
@@ -54,7 +55,7 @@ exports.getAllOrders = async (req, res) => {
                 GROUP BY order_id
             ) pay ON o.order_id = pay.order_id
             ${archiveFilter}
-            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.is_archived, o.customer_id, c.first_name, c.last_name, c.phone, c.street, c.barangay, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
+            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.is_archived, o.customer_id, c.first_name, c.last_name, c.phone, c.street_address, c.barangay, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
             ORDER BY o.order_id DESC
         `);
         res.json(rows);
@@ -75,9 +76,10 @@ exports.getOrderById = async (req, res) => {
                 o.customer_id,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
                 c.phone AS contact,
-                c.street,
+                c.street_address,
+                c.street_address AS street,
                 c.barangay,
-                c.address,
+                c.street_address AS address,
                 o.staff_id,
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
@@ -109,7 +111,7 @@ exports.getOrderById = async (req, res) => {
                 GROUP BY order_id
             ) pay ON o.order_id = pay.order_id
             WHERE o.order_id = ?
-            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.customer_id, c.first_name, c.last_name, c.phone, c.street, c.barangay, c.address, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
+            GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.customer_id, c.first_name, c.last_name, c.phone, c.street_address, c.barangay, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
         `, [id]);
 
         if (orders.length === 0) {
@@ -190,9 +192,8 @@ exports.createOrder = async (req, res) => {
         let firstName = (req.body.first_name || '').trim();
         let lastName = (req.body.last_name || '').trim();
         const contactNo = (contact || req.body.phone || '').trim();
-        const streetAddr = (req.body.street || '').trim();
+        const streetAddr = (req.body.street_address || req.body.street || '').trim();
         const barangayVal = (req.body.barangay || '').trim();
-        const finalAddress = address || (streetAddr && barangayVal ? `${streetAddr}, ${barangayVal}` : (streetAddr || barangayVal || 'Cabuyao, Laguna'));
 
         if (!finalCustomerId) {
             if (!firstName && customer_name) {
@@ -210,14 +211,14 @@ exports.createOrder = async (req, res) => {
                 finalCustomerId = found[0].customer_id;
                 if (streetAddr || barangayVal) {
                     await conn.query(
-                        'UPDATE customers SET street = COALESCE(NULLIF(street, ""), ?), barangay = COALESCE(NULLIF(barangay, ""), ?), address = COALESCE(NULLIF(address, ""), ?) WHERE customer_id = ?',
-                        [streetAddr, barangayVal, finalAddress, finalCustomerId]
+                        'UPDATE customers SET street_address = COALESCE(NULLIF(street_address, ""), ?), barangay = COALESCE(NULLIF(barangay, ""), ?) WHERE customer_id = ?',
+                        [streetAddr, barangayVal, finalCustomerId]
                     );
                 }
             } else {
                 const [createdCust] = await conn.query(
-                    'INSERT INTO customers (first_name, last_name, phone, street, barangay, address, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, "Active", FALSE)',
-                    [firstName || 'Customer', lastName || '', contactNo || '09170000000', streetAddr, barangayVal, finalAddress]
+                    'INSERT INTO customers (first_name, last_name, phone, street_address, barangay, status, is_archived) VALUES (?, ?, ?, ?, ?, "Active", FALSE)',
+                    [firstName || 'Customer', lastName || '', contactNo || '09170000000', streetAddr, barangayVal]
                 );
                 finalCustomerId = createdCust.insertId;
             }

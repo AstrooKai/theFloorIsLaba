@@ -13,9 +13,10 @@ exports.getAllCustomers = async (req, res) => {
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 phone,
                 phone AS contact,
-                street,
+                street_address,
+                street_address AS street,
+                street_address AS address,
                 barangay,
-                address,
                 COALESCE(status, 'Active') AS status,
                 COALESCE(is_archived, FALSE) AS is_archived,
                 created_at
@@ -40,9 +41,10 @@ exports.getCustomerById = async (req, res) => {
                 CONCAT(first_name, ' ', last_name) AS full_name,
                 phone,
                 phone AS contact,
-                street,
+                street_address,
+                street_address AS street,
+                street_address AS address,
                 barangay,
-                address,
                 COALESCE(status, 'Active') AS status,
                 COALESCE(is_archived, FALSE) AS is_archived,
                 created_at
@@ -61,16 +63,16 @@ exports.getCustomerById = async (req, res) => {
 
 exports.createCustomer = async (req, res) => {
     try {
-        let { first_name, last_name, full_name, phone, contact, street, barangay, address, status } = req.body;
+        let { first_name, last_name, full_name, phone, contact, street_address, street, barangay, address, status } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
             last_name = parts.slice(1).join(' ') || '';
         }
         const finalPhone = phone || contact || '';
-        const finalStreet = (street || '').trim();
+        const rawStreet = street_address !== undefined ? street_address : (street !== undefined ? street : (address || ''));
+        const finalStreetAddress = (rawStreet || '').trim();
         const finalBarangay = (barangay || '').trim();
-        const finalAddress = address || (finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : (finalStreet || finalBarangay || 'Cabuyao, Laguna'));
         const finalStatus = status || 'Active';
 
         if (!first_name) {
@@ -78,8 +80,8 @@ exports.createCustomer = async (req, res) => {
         }
 
         const [result] = await pool.query(
-            'INSERT INTO customers (first_name, last_name, phone, street, barangay, address, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)',
-            [first_name, last_name || '', finalPhone, finalStreet, finalBarangay, finalAddress, finalStatus]
+            'INSERT INTO customers (first_name, last_name, phone, street_address, barangay, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
+            [first_name, last_name || '', finalPhone, finalStreetAddress, finalBarangay, finalStatus]
         );
 
         res.status(201).json({
@@ -89,9 +91,10 @@ exports.createCustomer = async (req, res) => {
             full_name: `${first_name} ${last_name || ''}`.trim(),
             phone: finalPhone,
             contact: finalPhone,
-            street: finalStreet,
+            street_address: finalStreetAddress,
+            street: finalStreetAddress,
+            address: finalStreetAddress,
             barangay: finalBarangay,
-            address: finalAddress,
             status: finalStatus,
             is_archived: false
         });
@@ -103,7 +106,7 @@ exports.createCustomer = async (req, res) => {
 exports.updateCustomer = async (req, res) => {
     try {
         const { id } = req.params;
-        let { first_name, last_name, full_name, phone, contact, street, barangay, address, status, is_archived } = req.body;
+        let { first_name, last_name, full_name, phone, contact, street_address, street, barangay, address, status, is_archived } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
@@ -119,15 +122,16 @@ exports.updateCustomer = async (req, res) => {
         const finalFirstName = first_name !== undefined ? first_name : current.first_name;
         const finalLastName = last_name !== undefined ? last_name : current.last_name;
         const finalPhone = (phone !== undefined ? phone : (contact !== undefined ? contact : current.phone)) || '';
-        const finalStreet = street !== undefined ? street : (current.street || '');
+        
+        const inputStreet = street_address !== undefined ? street_address : (street !== undefined ? street : address);
+        const finalStreetAddress = inputStreet !== undefined ? inputStreet.trim() : (current.street_address || '');
         const finalBarangay = barangay !== undefined ? barangay : (current.barangay || '');
-        const finalAddress = address !== undefined ? address : (finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : current.address);
         const finalStatus = status !== undefined ? status : (current.status || 'Active');
         const finalArchived = is_archived !== undefined ? Boolean(is_archived) : Boolean(current.is_archived);
 
         await pool.query(
-            'UPDATE customers SET first_name = ?, last_name = ?, phone = ?, street = ?, barangay = ?, address = ?, status = ?, is_archived = ? WHERE customer_id = ?',
-            [finalFirstName, finalLastName, finalPhone, finalStreet, finalBarangay, finalAddress, finalStatus, finalArchived, id]
+            'UPDATE customers SET first_name = ?, last_name = ?, phone = ?, street_address = ?, barangay = ?, status = ?, is_archived = ? WHERE customer_id = ?',
+            [finalFirstName, finalLastName, finalPhone, finalStreetAddress, finalBarangay, finalStatus, finalArchived, id]
         );
 
         res.json({
@@ -137,9 +141,10 @@ exports.updateCustomer = async (req, res) => {
             full_name: `${finalFirstName} ${finalLastName}`.trim(),
             phone: finalPhone,
             contact: finalPhone,
-            street: finalStreet,
+            street_address: finalStreetAddress,
+            street: finalStreetAddress,
+            address: finalStreetAddress,
             barangay: finalBarangay,
-            address: finalAddress,
             status: finalStatus,
             is_archived: finalArchived
         });
