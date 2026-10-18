@@ -371,7 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const n = Number(s.replace(/[^0-9.-]+/g, ""));
         if (!isNaN(n)) return { type: "num", val: n };
       }
-      const idMatch = s.match(/^(?:ORD|PAY)-(\d+)$/i);
+      const idMatch = s.match(/\b(?:ORD|PAY)-(\d+)\b/i);
       if (idMatch) return { type: "num", val: Number(idMatch[1]) };
 
       const hrsMatch = s.match(/^(\d+)\s*hrs?$/i);
@@ -909,7 +909,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (prefill && b > 0 && !f.elements.amount.value) f.elements.amount.value = b.toFixed(2);
         }
       },
-      filter: (rows, f) => rows.filter((p) => (!f.q || `${nameOf(p)} ${ord(p.order_id)} ${p.order_id} ${p.reference_no || ''}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
+      filter: (rows, f) => rows.filter((p) => (!f.q || `${p.customer_name || nameOf(p)} ${pay(p.payment_id)} PAY-${p.payment_id} ${p.payment_id} ${ord(p.order_id)} ORD-${p.order_id} ${p.order_id} ${p.reference_no || ''}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
       stats: (list) => Object.fromEntries(["Paid", "Pending", "Refunded"].map((s) => [s, peso(list.filter((p) => p.status === s).reduce((n, p) => n + Number(p.amount), 0))])),
       draw: (list) => {
         const isMgr = isManager();

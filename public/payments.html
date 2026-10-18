@@ -79,7 +79,7 @@
         </div>   
       </div>   
       <section class="toolbar" role="search">
-        <div class="tf grow"><label>Search Payments</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by customer, order ID, or reference #..."></div>
+        <div class="tf grow"><label>Search Payments</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by customer, payment ID, order ID, or reference #..."></div>
         <div class="tf"><label>Method</label><select id="fl_m" data-flt="m"><option value="">All Methods</option><option value="cash">Cash</option><option value="e-wallet">E-Wallet</option><option value="card">Card</option></select></div>
         <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="refunded">Refunded</option></select></div>
         <button class="btn" data-act="clear" type="button">Clear</button>
@@ -87,7 +87,7 @@
       <p class="count" id="count" aria-live="polite"></p>   
       <div class="tw" id="list">     
         <table class="table table-hover align-middle mb-0">       
-          <thead><tr><th>Payment</th><th>Order / customer</th><th>Method</th><th>Date</th><th class="num">Amount</th><th>Status</th><th>Actions</th></tr></thead>       
+          <thead><tr><th>Payment ID</th><th>Order / customer</th><th>Method</th><th>Date</th><th class="num">Amount</th><th>Status</th><th>Actions</th></tr></thead>       
           <tbody id="out"></tbody>     
         </table>   
       </div>   
