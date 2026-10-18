@@ -788,7 +788,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         return list.map((o) => {
-          const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="See Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>See Invoice</button>`;
+          const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>Invoice</button>`;
           const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
           const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
           const actsHtml = `<div class="acts">${invoiceBtn}${editBtn}${archiveBtn}</div>`;
@@ -848,7 +848,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return qMatch && typeMatch && stMatch && archMatch;
       }),
       draw: (list) => list.map((o) => {
-        const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="See Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>See Invoice</button>`;
+        const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>Invoice</button>`;
         const archBtn = o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`;
         return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${invoiceBtn}${archBtn}</div></td></tr>`;
       }).join(""),
