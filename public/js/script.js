@@ -131,7 +131,7 @@ function toast(m, err) {
     document.body.appendChild(container);
   }
   const t = document.createElement("div");
-  t.className = "toast" + (err ? " e" : "");
+  t.className = "toast show" + (err ? " e" : "");
   t.setAttribute("role", "alert");
   t.setAttribute("aria-live", "assertive");
 
@@ -149,9 +149,14 @@ function toast(m, err) {
     </button>
   `;
 
+  let dismissed = false;
   const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
     t.style.animation = "toastSlideOut 0.25s forwards";
-    setTimeout(() => t.remove(), 250);
+    setTimeout(() => {
+      if (t.parentNode) t.remove();
+    }, 250);
   };
 
   const closeBtn = t.querySelector(".toast-close");
@@ -160,6 +165,7 @@ function toast(m, err) {
   container.appendChild(t);
   setTimeout(dismiss, 5000);
 }
+window.toast = toast;
 
 function openModal(el) {
   if (!el) return;

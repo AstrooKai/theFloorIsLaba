@@ -1153,30 +1153,51 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 9999;
+  z-index: 99999 !important;
   pointer-events: none;
 }
+.toasts .toast,
+.toasts .toast:not(.show),
+.toast.show,
 .toast {
-  pointer-events: auto;
-  background: var(--volcanic-100);
-  color: #fff;
-  padding: 14px 18px;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  min-width: 320px;
-  max-width: 440px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left: 4px solid var(--safe);
+  pointer-events: auto !important;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  background: var(--volcanic-100) !important;
+  color: #fff !important;
+  padding: 14px 18px !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  width: auto !important;
+  min-width: 320px !important;
+  max-width: 440px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-left: 4px solid var(--safe) !important;
   animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  margin: 0 !important;
 }
+.toasts .toast.e,
 .toast.e {
-  border-left-color: var(--hazard);
+  border-left-color: var(--hazard) !important;
+}
+
+[data-bs-theme="dark"] .toasts .toast,
+[data-bs-theme="dark"] .toast.show,
+[data-bs-theme="dark"] .toast {
+  background: #20130E !important;
+  border: 1px solid #3D251D !important;
+  border-left: 4px solid var(--safe) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45) !important;
+}
+[data-bs-theme="dark"] .toasts .toast.e,
+[data-bs-theme="dark"] .toast.e {
+  border-left-color: var(--hazard) !important;
 }
 .toast-body-content {
   display: flex;
