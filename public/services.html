@@ -61,18 +61,47 @@
         <div><button class="btn btn-primary" id="addBtn" data-act="add" type="button">Add service</button></div>   
       </div>   
       <section class="toolbar" role="search">     
-        <div class="tf grow"><label>Search</label><input id="fl_q" data-flt="q" type="search" placeholder="Service name"></div>     
-        <div class="tf"><label>Category</label><select id="fl_cat" data-flt="cat"><option value="">All</option><option value="wash & fold">Wash & fold</option><option value="dry cleaning">Dry cleaning</option></select></div>     
-        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>     
+        <div class="tf grow"><label>Search</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by service name or description..."></div>     
+        <div class="tf"><label>Category</label><select id="fl_cat" data-flt="cat"><option value="">All Categories</option><option value="wash & fold">Wash & fold</option><option value="dry cleaning">Dry cleaning</option><option value="ironing">Ironing</option></select></div>     
+        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="active">Active Only</option><option value="discontinued">Discontinued Only</option></select></div>     
         <button class="btn" data-act="clear" type="button">Clear</button>   
       </section>   
       <p class="count" id="count" aria-live="polite"></p>   
-      <div class="tw" id="list">     
-        <table class="table table-hover align-middle mb-0">       
-          <thead><tr><th scope="col">Service</th><th scope="col">Category</th><th scope="col" class="num">Price</th><th scope="col" class="num">Turnaround</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>       
-          <tbody id="out"></tbody>     
-        </table>   
-      </div>   
+      <div class="tw" id="list">
+        <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-tag fs-5 text-primary"></i>
+            <h2 class="fs-6 fw-bold mb-0">Active Services</h2>
+            <span class="badge bg-secondary-subtle text-secondary rounded-pill" id="badge-active">0</span>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">       
+            <thead><tr><th scope="col">Service</th><th scope="col">Category</th><th scope="col" class="num">Price</th><th scope="col" class="num">Turnaround</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>       
+            <tbody id="out"></tbody>     
+          </table>
+        </div>
+      </div>
+
+      <!-- Discontinued Services Section -->
+      <section class="mt-4" id="section-discontinued">
+        <div class="tw">
+          <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-slash-circle fs-5 text-muted"></i>
+              <h2 class="fs-6 fw-bold mb-0">Discontinued Services</h2>
+              <span class="badge bg-secondary-subtle text-secondary rounded-pill" id="badge-discontinued">0</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="table-discontinued">
+              <thead><tr><th scope="col">Service</th><th scope="col">Category</th><th scope="col" class="num">Price</th><th scope="col" class="num">Turnaround</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
+              <tbody id="out-discontinued"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <div class="modal fade" id="dlg" tabindex="-1" aria-labelledby="dlgT" aria-hidden="true">     
         <div class="modal-dialog modal-dialog-centered modal-lg">
           <div class="modal-content">
@@ -84,11 +113,11 @@
               <div class="modal-body py-4">         
                 <div class="grid">           
                   <div class="field full" data-f="service_name"><label>Service name <span class="req">*</span></label><input name="service_name" class="form-control"></div>           
-                  <div class="field" data-f="category"><label>Category</label><select name="category" class="form-select"><option>Wash & fold</option><option>Dry cleaning</option></select></div>           
+                  <div class="field" data-f="category"><label>Category</label><select name="category" class="form-select"><option>Wash & fold</option><option>Dry cleaning</option><option>Ironing</option></select></div>           
                   <div class="field" data-f="unit"><label>Charged per</label><select name="unit" class="form-select"><option value="kg">Kilogram</option><option value="piece">Piece</option></select></div>           
                   <div class="field" data-f="price"><label>Price (₱) <span class="req">*</span></label><input name="price" type="number" class="form-control"></div>           
                   <div class="field" data-f="turnaround_hours"><label>Turnaround (hours)</label><input name="turnaround_hours" type="number" class="form-control"></div>           
-                  <div class="field" data-f="status"><label>Status</label><select name="status" class="form-select"><option>Active</option><option>Inactive</option></select></div>           
+                  <div class="field" data-f="status"><label>Status</label><select name="status" class="form-select"><option value="Active">Active</option><option value="Discontinued">Discontinued</option></select></div>           
                   <div class="field full" data-f="description"><label>Description</label><textarea name="description" class="form-control"></textarea></div>         
                 </div>       
               </div>       

@@ -570,7 +570,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function draw() {
     const e = ENT[cur], list = e.filter(S.rows, flt());
-    if($("#count")) $("#count").textContent = `Showing ${list.length} of ${S.rows.length} ${M.noun || ''}`;
+    if($("#count")) {
+      if (cur === "services") {
+        const actCount = list.filter(r => (r.status || "Active").toLowerCase() === "active").length;
+        const discCount = list.length - actCount;
+        $("#count").textContent = `Showing ${actCount} active service${actCount === 1 ? '' : 's'}${discCount > 0 ? ` and ${discCount} discontinued` : ''}`;
+      } else {
+        $("#count").textContent = `Showing ${list.length} of ${S.rows.length} ${M.noun || ''}`;
+      }
+    }
     if (e.stats) { const st = e.stats(list); document.querySelectorAll("[data-stat]").forEach((el) => (el.textContent = st[el.dataset.stat] || 0)); }
     if($("#out")) {
       if (list.length) {
@@ -892,26 +900,81 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     services: {
       name: "services", id: "service_id",
-      filter: (rows, f) => rows.filter((r) => (!f.q || (r.service_name + " " + (r.description || '')).toLowerCase().includes(f.q)) && (!f.cat || (r.category || '').toLowerCase() === f.cat) && (!f.st || (r.status || '').toLowerCase() === f.st)).sort((a, b) => a.service_name.localeCompare(b.service_name)),
+      filter: (rows, f) => {
+        const q = (f.q || "").toLowerCase();
+        const cat = (f.cat || "").toLowerCase();
+        const st = (f.st || "").toLowerCase();
+        return rows.filter((r) => {
+          const nameDesc = `${r.service_name || ""} ${r.description || ""}`.toLowerCase();
+          const matchQ = !q || nameDesc.includes(q);
+          const matchCat = !cat || (r.category || "").toLowerCase() === cat;
+          const statusLower = (r.status || "Active").toLowerCase();
+          const isDisc = statusLower === "discontinued" || statusLower === "inactive";
+          const matchSt = !st || (st === "active" ? !isDisc : isDisc);
+          return matchQ && matchCat && matchSt;
+        }).sort((a, b) => a.service_name.localeCompare(b.service_name));
+      },
       draw: (list) => {
         const isMgr = isManager();
-        return list.map((r) => {
+        const filterSt = (flt().st || "").toLowerCase();
+
+        const activeList = list.filter((r) => {
+          const s = (r.status || "Active").toLowerCase();
+          return s !== "discontinued" && s !== "inactive";
+        });
+        const discList = list.filter((r) => {
+          const s = (r.status || "Active").toLowerCase();
+          return s === "discontinued" || s === "inactive";
+        });
+
+        const badgeActive = $("#badge-active");
+        if (badgeActive) badgeActive.textContent = activeList.length;
+
+        const badgeDisc = $("#badge-discontinued");
+        if (badgeDisc) badgeDisc.textContent = discList.length;
+
+        const secActive = $("#list");
+        if (secActive) {
+          secActive.style.display = filterSt === "discontinued" ? "none" : "block";
+        }
+
+        const secDisc = $("#section-discontinued");
+        if (secDisc) {
+          secDisc.style.display = filterSt === "active" ? "none" : "block";
+        }
+
+        const renderRow = (r) => {
+          const isAct = (r.status || "Active").toLowerCase() === "active";
           const items = [];
           if (isMgr) {
             items.push(`<button class="dropdown-item" data-act="edit" data-id="${r.service_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
-            const isActive = (r.status || "Active") === "Active";
-            if (isActive) {
-              items.push(`<button class="dropdown-item text-danger" data-act="toggle-status" data-id="${r.service_id}" type="button"><i class="bi bi-slash-circle me-2"></i>Disable</button>`);
+            if (isAct) {
+              items.push(`<button class="dropdown-item text-danger" data-act="toggle-status" data-id="${r.service_id}" type="button"><i class="bi bi-slash-circle me-2"></i>Discontinue</button>`);
             } else {
-              items.push(`<button class="dropdown-item text-success" data-act="toggle-status" data-id="${r.service_id}" type="button"><i class="bi bi-check-circle me-2"></i>Enable</button>`);
+              items.push(`<button class="dropdown-item text-success" data-act="toggle-status" data-id="${r.service_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Reactivate Service</button>`);
             }
           }
           const actsHtml = actionsDropdown(items, "Read only");
+          const displayStatus = isAct ? "Active" : "Discontinued";
           const badgeHtml = isMgr
-            ? `<span class="badge status-clickable ${(r.status || "Active") === "Active" ? "ok" : "mute"}" data-act="quick-status" data-id="${r.service_id}" data-current="${esc(r.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(r.status || "Active")}</span>`
-            : `<span class="badge ${(r.status || "Active") === "Active" ? "ok" : "mute"}">${esc(r.status || "Active")}</span>`;
+            ? `<span class="badge status-clickable ${isAct ? "ok" : "mute"}" data-act="quick-status" data-id="${r.service_id}" data-current="${esc(displayStatus)}" role="button" tabindex="0" title="Click to ${isAct ? 'discontinue' : 'reactivate'}">${esc(displayStatus)}</span>`
+            : `<span class="badge ${isAct ? "ok" : "mute"}">${esc(displayStatus)}</span>`;
           return `<tr><td><strong>${esc(r.service_name)}</strong>${r.description ? `<span class="sub">${esc(r.description)}</span>` : ""}</td><td>${esc(r.category || 'Wash & fold')}</td><td class="num">${peso(r.price || r.price_per_kg)}<span class="sub">per ${esc(r.unit || 'kg')}</span></td><td class="num">${hrs(r.turnaround_hours || 24)}</td><td>${badgeHtml}</td><td>${actsHtml}</td></tr>`;
-        }).join("");
+        };
+
+        const outDisc = $("#out-discontinued");
+        if (outDisc) {
+          if (discList.length === 0) {
+            outDisc.innerHTML = `<tr class="empty-row"><td colspan="6" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No discontinued services.</p></div></td></tr>`;
+          } else {
+            outDisc.innerHTML = discList.map(renderRow).join("");
+          }
+        }
+
+        if (activeList.length === 0) {
+          return `<tr class="empty-row"><td colspan="6" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No active services found.</p></div></td></tr>`;
+        }
+        return activeList.map(renderRow).join("");
       },
       validate(d) {
         const e = {};
@@ -929,16 +992,32 @@ document.addEventListener("DOMContentLoaded", () => {
         status: d.status || "Active",
         description: (d.description || "").trim()
       }),
-      delMsg: (r) => `Deactivate <strong>"${esc(r.service_name)}"</strong>?`,
+      delMsg: (r) => `Discontinue service <strong>"${esc(r.service_name)}"</strong>?`,
       async act(a, r) {
         if (a === "toggle-status") {
-          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
-          const actWord = next === "Inactive" ? "Disable" : "Enable";
-          if (await ask(`${actWord} Service?`, `${actWord} laundry service <strong>"${esc(r.service_name)}"</strong>? ${next === 'Inactive' ? 'It will be hidden from new order creation.' : 'It will be available for new orders.'}`, actWord)) {
-            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to toggle service status");
-            toast(`Service "${r.service_name}" status updated to ${next}.`);
-            await init();
+          const isAct = (r.status || "Active").toLowerCase() === "active";
+          if (isAct) {
+            if (await ask(
+              "Discontinue Service?",
+              `Discontinue laundry service <strong>"${esc(r.service_name)}"</strong>? It will be moved to the Discontinued Services table and hidden from new order creation.`,
+              "Discontinue"
+            )) {
+              const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
+              if (!res.ok) throw new Error("Failed to toggle service status");
+              toast(`Service "${r.service_name}" discontinued.`);
+              await init();
+            }
+          } else {
+            if (await ask(
+              "Reactivate Service?",
+              `Reactivate laundry service <strong>"${esc(r.service_name)}"</strong>? It will be restored to active services and available for new orders.`,
+              "Reactivate"
+            )) {
+              const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
+              if (!res.ok) throw new Error("Failed to toggle service status");
+              toast(`Service "${r.service_name}" reactivated.`);
+              await init();
+            }
           }
         }
       }
@@ -1301,13 +1380,29 @@ document.addEventListener("DOMContentLoaded", () => {
       const r = S.rows.find((x) => x[e.id] == b.dataset.id);
       if (a === "quick-status" && r) {
         if (cur === "services") {
-          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
-          const actWord = next === "Inactive" ? "Disable" : "Enable";
-          if (await ask(`${actWord} Service?`, `${actWord} laundry service <strong>"${esc(r.service_name)}"</strong>?`, actWord)) {
-            const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to toggle service status");
-            toast(`Service "${r.service_name}" status updated to ${next}.`);
-            await init();
+          const isAct = (r.status || "Active").toLowerCase() === "active";
+          if (isAct) {
+            if (await ask(
+              "Discontinue Service?",
+              `Discontinue laundry service <strong>"${esc(r.service_name)}"</strong>? It will be moved to the Discontinued Services table and hidden from new order creation.`,
+              "Discontinue"
+            )) {
+              const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
+              if (!res.ok) throw new Error("Failed to toggle service status");
+              toast(`Service "${r.service_name}" discontinued.`);
+              await init();
+            }
+          } else {
+            if (await ask(
+              "Reactivate Service?",
+              `Reactivate laundry service <strong>"${esc(r.service_name)}"</strong>? It will be restored to active services and available for new orders.`,
+              "Reactivate"
+            )) {
+              const res = await fetch(`/api/services/${r.service_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
+              if (!res.ok) throw new Error("Failed to toggle service status");
+              toast(`Service "${r.service_name}" reactivated.`);
+              await init();
+            }
           }
           return;
         }

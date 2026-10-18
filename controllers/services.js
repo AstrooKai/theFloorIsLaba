@@ -111,8 +111,9 @@ exports.updateService = async (req, res) => {
             params.push(Number(turnaround_hours));
         }
         if (status !== undefined) {
+            const normStatus = status === 'Inactive' ? 'Discontinued' : status;
             updates.push('status = ?');
-            params.push(status);
+            params.push(normStatus);
         }
         if (description !== undefined) {
             updates.push('description = ?');
@@ -143,7 +144,8 @@ exports.toggleServiceStatus = async (req, res) => {
         }
 
         const currentStatus = rows[0].status || 'Active';
-        const nextStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+        const isCurrentlyActive = currentStatus.toLowerCase() === 'active';
+        const nextStatus = isCurrentlyActive ? 'Discontinued' : 'Active';
 
         await pool.query('UPDATE service_types SET status = ? WHERE service_id = ?', [nextStatus, id]);
 
@@ -161,8 +163,8 @@ exports.toggleServiceStatus = async (req, res) => {
 exports.deleteService = async (req, res) => {
     try {
         const { id } = req.params;
-        await pool.query("UPDATE service_types SET status = 'Inactive' WHERE service_id = ?", [id]);
-        res.json({ message: 'Service deactivated successfully', service_id: Number(id), status: 'Inactive' });
+        await pool.query("UPDATE service_types SET status = 'Discontinued' WHERE service_id = ?", [id]);
+        res.json({ message: 'Service discontinued successfully', service_id: Number(id), status: 'Discontinued' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

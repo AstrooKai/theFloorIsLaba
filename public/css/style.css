@@ -1697,11 +1697,13 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 .archive-section {
   transition: opacity 0.2s ease;
 }
+.tw .table-header,
 .archive-section .table-header {
   border-top-left-radius: var(--radius-md);
   border-top-right-radius: var(--radius-md);
   background: #fff;
 }
+[data-bs-theme="dark"] .tw .table-header,
 [data-bs-theme="dark"] .archive-section .table-header {
   background: #20130E;
 }
