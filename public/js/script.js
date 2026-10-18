@@ -764,10 +764,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         return list.map((o) => {
-          const receiptBtn = `<button class="btn sm btn-outline-primary" data-act="receipt" data-id="${o.order_id}" title="View Receipt" type="button"><i class="bi bi-receipt"></i> Receipt</button>`;
+          const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="See Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>See Invoice</button>`;
           const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
           const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
-          const actsHtml = `<div class="acts">${receiptBtn}${editBtn}${archiveBtn}</div>`;
+          const actsHtml = `<div class="acts">${invoiceBtn}${editBtn}${archiveBtn}</div>`;
           return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
@@ -824,9 +824,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return qMatch && typeMatch && stMatch && archMatch;
       }),
       draw: (list) => list.map((o) => {
-        const receiptBtn = `<button class="btn sm btn-outline-primary" data-act="receipt" data-id="${o.order_id}" title="View Receipt" type="button"><i class="bi bi-receipt"></i> Receipt</button>`;
+        const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="See Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>See Invoice</button>`;
         const archBtn = o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`;
-        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${receiptBtn}${archBtn}</div></td></tr>`;
+        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${invoiceBtn}${archBtn}</div></td></tr>`;
       }).join(""),
       async act(a, r) {
         if (a === "archive") {
@@ -1298,9 +1298,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
       }
-      if (a === "receipt") {
-        if (cur === "payments") return openReceipt({ paymentId: b.dataset.id });
-        return openReceipt({ orderId: b.dataset.id });
+      if (a === "invoice" || a === "receipt") {
+        const isInvoice = a === "invoice" || cur === "orders" || cur === "history";
+        if (cur === "payments") return openReceipt({ paymentId: b.dataset.id, isInvoice: false });
+        return openReceipt({ orderId: b.dataset.id, isInvoice });
       }
       if (a === "add") return openForm();
       if (a === "edit") return openForm(r);
@@ -1316,7 +1317,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("#view").addEventListener("change", (ev) => { if (ev.target.dataset.flt) draw(); });
   }
 
-  async function openReceipt({ paymentId, orderId } = {}) {
+  async function openReceipt({ paymentId, orderId, isInvoice } = {}) {
     try {
       let payment = null;
       let order = null;
@@ -1337,11 +1338,18 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!payment && !order) {
-        return toast("Receipt data could not be found.", 1);
+        return toast((isInvoice ? "Invoice" : "Receipt") + " data could not be found.", 1);
       }
 
+      const isInv = Boolean(isInvoice);
       const payId = payment ? pay(payment.payment_id) : "REC-" + ord(order?.order_id || 0).replace("ORD-", "");
       const ordId = order ? ord(order.order_id) : (payment ? ord(payment.order_id) : "ORD-0000");
+      const docTitle = isInv ? "OFFICIAL INVOICE" : "OFFICIAL RECEIPT";
+      const docNumLabel = isInv ? "Invoice #:" : "Receipt #:";
+      const docNumVal = isInv ? `INV-${String(ordId).replace('ORD-', '')}` : payId;
+      const modalTitleText = isInv ? "Official Invoice" : "Official Receipt";
+      const modalTitleIcon = isInv ? "bi-file-earmark-text" : "bi-receipt";
+      const printBtnText = isInv ? "Print Invoice" : "Print Receipt";
       const rawDate = payment ? (payment.paid_at || payment.payment_date) : (order ? order.order_date : today());
       const receiptDate = formatDate(rawDate);
       const staffName = (order && order.staff_name) || (JSON.parse(sessionStorage.getItem("current_staff") || "{}").full_name) || "Staff on duty";
@@ -1418,6 +1426,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
+      // Update modal header & print button for invoice/receipt
+      const titleEl = modalEl.querySelector("#receiptModalTitle");
+      if (titleEl) titleEl.innerHTML = `<i class="bi ${modalTitleIcon} me-2 text-primary"></i>${modalTitleText}`;
+      const printBtn = modalEl.querySelector("#receiptPrintBtn");
+      if (printBtn) printBtn.innerHTML = `<i class="bi bi-printer me-1"></i> ${printBtnText}`;
+
       const typeBadgeCls = releaseType.toLowerCase() === "delivery" ? "type-delivery" : "type-pickup";
 
       $("#receiptModalBody").innerHTML = `
@@ -1436,12 +1450,12 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="receipt-divider-dashed"></div>
             
             <div class="receipt-title-row">
-              <span class="receipt-title">OFFICIAL RECEIPT</span>
+              <span class="receipt-title">${docTitle}</span>
               <span class="receipt-stamp ${pStatusCls}">${esc(pStatus)}</span>
             </div>
 
             <div class="receipt-meta-grid">
-              <div><span class="lbl text-muted">Receipt #:</span> <strong>${esc(payId)}</strong></div>
+              <div><span class="lbl text-muted">${docNumLabel}</span> <strong>${esc(docNumVal)}</strong></div>
               <div><span class="lbl text-muted">Order #:</span> <strong>${esc(ordId)}</strong></div>
               <div><span class="lbl text-muted">Date:</span> <span>${esc(receiptDate)}</span></div>
               <div><span class="lbl text-muted">Cashier:</span> <span>${esc(staffName)}</span></div>
