@@ -24,18 +24,17 @@ function enforceAuthAndRouteGuards() {
 
   const WORKSPACE_PAGES = ["dashboard.html", "orders.html", "customers.html", "payments.html", "services.html", "pickup-delivery.html", "history.html", "staff.html"];
   const isWorkspace = WORKSPACE_PAGES.includes(page);
-  const isLoginPage = (page === "login" || page === "staff-login.html" || path.endsWith("/login"));
-  const isLandingPage = (page === "index.html" || path === "/" || path === "");
+  const isLoginPage = (page === "index.html" || page === "login" || page === "staff-login.html" || path === "/" || path === "" || path.endsWith("/login"));
 
   const currentStaff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
 
   if (!currentStaff && isWorkspace) {
     sessionStorage.setItem("auth_redirect_msg", "Please sign in to access the staff workspace.");
-    window.location.replace("/login");
+    window.location.replace("/");
     return false;
   }
 
-  if (currentStaff && (isLoginPage || isLandingPage)) {
+  if (currentStaff && isLoginPage) {
     const role = (currentStaff.role || "Manager").toLowerCase();
     const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
     window.location.replace(target);
@@ -281,7 +280,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (confirmSignOut) {
     confirmSignOut.addEventListener("click", () => {
       sessionStorage.removeItem("current_staff");
-      window.location.href = "/login";
+      window.location.href = "/";
     });
   }
   const cancelSignOut = $("#cancelSignOut");

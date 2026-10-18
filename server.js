@@ -13,14 +13,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(require('./middleware/auth').authenticate);
 
-// Redirect old /staff-login.html to clean route /login
-app.get('/staff-login.html', (req, res) => {
-    res.redirect(301, '/login');
-});
-
-// Clean route for Staff Login
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'staff-login.html'));
+// Redirect old /login and /staff-login.html to root (index.html now contains the login page)
+app.get(['/login', '/staff-login.html'], (req, res) => {
+    res.redirect(302, '/');
 });
 
 // Serve frontend static files

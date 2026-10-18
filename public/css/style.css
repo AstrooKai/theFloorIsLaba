@@ -102,114 +102,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn-solid { background: var(--magma-600); color: #fff; border: none; }
 .sm { padding: 8px 16px; min-height: 36px; font-size: 13px; }
 
-/* Landing Page */
-.landing-body {
-  background: var(--volcanic-100);
-  color: var(--text-light);
-  overflow: hidden;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-}
-.landing-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 48px;
-  max-width: 1280px;
-  width: 100%;
-  margin: 0 auto;
-  position: relative;
-  z-index: 10;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  flex-shrink: 0;
-}
+/* Brand Logo */
 .brand-logo { font-family: var(--font-sans); font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; }
 .brand-logo svg { width: 28px; height: 28px; }
-.nav-links { display: flex; gap: 24px; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
 
-.hero-container {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 48px;
-  max-width: 1280px;
-  width: 100%;
-  margin: auto;
-  padding: 16px 48px;
-  align-items: center;
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-.hero-container::before {
-  content: ''; position: absolute; width: 900px; height: 900px; border-radius: 50%;
-  border: 1px solid rgba(232, 93, 4, 0.05); right: -200px; top: -150px; pointer-events: none;
-}
-.hero-container::after {
-  content: ''; position: absolute; width: 600px; height: 600px; border-radius: 50%;
-  border: 1px solid rgba(232, 93, 4, 0.05); right: -50px; top: 0; pointer-events: none;
-}
-
-@media (max-width: 991px), (max-height: 680px) {
-  .landing-body {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100dvh;
-    overflow-y: auto;
-  }
-  .landing-nav {
-    padding: 16px 24px;
-  }
-  .hero-container {
-    grid-template-columns: 1fr;
-    gap: 32px;
-    padding: 24px;
-    margin: 0 auto;
-    overflow: visible;
-  }
-  .hero-container::before,
-  .hero-container::after {
-    display: none;
-  }
-}
-.hero-text-block { position: relative; z-index: 10; }
-.hero-text-block h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
-.hero-text-block h4::before, .hero-text-block h4::after { content: ''; height: 1px; width: 32px; background: rgba(255,255,255,0.2); }
-.hero-text-block h1 { font-size: 40px; line-height: 1.15; margin-bottom: 16px; color: #fff; }
-.hero-text-block h1 .serif { font-size: 48px; display: block; margin-bottom: 4px; }
-.hero-text-block h1 i { font-style: italic; color: var(--magma-500); font-family: var(--font-serif); font-weight: 400; }
-.hero-text-block p { font-size: 15px; color: rgba(255,255,255,0.7); margin-bottom: 28px; max-width: 440px; line-height: 1.6; }
-
-.btn-hero {
-  display: inline-flex; align-items: center; justify-content: space-between;
-  background: transparent; border: 1px solid rgba(255,255,255,0.3);
-  color: #fff; padding: 12px 20px; border-radius: var(--radius-pill);
-  font-size: 14px; font-weight: 600; width: 220px; transition: all 0.3s;
-}
-.btn-hero:hover { background: rgba(255,255,255,0.05); border-color: #fff; }
-.hero-footer-text { margin-top: 18px; font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
-.hero-visual { position: relative; z-index: 10; display: flex; justify-content: center; }
-.hero-glass-card {
-  background: rgba(35, 21, 16, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05);
-  border-radius: var(--radius-lg); padding: 24px 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-  position: relative; overflow: hidden; width: 100%; max-width: 400px;
-}
-.hero-glass-card-header { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
-.hero-glass-card-header .status { color: var(--safe); display: flex; align-items: center; gap: 8px; }
-.hero-glass-card-header .status::before { content: ''; width: 8px; height: 8px; background: var(--safe); border-radius: 50%; }
-.flow-line-container { display: flex; justify-content: space-between; position: relative; margin-bottom: 20px; }
-.flow-line-container::before { content: ''; position: absolute; top: 14px; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.1); z-index: -1; }
-.flow-step { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.step-icon { width: 28px; height: 28px; border-radius: 50%; background: var(--volcanic-200); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; }
-.step-icon svg { width: 12px; height: 12px; }
-.step-icon.done { background: var(--safe); border-color: var(--safe); }
-.step-icon.active { background: transparent; border-color: var(--magma-500); color: var(--magma-500); box-shadow: inset 0 0 0 2px var(--volcanic-200); }
-.flow-step span { font-size: 10px; color: var(--text-muted); font-weight: 600; }
-.svg-graphic-container { display: flex; justify-content: center; margin-top: -6px; }
-.svg-graphic-container svg { width: 150px; height: 180px; }
 
 /* Login */
 .login-layout {
@@ -1239,22 +1135,7 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 .meta i { font-style: normal; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; font-weight: 700; }
 .meta b { color: var(--text-main); font-weight: 600; }
 
-@media (max-width: 960px) {
-  .hero-container {
-    grid-template-columns: 1fr;
-    gap: 36px;
-    padding: 32px 24px;
-    min-height: auto;
-  }
-  .landing-nav {
-    padding: 16px 24px;
-  }
-  .hero-text-block h1 {
-    font-size: 34px;
-  }
-  .hero-text-block h1 .serif {
-    font-size: 42px;
-  }
+@media (max-width: 820px) {
   .login-layout {
     flex-direction: column;
     height: auto;
