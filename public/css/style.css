@@ -320,11 +320,35 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-color: #3D251D !important;
   box-shadow: none !important;
 }
-[data-bs-theme="dark"] th {
+[data-bs-theme="dark"] th,
+[data-bs-theme="dark"] thead th,
+[data-bs-theme="dark"] .table thead th,
+[data-bs-theme="dark"] .tw table th {
   background-color: #352019 !important;
-  color: #E0D3CC !important;
+  color: #FAF7F5 !important;
+  font-weight: 700 !important;
   border-color: #3D251D !important;
   box-shadow: none !important;
+}
+[data-bs-theme="dark"] .sort-indicator {
+  opacity: 0.9 !important;
+}
+[data-bs-theme="dark"] .sort-neutral {
+  color: rgba(255, 255, 255, 0.75) !important;
+  opacity: 1 !important;
+  font-weight: 700;
+}
+[data-bs-theme="dark"] .sort-active {
+  color: var(--glow) !important;
+  font-weight: 900 !important;
+  text-shadow: 0 0 6px rgba(250, 163, 7, 0.5);
+}
+[data-bs-theme="dark"] th.sortable-th:hover {
+  background-color: #442921 !important;
+  color: #FFFFFF !important;
+}
+[data-bs-theme="dark"] th.sortable-th:hover .sort-neutral {
+  color: #FFFFFF !important;
 }
 [data-bs-theme="dark"] tbody tr:hover,
 [data-bs-theme="dark"] tbody tr:hover > *,
@@ -460,10 +484,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 table { width: 100%; border-collapse: collapse; min-width: 720px; background: #FFFFFF; }
-th {
+th, thead th, .table thead th, .tw table th {
   text-align: left;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 700 !important;
   color: #5C4A42;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -485,7 +509,7 @@ th.sortable-th:hover {
   align-items: center;
   margin-left: 6px;
   font-size: 11px;
-  opacity: 0.5;
+  opacity: 0.85;
   vertical-align: middle;
 }
 th[data-sort-dir] .sort-indicator {
@@ -496,11 +520,8 @@ th[data-sort-dir] .sort-indicator {
   color: var(--magma-500);
 }
 .sort-neutral {
-  opacity: 0.4;
-}
-[data-bs-theme="dark"] th.sortable-th:hover {
-  background: #2D1B15;
-  color: var(--glow);
+  opacity: 0.65;
+  color: inherit;
 }
 td {
   padding: 18px 24px;
