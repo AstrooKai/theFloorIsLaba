@@ -362,14 +362,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   --bs-table-hover-bg: #3C241D !important;
   box-shadow: none !important;
 }
-[data-bs-theme="dark"] .tf input,
+[data-bs-theme="dark"] .tf input:not([type="radio"]):not([type="checkbox"]),
 [data-bs-theme="dark"] .tf select,
-[data-bs-theme="dark"] .field input,
+[data-bs-theme="dark"] .field input:not([type="radio"]):not([type="checkbox"]),
 [data-bs-theme="dark"] .field select,
 [data-bs-theme="dark"] .field textarea,
-[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-control:not([type="radio"]):not([type="checkbox"]),
 [data-bs-theme="dark"] .form-select,
-[data-bs-theme="dark"] .form-group input {
+[data-bs-theme="dark"] .form-group input:not([type="radio"]):not([type="checkbox"]) {
   background-color: #1A0F0C !important;
   color: #F2EBE9 !important;
   border-color: #4D3126 !important;
@@ -629,15 +629,116 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field > label { font-weight: 600; font-size: 13px; color: var(--text-main); }
 .req { color: var(--hazard); }
-.field input, .field select, .field textarea { padding: 14px 16px; border: 1px solid #D9D2CE; border-radius: 8px; background: #fff; font-family: inherit; font-size: 14px; transition: border-color 0.2s; }
-.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--magma-500); }
+.field input:not([type="radio"]):not([type="checkbox"]), .field select, .field textarea { padding: 14px 16px; border: 1px solid #D9D2CE; border-radius: 8px; background: #fff; font-family: inherit; font-size: 14px; transition: border-color 0.2s; }
+.field input:not([type="radio"]):not([type="checkbox"]):focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--magma-500); }
 .field textarea { resize: vertical; min-height: 100px; }
-.field.invalid input, .field.invalid select { border-color: var(--hazard); }
+.field.invalid input:not([type="radio"]):not([type="checkbox"]), .field.invalid select { border-color: var(--hazard); }
 .err { font-size: 12px; color: var(--hazard); font-weight: 600; }
 .hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .seg { display: flex; gap: 8px; }
-.seg label { flex: 1; display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #D9D2CE; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
-.seg input { margin: 0; accent-color: var(--magma-500); }
+.seg label { flex: 1; display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #D9D2CE; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s ease; }
+.seg input { margin: 0; width: 18px; height: 18px; accent-color: var(--magma-500); cursor: pointer; }
+[data-bs-theme="dark"] .seg label { border-color: #4D3126; background-color: #1A0F0C; color: #F2EBE9; }
+
+/* Form Checks & Radio Buttons */
+.form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 1.5rem;
+  margin-bottom: 0;
+  padding-left: 0;
+  cursor: pointer;
+}
+
+.form-check .form-check-input {
+  float: none;
+  margin: 0;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0 !important;
+  border: 2px solid #C4B5AE !important;
+  background-color: #FFFFFF !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% !important;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: all 0.2s ease-in-out;
+  box-shadow: none !important;
+}
+
+.form-check-input[type="radio"] {
+  border-radius: 50% !important;
+}
+
+.form-check-input[type="checkbox"] {
+  border-radius: 6px !important;
+}
+
+.form-check-input:hover {
+  border-color: var(--magma-500) !important;
+}
+
+.form-check-input:focus {
+  outline: none !important;
+  border-color: var(--magma-500) !important;
+  box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.25) !important;
+}
+
+.form-check-input[type="radio"]:checked {
+  background-color: var(--magma-500) !important;
+  border-color: var(--magma-500) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2.2' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+}
+
+.form-check-input[type="checkbox"]:checked {
+  background-color: var(--magma-500) !important;
+  border-color: var(--magma-500) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
+}
+
+.form-check-label {
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+[data-bs-theme="dark"] .form-check-input {
+  background-color: #241612 !important;
+  border: 2px solid #5A3A30 !important;
+}
+
+[data-bs-theme="dark"] .form-check-input:hover {
+  border-color: var(--magma-500) !important;
+}
+
+[data-bs-theme="dark"] .form-check-input:focus {
+  border-color: var(--magma-500) !important;
+  box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .form-check-input[type="radio"]:checked {
+  background-color: var(--magma-500) !important;
+  border-color: var(--magma-500) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2.2' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+}
+
+[data-bs-theme="dark"] .form-check-input[type="checkbox"]:checked {
+  background-color: var(--magma-500) !important;
+  border-color: var(--magma-500) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
+}
+
+[data-bs-theme="dark"] .form-check-label {
+  color: #F2EBE9;
+}
 
 /* Toasts */
 .toasts {

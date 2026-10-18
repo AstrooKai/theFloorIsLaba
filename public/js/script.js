@@ -516,13 +516,58 @@ document.addEventListener("DOMContentLoaded", () => {
     return !Object.keys(errs).length;
   }
 
+  function setRadioValue(form, name, value) {
+    const radios = form.querySelectorAll(`input[type="radio"][name="${name}"]`);
+    if (!radios.length) return;
+    const target = String(value || "Active").trim().toLowerCase();
+    let matched = false;
+    radios.forEach((r) => {
+      const isMatch = r.value.trim().toLowerCase() === target;
+      r.checked = isMatch;
+      if (isMatch) matched = true;
+    });
+    if (!matched) {
+      const activeRadio = Array.from(radios).find((r) => r.value.trim().toLowerCase() === "active") || radios[0];
+      if (activeRadio) activeRadio.checked = true;
+    }
+  }
+
   function openForm(row) {
     const e = ENT[cur], f = $("#form"); EDIT = row || null; feeTouched = !!row; f.reset(); setErrors({});
     if($("#dlgT")) $("#dlgT").textContent = row ? "Edit " + (M.one || '') : ($("#addBtn") ? $("#addBtn").textContent : "Add");
     if($("#save")) $("#save").textContent = row ? "Save changes" : "Save " + (M.one || '');
     f.querySelectorAll("[data-lock]").forEach((i) => (i.disabled = !!row));
-    if (row) Object.entries(row).forEach(([k, v]) => { if (f.elements[k]) f.elements[k].value = v ?? ""; });
-    else if (e.defaults) Object.entries(e.defaults()).forEach(([k, v]) => { if(f.elements[k]) f.elements[k].value = v; });
+    if (row) {
+      Object.entries(row).forEach(([k, v]) => {
+        if (f.elements[k]) {
+          if (f.elements[k] instanceof RadioNodeList || (f.elements[k].length && f.elements[k][0]?.type === "radio")) {
+            setRadioValue(f, k, v || "Active");
+          } else {
+            f.elements[k].value = v ?? "";
+          }
+        }
+      });
+    } else if (e.defaults) {
+      Object.entries(e.defaults()).forEach(([k, v]) => {
+        if (f.elements[k]) {
+          if (f.elements[k] instanceof RadioNodeList || (f.elements[k].length && f.elements[k][0]?.type === "radio")) {
+            setRadioValue(f, k, v || "Active");
+          } else {
+            f.elements[k].value = v;
+          }
+        }
+      });
+    }
+
+    // Always ensure all radio groups in the form have a default selection (defaulting to "Active")
+    const radioNames = new Set(Array.from(f.querySelectorAll('input[type="radio"]')).map((r) => r.name).filter(Boolean));
+    radioNames.forEach((name) => {
+      const checked = f.querySelector(`input[type="radio"][name="${name}"]:checked`);
+      if (!checked) {
+        setRadioValue(f, name, (row && row[name]) || "Active");
+      }
+    });
+
     e.init && e.init(f);
     if($("#dlg")) openModal($("#dlg"));
   }
@@ -538,7 +583,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const ENT = {
     customers: {
-      name: "customers", id: "customer_id",
+      name: "customers", id: "customer_id", defaults: () => ({ status: "Active" }),
       init: (f) => {
         if (EDIT) {
           if (EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
@@ -547,9 +592,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (EDIT.street) f.elements.street.value = EDIT.street;
           else if (EDIT.address) f.elements.street.value = EDIT.address;
           if (EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
-          if (EDIT.status) f.elements.status.value = EDIT.status;
+          setRadioValue(f, "status", EDIT.status || "Active");
         } else {
-          f.elements.status.value = "Active";
+          setRadioValue(f, "status", "Active");
         }
       },
       filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + (r.contact||"") + " " + (r.address||"")).toLowerCase().includes(f.q)) && (!f.st || (r.status || "Active").toLowerCase() === f.st)),
@@ -866,6 +911,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (EDIT.time_slot) f.elements.time_slot.value = EDIT.time_slot;
           if (EDIT.fee !== undefined) f.elements.fee.value = EDIT.fee;
           if (EDIT.rider) f.elements.rider.value = EDIT.rider;
+          setRadioValue(f, "type", EDIT.type || "Pickup");
+        } else {
+          setRadioValue(f, "type", "Pickup");
         }
         ENT.deliveries.updateRiderVisibility(f);
       },
@@ -1004,8 +1052,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if (EDIT.role) f.elements.role.value = EDIT.role;
           if (EDIT.email) f.elements.email.value = EDIT.email;
           if (EDIT.phone) f.elements.phone.value = EDIT.phone;
-          if (EDIT.status) f.elements.status.value = EDIT.status;
+          setRadioValue(f, "status", EDIT.status || "Active");
           if (f.elements.password) f.elements.password.value = "";
+        } else {
+          setRadioValue(f, "status", "Active");
         }
       },
       validate(d) {
