@@ -231,18 +231,8 @@ exports.createOrder = async (req, res) => {
             finalStaffId = staffRows.length > 0 ? staffRows[0].staff_id : 1;
         }
 
-        // Resolve status
-        let finalStatusId = status_id;
-        if (!finalStatusId) {
-            const statusMap = {
-                'Received': 1,
-                'Washing': 2,
-                'Ready for Pickup': 3,
-                'Out for Delivery': 4,
-                'Completed': 5
-            };
-            finalStatusId = (order_status && statusMap[order_status]) ? statusMap[order_status] : 1;
-        }
+        // New orders always strictly start at 'Received' (status_id 1)
+        const finalStatusId = 1;
 
         const finalOrderDate = order_date || new Date().toISOString().split('T')[0];
 

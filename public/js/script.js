@@ -882,7 +882,7 @@ document.addEventListener("DOMContentLoaded", () => {
           release_type: d.release_type || "Pickup",
           total: totalVal,
           order_date: d.order_date || today(),
-          order_status: d.order_status || "Received",
+          order_status: EDIT ? (EDIT.order_status || "Received") : "Received",
           items: [{ service_id: svcId, weight_kg: weight, subtotal: totalVal }]
         };
       },
