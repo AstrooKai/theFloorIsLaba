@@ -334,9 +334,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (k === "services") {
         const active = (S.services || []).filter(s => (s.status || "Active").toLowerCase() === "active");
         sel.innerHTML = `<option value="">Choose service</option>` + active.map(s => `<option value="${s.service_id}" data-price="${s.price || s.price_per_kg}" data-unit="${esc(s.unit || 'kg')}">${esc(s.service_name)} (${peso(s.price || s.price_per_kg)}/${esc(s.unit || 'kg')})</option>`).join("");
+      } else if (k === "riders") {
+        const busyRiderNames = new Set(
+          (S.rows || [])
+            .filter(d => d.status === "On the way" && (d.rider_id || d.rider))
+            .map(d => String(d.rider || '').toLowerCase().trim())
+        );
+        const busyRiderIds = new Set(
+          (S.rows || [])
+            .filter(d => d.status === "On the way" && d.rider_id)
+            .map(d => Number(d.rider_id))
+        );
+        sel.innerHTML = `<option value="">Choose rider</option>` + S.riders.map((r) => {
+          const isBusy = busyRiderIds.has(Number(r.staff_id)) || busyRiderNames.has((r.full_name || '').toLowerCase().trim());
+          const label = isBusy ? `${r.full_name} (Occupied on delivery)` : `${r.full_name} (Available)`;
+          return `<option value="${esc(r.full_name)}">${esc(label)}</option>`;
+        }).join("");
       } else {
-        const opts = k === "riders" ? S.riders.map((r) => [r.full_name, r.full_name]) : S.orders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
-        sel.innerHTML = `<option value="">Choose ${k.includes('riders') ? 'rider' : 'order'}</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+        const opts = S.orders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
+        sel.innerHTML = `<option value="">Choose order</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
       }
     });
   }
@@ -619,6 +635,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    fillSelects();
     e.init && e.init(f);
     if($("#dlg")) openModal($("#dlg"));
   }
@@ -1046,12 +1063,35 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMgr = isManager();
         const isCashierMgr = isCashierOrManager();
         const isR = isRider();
+
+        const occupiedRiderMap = {};
+        (S.rows || []).forEach((d) => {
+          if (d.status === "On the way") {
+            if (d.rider_id) occupiedRiderMap[Number(d.rider_id)] = d;
+            if (d.rider) occupiedRiderMap[d.rider.toLowerCase().trim()] = d;
+          }
+        });
+
         const g = {}; list.forEach((r) => (g[r.scheduled_date] ||= []).push(r));
         const label = (d) => d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
         return Object.keys(g).sort().map((d) => `<section class="day"><h2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
           const act = r.status === "Scheduled" || r.status === "On the way";
           const isPickup = (r.type || "").toLowerCase() === "pickup";
-          const startBtn = (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) ? btn("start", r.delivery_id, "Start run", "btn-warning") : "";
+
+          const activeRun = (r.rider_id && occupiedRiderMap[Number(r.rider_id)]) || (r.rider && occupiedRiderMap[r.rider.toLowerCase().trim()]);
+          const isRiderOccupied = Boolean(activeRun && activeRun.delivery_id !== r.delivery_id);
+
+          let startBtn = "";
+          if (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) {
+            if (isRiderOccupied) {
+              startBtn = `<button class="btn sm btn-outline-warning" disabled title="Rider ${esc(r.rider)} is currently on active delivery #${ord(activeRun.order_id)}" type="button"><i class="bi bi-clock-history me-1"></i>Rider Busy</button>`;
+            } else if (!r.rider) {
+              startBtn = `<button class="btn sm btn-outline-secondary" disabled title="Please assign a rider before starting this delivery run" type="button">No Rider</button>`;
+            } else {
+              startBtn = btn("start", r.delivery_id, "Start run", "btn-warning");
+            }
+          }
+
           const doneBtn = ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
           const editBtn = ((r.status !== "Completed" && r.status !== "Cancelled") && isCashierMgr) ? btn("edit", r.delivery_id, "Edit") : "";
           const cancelBtn = (act && isCashierMgr) ? btn("cancel", r.delivery_id, isPickup ? "Cancel pickup" : "Cancel run", "btn-danger") : "";
@@ -1060,7 +1100,8 @@ document.addEventListener("DOMContentLoaded", () => {
             ? `${startBtn}${doneBtn}${editBtn}${cancelBtn}${archiveBtn}`
             : `<span class="text-muted small">View only</span>`;
           const displayAddress = r.street && r.barangay ? `${r.street}, ${r.barangay}` : (r.address || "Cabuyao, Laguna");
-          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${esc(r.type)}</span></div><div class="tm"><div class="tt"><strong>${esc(r.customer_name || nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(displayAddress)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b></span></div><div class="acts" style="justify-content:flex-start">${acts}</div></div></article>`;
+          const riderBadge = isRiderOccupied ? `<span class="badge warn" style="font-size:9.5px; padding:1px 5px; margin-left:4px;" title="Currently doing another delivery">Busy on Run</span>` : "";
+          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${esc(r.type)}</span></div><div class="tm"><div class="tt"><strong>${esc(r.customer_name || nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(displayAddress)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b>${riderBadge}</span></div><div class="acts" style="justify-content:flex-start">${acts}</div></div></article>`;
         }).join("")}</section>`).join("");
       },
       validate(d) {
@@ -1093,7 +1134,21 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       delMsg: () => "Archive run?",
       async act(a, r) {
-        if (a === "start") return r.rider ? patch(r, { status: "On the way" }, "Run started.") : toast("Please assign a rider before starting the run.", 1);
+        if (a === "start") {
+          if (!r.rider) return toast("Please assign a rider before starting the run.", 1);
+          const busy = (S.rows || []).find((d) =>
+            d.delivery_id !== r.delivery_id &&
+            d.status === "On the way" &&
+            (
+              (r.rider_id && d.rider_id && Number(d.rider_id) === Number(r.rider_id)) ||
+              (d.rider && r.rider && d.rider.toLowerCase().trim() === r.rider.toLowerCase().trim())
+            )
+          );
+          if (busy) {
+            return toast(`Rider ${r.rider} is currently occupied on an active delivery. Please wait until they return.`, 1);
+          }
+          return patch(r, { status: "On the way" }, "Run started.");
+        }
         if (a === "done") {
           const isPickup = (r.type || "").toLowerCase() === "pickup";
           return patch(r, { status: "Completed" }, isPickup ? "Pickup completed." : "Run completed.");

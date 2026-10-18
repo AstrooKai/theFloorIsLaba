@@ -151,6 +151,40 @@ exports.updateDelivery = async (req, res) => {
             params.push(Number(fee));
         }
         if (status) {
+            if (status === 'On the way') {
+                let targetRiderId = rider_id;
+                if (!targetRiderId && rider) {
+                    const [riderRows] = await pool.query(
+                        "SELECT staff_id FROM staff WHERE CONCAT(first_name, ' ', last_name) = ? OR first_name = ? LIMIT 1",
+                        [rider, rider]
+                    );
+                    if (riderRows.length > 0) targetRiderId = riderRows[0].staff_id;
+                }
+                if (!targetRiderId) {
+                    const [current] = await pool.query('SELECT rider_id, type FROM deliveries WHERE delivery_id = ?', [id]);
+                    if (current.length > 0) {
+                        if (current[0].type === 'Pickup') {
+                            return res.status(400).json({ error: 'Pickup runs do not have a transit state.' });
+                        }
+                        targetRiderId = current[0].rider_id;
+                    }
+                }
+                if (!targetRiderId) {
+                    return res.status(400).json({ error: 'Please assign a rider before starting the run.' });
+                }
+                const [busyRuns] = await pool.query(
+                    `SELECT d.delivery_id, CONCAT(s.first_name, ' ', s.last_name) AS rider_name 
+                     FROM deliveries d 
+                     JOIN staff s ON d.rider_id = s.staff_id 
+                     WHERE d.rider_id = ? AND d.status = 'On the way' AND d.delivery_id != ? AND (d.is_archived IS NULL OR d.is_archived = FALSE)`,
+                    [targetRiderId, id]
+                );
+                if (busyRuns.length > 0) {
+                    return res.status(400).json({ 
+                        error: `Rider ${busyRuns[0].rider_name} is currently occupied on an active delivery (#${busyRuns[0].delivery_id}). Please wait until they complete their current run.` 
+                    });
+                }
+            }
             updates.push('status = ?');
             params.push(status);
         }
