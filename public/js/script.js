@@ -792,7 +792,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const editBtn = isCashierMgr ? `<button class="btn sm" data-act="edit" data-id="${o.order_id}" type="button">Edit</button>` : "";
           const archiveBtn = isMgr ? `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>` : "";
           const actsHtml = `<div class="acts">${invoiceBtn}${editBtn}${archiveBtn}</div>`;
-          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
+          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
       validate(d) {
@@ -850,7 +850,7 @@ document.addEventListener("DOMContentLoaded", () => {
       draw: (list) => list.map((o) => {
         const invoiceBtn = `<button class="btn sm btn-outline-primary" data-act="invoice" data-id="${o.order_id}" title="Invoice" type="button"><i class="bi bi-file-earmark-text me-1"></i>Invoice</button>`;
         const archBtn = o.is_archived ? `<button class="btn sm btn-primary" data-act="unarchive" data-id="${o.order_id}" type="button">Unarchive</button>` : `<button class="btn sm btn-outline-secondary" data-act="archive" data-id="${o.order_id}" type="button">Archive</button>`;
-        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : o.payment_status === "Partial" ? "warn" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${invoiceBtn}${archBtn}</div></td></tr>`;
+        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${o.payment_status === "Paid" ? "ok" : "mute"}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td><div class="acts">${invoiceBtn}${archBtn}</div></td></tr>`;
       }).join(""),
       async act(a, r) {
         if (a === "archive") {
@@ -1383,11 +1383,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const address = (order && (order.street || order.barangay || order.address)) ? `${order.street ? order.street + ', ' : ''}${order.barangay ? order.barangay + ', ' : ''}${order.address || ''}`.replace(/,\s*,/g, ', ').replace(/^,\s*|,\s*$/g, '').trim() : "";
 
       const orderTotal = Number((order && (order.total || order.total_amount)) || (payment && payment.amount) || 0);
-      const amountPaid = Number(payment ? (payment.amount_paid || payment.amount) : orderTotal);
-      const paymentMethod = (payment && (payment.payment_method || payment.method)) || "Cash";
+      let balance = 0;
+      if (order && order.payments && order.payments.length > 0) {
+        const allPaid = order.payments.reduce((s, p) => s + Number(p.amount_paid || p.amount || 0), 0);
+        balance = Math.max(0, orderTotal - allPaid);
+      } else if (order && order.payment_status === "Unpaid") {
+        balance = orderTotal;
+      }
+
+      const isPaid = (order && order.payment_status === "Paid") || (payment && payment.status === "Paid") || (balance <= 0 && orderTotal > 0);
+      const pStatus = isPaid ? "Paid" : "Unpaid";
+      const amountPaid = isPaid ? orderTotal : 0;
+      const paymentMethod = (payment && (payment.payment_method || payment.method)) || (isPaid ? "Cash" : "N/A");
       const refNo = payment ? payment.reference_no : "";
-      const pStatus = (payment && payment.status) || (order && order.payment_status) || "Paid";
-      const pStatusCls = pStatus === "Paid" ? "stamp-paid" : pStatus === "Pending" ? "stamp-pending" : "stamp-refunded";
 
       let items = (order && Array.isArray(order.items) && order.items.length > 0) ? order.items : [];
       let itemsHtml = "";
@@ -1415,14 +1423,6 @@ document.addEventListener("DOMContentLoaded", () => {
             <td class="text-end fw-semibold">${peso(orderTotal)}</td>
           </tr>
         `;
-      }
-
-      let balance = 0;
-      if (order && order.payments && order.payments.length > 0) {
-        const allPaid = order.payments.reduce((s, p) => s + Number(p.amount_paid || p.amount || 0), 0);
-        balance = Math.max(0, orderTotal - allPaid);
-      } else if (orderTotal > amountPaid) {
-        balance = Math.max(0, orderTotal - amountPaid);
       }
 
       let modalEl = $("#receiptModal");
@@ -1471,9 +1471,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const statusBadgeStyle = pStatus === "Paid" 
         ? "background: rgba(46, 125, 50, 0.12); color: #2e7d32; border: 1px solid rgba(46, 125, 50, 0.25);" 
-        : pStatus === "Pending" 
-          ? "background: rgba(245, 127, 23, 0.12); color: #f57f17; border: 1px solid rgba(245, 127, 23, 0.25);" 
-          : "background: rgba(100, 116, 139, 0.12); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.25);";
+        : "background: rgba(100, 116, 139, 0.12); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.25);";
 
       $("#receiptModalBody").innerHTML = `
         <div class="invoice-container">
@@ -1568,11 +1566,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="invoice-summary-row">
                   <span style="color: var(--text-muted);">Amount Paid:</span>
-                  <span style="font-weight: 600; color: #2e7d32;">${peso(amountPaid)}</span>
+                  <span style="font-weight: 600; color: ${isPaid ? '#2e7d32' : 'inherit'};">${peso(amountPaid)}</span>
                 </div>
                 <div class="invoice-summary-row total-row">
-                  <span>${balance > 0 ? 'Balance Due:' : 'Total Amount:'}</span>
-                  <span style="color: ${balance > 0 ? 'var(--magma-600)' : 'inherit'};">${balance > 0 ? peso(balance) : peso(orderTotal)}</span>
+                  <span>${isPaid ? 'Total Amount:' : 'Balance Due:'}</span>
+                  <span style="color: ${isPaid ? 'inherit' : 'var(--magma-600)'};">${peso(orderTotal)}</span>
                 </div>
               </div>
             </div>

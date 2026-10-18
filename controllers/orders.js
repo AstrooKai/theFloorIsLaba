@@ -32,7 +32,6 @@ exports.getAllOrders = async (req, res) => {
                 COALESCE(pay.total_paid, 0) AS total_paid,
                 CASE 
                     WHEN COALESCE(pay.total_paid, 0) >= COALESCE(SUM(oi.subtotal), 0) AND COALESCE(SUM(oi.subtotal), 0) > 0 THEN 'Paid'
-                    WHEN COALESCE(pay.total_paid, 0) > 0 THEN 'Partial'
                     ELSE 'Unpaid'
                 END AS payment_status
             FROM orders o
