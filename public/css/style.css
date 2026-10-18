@@ -259,6 +259,32 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: var(--paper);
   color: var(--text-main);
 }
+[data-bs-theme="dark"] .sidebar {
+  background-color: #180F0C !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+[data-bs-theme="dark"] .sidebar .user-profile {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+[data-bs-theme="dark"] .login-left {
+  background: linear-gradient(165deg, #2D1A14 0%, #23140F 100%) !important;
+  border-right: 1px solid rgba(232, 93, 4, 0.16) !important;
+  box-shadow: 20px 0 40px rgba(0, 0, 0, 0.45) !important;
+}
+[data-bs-theme="dark"] .login-left::before {
+  border-color: rgba(232, 93, 4, 0.08);
+}
+[data-bs-theme="dark"] .login-left::after {
+  border-color: rgba(232, 93, 4, 0.06);
+}
+[data-bs-theme="dark"] .login-left-footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+[data-bs-theme="dark"] .login-left-footer .step-icon {
+  background: rgba(232, 93, 4, 0.12);
+  color: var(--magma-500);
+}
 [data-bs-theme="dark"] .stat,
 [data-bs-theme="dark"] .toolbar,
 [data-bs-theme="dark"] .tw,
@@ -683,6 +709,10 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
     padding: 36px 24px;
     gap: 28px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  }
+  [data-bs-theme="dark"] .login-left {
+    border-right: none !important;
+    border-bottom: 1px solid rgba(232, 93, 4, 0.16) !important;
   }
   .login-left-middle, .login-left-content {
     margin-top: 0;
