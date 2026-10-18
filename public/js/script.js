@@ -1377,6 +1377,10 @@ document.addEventListener("DOMContentLoaded", () => {
       init: (f) => {
         const pwdHelp = $("#pwdHelp");
         if (pwdHelp) pwdHelp.textContent = EDIT ? "Leave blank to keep existing password." : "Default password if blank: admin123";
+        const statusField = f.querySelector('[data-f="status"]');
+        if (statusField) {
+          statusField.style.display = EDIT ? "" : "none";
+        }
         if (EDIT) {
           if (EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
           if (EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
@@ -1404,7 +1408,7 @@ document.addEventListener("DOMContentLoaded", () => {
           role: d.role || "Cashier",
           email: (d.email || "").trim().toLowerCase(),
           phone: (d.phone || "").trim(),
-          status: d.status || "Active"
+          status: EDIT ? (d.status || EDIT.status || "Active") : "Active"
         };
         if (d.password && d.password.trim()) {
           data.password = d.password.trim();

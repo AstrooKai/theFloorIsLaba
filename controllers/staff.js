@@ -81,7 +81,7 @@ exports.getStaffById = async (req, res) => {
 
 exports.createStaff = async (req, res) => {
     try {
-        let { first_name, last_name, full_name, role = 'Staff', email, password = 'password123', phone, status = 'Active' } = req.body;
+        let { first_name, last_name, full_name, role = 'Staff', email, password = 'password123', phone } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
@@ -95,9 +95,10 @@ exports.createStaff = async (req, res) => {
         const finalEmail = (email || `${first_name.toLowerCase()}.${(last_name || 'staff').toLowerCase()}@laba.ph`).trim().toLowerCase();
         const hashedPassword = await bcrypt.hash(password || 'password123', 10);
 
+        // Newly added staff accounts are strictly Active initially
         const [result] = await pool.query(
-            'INSERT INTO staff (first_name, last_name, role, email, password, phone, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)',
-            [first_name, last_name || '', role, finalEmail, hashedPassword, phone || '', status || 'Active']
+            'INSERT INTO staff (first_name, last_name, role, email, password, phone, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, "Active", FALSE)',
+            [first_name, last_name || '', role, finalEmail, hashedPassword, phone || '']
         );
 
         res.status(201).json({
@@ -108,7 +109,7 @@ exports.createStaff = async (req, res) => {
             role,
             email: finalEmail,
             phone: phone || '',
-            status: status || 'Active',
+            status: 'Active',
             is_archived: false
         });
     } catch (error) {
