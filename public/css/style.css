@@ -348,6 +348,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: #fff !important;
 }
 
+[data-bs-theme="dark"] .btn-white {
+  background-color: #FFFFFF !important;
+  color: #160D0A !important;
+}
+[data-bs-theme="dark"] .btn-white:hover {
+  background-color: #F2EBE9 !important;
+  color: #160D0A !important;
+}
+
 /* Dashboard Banner */
 .dash-banner {
   background: var(--volcanic-100);
@@ -359,8 +368,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .dash-banner h1 { font-size: 36px; margin-bottom: 12px; font-family: var(--font-serif); letter-spacing: -1px; }
 .dash-banner p { font-size: 15px; color: rgba(255,255,255,0.7); margin-bottom: 24px; max-width: 480px; }
 .dash-banner-actions { display: flex; align-items: center; gap: 24px; }
-.btn-white { background: #fff; color: var(--text-main); padding: 14px 24px; border-radius: var(--radius-pill); font-weight: 600; border: none; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s; }
-.btn-white:hover { background: #F2EBE9; }
+.btn-white { background: #FFFFFF; color: #160D0A !important; padding: 14px 24px; border-radius: var(--radius-pill); font-weight: 700; border: none; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s; }
+.btn-white:hover { background: #F2EBE9; color: #160D0A !important; }
 .banner-status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); }
 .banner-status::before { content:''; width:8px; height:8px; background:var(--safe); border-radius:50%; }
 .dash-graphic { position: relative; z-index: 2; margin-right: 40px; transform: scale(1.2); }
