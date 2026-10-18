@@ -1392,19 +1392,27 @@ document.addEventListener("DOMContentLoaded", () => {
       let items = (order && Array.isArray(order.items) && order.items.length > 0) ? order.items : [];
       let itemsHtml = "";
       if (items.length > 0) {
-        itemsHtml = items.map((it) => `
+        itemsHtml = items.map((it, idx) => `
           <tr>
-            <td><strong>${esc(it.service_name || 'Laundry Service')}</strong></td>
+            <td class="text-center text-muted" style="width: 45px;">${idx + 1}</td>
+            <td>
+              <div class="fw-semibold">${esc(it.service_name || 'Laundry Service')}</div>
+              ${it.notes ? `<div class="text-muted small" style="font-size: 11.5px;">${esc(it.notes)}</div>` : ''}
+            </td>
             <td class="text-center">${Number(it.weight_kg || 1).toFixed(2)} kg</td>
-            <td class="text-end">${peso(it.subtotal || 0)}</td>
+            <td class="text-end fw-semibold">${peso(it.subtotal || 0)}</td>
           </tr>
         `).join("");
       } else {
         itemsHtml = `
           <tr>
-            <td><strong>Standard Laundry Service</strong></td>
+            <td class="text-center text-muted" style="width: 45px;">1</td>
+            <td>
+              <div class="fw-semibold">Standard Laundry Service</div>
+              <div class="text-muted small" style="font-size: 11.5px;">Wash, Dry & Fold</div>
+            </td>
             <td class="text-center">1 load</td>
-            <td class="text-end">${peso(orderTotal)}</td>
+            <td class="text-end fw-semibold">${peso(orderTotal)}</td>
           </tr>
         `;
       }
@@ -1426,10 +1434,10 @@ document.addEventListener("DOMContentLoaded", () => {
         modalEl.setAttribute("aria-labelledby", "receiptModalTitle");
         modalEl.setAttribute("aria-hidden", "true");
         modalEl.innerHTML = `
-          <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow">
               <div class="modal-header border-0 pb-0">
-                <h2 class="modal-title fs-5 fw-bold" id="receiptModalTitle"><i class="bi bi-receipt me-2 text-primary"></i>Official Receipt</h2>
+                <h2 class="modal-title fs-5 fw-bold" id="receiptModalTitle"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Official Invoice</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div class="modal-body p-3 p-md-4" id="receiptModalBody">
@@ -1437,7 +1445,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="modal-footer border-0 pt-0 justify-content-between">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                 <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-primary" id="receiptPrintBtn"><i class="bi bi-printer me-1"></i> Print Receipt</button>
+                  <button type="button" class="btn btn-primary" id="receiptPrintBtn"><i class="bi bi-printer me-1"></i> Print</button>
                 </div>
               </div>
             </div>
@@ -1448,6 +1456,11 @@ document.addEventListener("DOMContentLoaded", () => {
         modalEl.querySelector("#receiptPrintBtn").addEventListener("click", () => {
           window.print();
         });
+      } else {
+        const dialog = modalEl.querySelector(".modal-dialog");
+        if (dialog && !dialog.classList.contains("modal-lg")) {
+          dialog.classList.add("modal-lg");
+        }
       }
 
       // Update modal header & print button for invoice/receipt
@@ -1456,52 +1469,88 @@ document.addEventListener("DOMContentLoaded", () => {
       const printBtn = modalEl.querySelector("#receiptPrintBtn");
       if (printBtn) printBtn.innerHTML = `<i class="bi bi-printer me-1"></i> ${printBtnText}`;
 
-      const typeBadgeCls = releaseType.toLowerCase() === "delivery" ? "type-delivery" : "type-pickup";
+      const statusBadgeStyle = pStatus === "Paid" 
+        ? "background: rgba(46, 125, 50, 0.12); color: #2e7d32; border: 1px solid rgba(46, 125, 50, 0.25);" 
+        : pStatus === "Pending" 
+          ? "background: rgba(245, 127, 23, 0.12); color: #f57f17; border: 1px solid rgba(245, 127, 23, 0.25);" 
+          : "background: rgba(100, 116, 139, 0.12); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.25);";
 
       $("#receiptModalBody").innerHTML = `
-        <div class="receipt-container">
-          <div class="receipt-paper" id="receiptPrintArea">
-            <div class="receipt-header">
-              <div class="receipt-logo">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--magma-500)" stroke-width="2.5" class="receipt-icon"><path d="M2 12h4l2-9 5 18 3-10h6"></path></svg>
-                <div class="receipt-brand">The Floor Is <b>Laba.</b></div>
+        <div class="invoice-container">
+          <div class="invoice-paper" id="receiptPrintArea">
+            <div class="invoice-header">
+              <div class="invoice-brand">
+                <div class="invoice-brand-title">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--magma-500)" stroke-width="2.5" class="invoice-icon"><path d="M2 12h4l2-9 5 18 3-10h6"></path></svg>
+                  <span>The Floor Is <strong>Laba.</strong></span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Professional Laundry & Dry Cleaning Services</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
+                  Poblacion, Cabuyao, Laguna, Philippines<br>
+                  Tel: 0917-123-4567 • Email: support@floorislaba.ph<br>
+                  VAT Reg. TIN: 432-891-000-000
+                </div>
               </div>
-              <div class="receipt-sub">Professional Laundry & Dry Cleaning</div>
-              <div class="receipt-address">Poblacion, Cabuyao, Laguna</div>
-              <div class="receipt-contact">Tel: 0917-123-4567 • VAT Reg. TIN: 432-891-000</div>
-            </div>
-            
-            <div class="receipt-divider-dashed"></div>
-            
-            <div class="receipt-title-row">
-              <span class="receipt-title">${docTitle}</span>
-              <span class="receipt-stamp ${pStatusCls}">${esc(pStatus)}</span>
-            </div>
-
-            <div class="receipt-meta-grid">
-              <div><span class="lbl text-muted">${docNumLabel}</span> <strong>${esc(docNumVal)}</strong></div>
-              <div><span class="lbl text-muted">Order #:</span> <strong>${esc(ordId)}</strong></div>
-              <div><span class="lbl text-muted">Date:</span> <span>${esc(receiptDate)}</span></div>
-              <div><span class="lbl text-muted">Cashier:</span> <span>${esc(staffName)}</span></div>
+              
+              <div class="invoice-meta">
+                <div class="invoice-title">${docTitle}</div>
+                <div class="invoice-number">${docNumLabel} ${esc(docNumVal)}</div>
+                <div style="margin-top: 8px;">
+                  <span style="display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; ${statusBadgeStyle}">
+                    ${esc(pStatus)}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div class="receipt-divider-dashed"></div>
+            <hr class="invoice-divider">
 
-            <div class="receipt-section">
-              <div class="receipt-row"><span class="lbl text-muted">Customer:</span> <strong>${esc(customerName)}</strong></div>
-              <div class="receipt-row"><span class="lbl text-muted">Contact:</span> <span>${esc(contact)}</span></div>
-              <div class="receipt-row"><span class="lbl text-muted">Type:</span> <span class="badge ${typeBadgeCls}">${esc(releaseType)}</span></div>
-              ${address ? `<div class="receipt-row"><span class="lbl text-muted">Address:</span> <span style="font-size:11.5px; max-width:230px; text-align:right;">${esc(address)}</span></div>` : ''}
+            <div class="invoice-details-grid">
+              <div>
+                <div class="invoice-section-title">Billed To</div>
+                <div style="font-size: 15px; font-weight: 700;">${esc(customerName)}</div>
+                <div style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
+                  <i class="bi bi-telephone me-1"></i> ${esc(contact)}
+                </div>
+                <div style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
+                  <i class="bi bi-box-seam me-1"></i> Fulfillment: <strong>${esc(releaseType)}</strong>
+                </div>
+                ${address ? `<div style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;"><i class="bi bi-geo-alt me-1"></i> ${esc(address)}</div>` : ''}
+              </div>
+
+              <div>
+                <div class="invoice-section-title">Invoice Details</div>
+                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                  <span style="color: var(--text-muted);">Order ID:</span>
+                  <span style="font-weight: 600;">${esc(ordId)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                  <span style="color: var(--text-muted);">Issue Date:</span>
+                  <span>${esc(receiptDate)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                  <span style="color: var(--text-muted);">Payment Method:</span>
+                  <span>${esc(paymentMethod)}</span>
+                </div>
+                ${refNo ? `
+                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                  <span style="color: var(--text-muted);">Reference #:</span>
+                  <span class="font-monospace">${esc(refNo)}</span>
+                </div>` : ''}
+                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0;">
+                  <span style="color: var(--text-muted);">Attending Staff:</span>
+                  <span>${esc(staffName)}</span>
+                </div>
+              </div>
             </div>
 
-            <div class="receipt-divider-dashed"></div>
-
-            <table class="receipt-items-table">
+            <table class="invoice-table">
               <thead>
                 <tr>
-                  <th>Service / Item</th>
-                  <th class="text-center">Qty / Wt</th>
-                  <th class="text-end">Amount</th>
+                  <th class="text-center" style="width: 45px;">#</th>
+                  <th>Service Description</th>
+                  <th class="text-center" style="width: 140px;">Quantity / Weight</th>
+                  <th class="text-end" style="width: 130px;">Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -1509,24 +1558,26 @@ document.addEventListener("DOMContentLoaded", () => {
               </tbody>
             </table>
 
-            <div class="receipt-divider-dashed"></div>
-
-            <div class="receipt-totals">
-              <div class="receipt-row"><span class="lbl text-muted">Order Total:</span> <strong>${peso(orderTotal)}</strong></div>
-              <div class="receipt-row"><span class="lbl text-muted">Method:</span> <span>${esc(paymentMethod)}</span></div>
-              ${refNo ? `<div class="receipt-row"><span class="lbl text-muted">Ref #:</span> <span class="font-monospace">${esc(refNo)}</span></div>` : ''}
-              <div class="receipt-row highlight"><span class="lbl">Amount Paid:</span> <strong style="font-size:15px; color:var(--magma-600);">${peso(amountPaid)}</strong></div>
-              <div class="receipt-row ${balance > 0 ? 'text-danger' : 'text-success'}"><span class="lbl">${balance > 0 ? 'Balance Due:' : 'Remaining Balance:'}</span> <strong>${peso(balance)}</strong></div>
+            <div class="invoice-summary-wrapper">
+              <div class="invoice-summary-card">
+                <div class="invoice-summary-row">
+                  <span style="color: var(--text-muted);">Order Subtotal:</span>
+                  <span>${peso(orderTotal)}</span>
+                </div>
+                <div class="invoice-summary-row">
+                  <span style="color: var(--text-muted);">Amount Paid:</span>
+                  <span style="font-weight: 600; color: #2e7d32;">${peso(amountPaid)}</span>
+                </div>
+                <div class="invoice-summary-row total-row">
+                  <span>${balance > 0 ? 'Balance Due:' : 'Total Amount:'}</span>
+                  <span style="color: ${balance > 0 ? 'var(--magma-600)' : 'inherit'};">${balance > 0 ? peso(balance) : peso(orderTotal)}</span>
+                </div>
+              </div>
             </div>
 
-            <div class="receipt-divider-dashed"></div>
-
-            <div class="receipt-footer">
-              <div class="receipt-barcode">
-                <div class="barcode-lines"></div>
-                <div class="barcode-num">*${esc(ordId)}-${esc(payId)}*</div>
-              </div>
-              <p class="receipt-notes">Thank you for choosing The Floor Is Laba!<br>Please present this receipt upon claiming your laundry.<br>All claims must be made within 30 days.</p>
+            <div class="invoice-footer">
+              <div style="font-weight: 600; margin-bottom: 4px;">Thank you for your business!</div>
+              <div>This is an official document issued by The Floor Is Laba. For questions or customer support, email support@floorislaba.ph or call (0917) 123-4567.</div>
             </div>
           </div>
         </div>

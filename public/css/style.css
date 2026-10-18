@@ -1284,257 +1284,223 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   }
 }
 
-/* Receipt Modal & Printable Paper */
-.receipt-container {
+/* Invoice & Document Modal */
+.invoice-container {
   display: flex;
   justify-content: center;
-  padding: 8px 0;
-}
-
-.receipt-paper {
-  background: #ffffff;
-  color: #1a1a1a;
   width: 100%;
-  max-width: 420px;
-  padding: 24px 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace, var(--font-sans);
-  font-size: 12.5px;
-  line-height: 1.45;
-  border: 1px dashed #DDD5D2;
+  padding: 4px 0;
 }
 
-[data-bs-theme="dark"] .receipt-paper {
-  background: #1E1411;
-  color: #EDE4E0;
-  border-color: #4A332B;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+.invoice-paper {
+  background: #ffffff;
+  color: #160D0A;
+  width: 100%;
+  padding: 32px 36px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid #EAE5E3;
+  font-family: var(--font-sans);
+  line-height: 1.5;
 }
 
-.receipt-header {
-  text-align: center;
-  margin-bottom: 12px;
+[data-bs-theme="dark"] .invoice-paper {
+  background: var(--surface);
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-lg);
 }
-.receipt-header .receipt-logo {
+
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.invoice-brand {
+  max-width: 340px;
+}
+
+.invoice-brand-title {
+  font-size: 20px;
+  font-weight: 800;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.receipt-header .receipt-icon {
-  width: 22px;
-  height: 22px;
-}
-.receipt-header .receipt-brand {
-  font-size: 18px;
-  font-weight: 800;
+  gap: 10px;
   color: #160D0A;
   letter-spacing: -0.5px;
 }
-[data-bs-theme="dark"] .receipt-header .receipt-brand {
-  color: #FFFFFF;
+
+[data-bs-theme="dark"] .invoice-brand-title {
+  color: #ffffff;
 }
-.receipt-header .receipt-sub {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
+
+.invoice-meta {
+  text-align: right;
+}
+
+.invoice-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
   color: var(--magma-600);
-  letter-spacing: 0.5px;
-}
-[data-bs-theme="dark"] .receipt-header .receipt-sub {
-  color: #FF9E66;
-}
-.receipt-header .receipt-address,
-.receipt-header .receipt-contact {
-  font-size: 11px;
-  color: #6c757d;
-  margin-top: 2px;
-}
-[data-bs-theme="dark"] .receipt-header .receipt-address,
-[data-bs-theme="dark"] .receipt-header .receipt-contact {
-  color: #A39690;
+  margin-bottom: 2px;
 }
 
-.receipt-divider-dashed {
-  border-top: 1px dashed #DDD5D2;
-  margin: 12px 0;
-}
-[data-bs-theme="dark"] .receipt-divider-dashed {
-  border-color: #4A332B;
+[data-bs-theme="dark"] .invoice-title {
+  color: var(--glow);
 }
 
-.receipt-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.receipt-title {
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 1px;
-  color: #160D0A;
-}
-[data-bs-theme="dark"] .receipt-title {
-  color: #FFFFFF;
+.invoice-number {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
-.receipt-stamp {
-  font-weight: 800;
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border: 1.5px solid currentColor;
-}
-.receipt-stamp.stamp-paid {
-  color: #137333;
-  background: #E6F4EA;
-  border-color: #137333;
-}
-.receipt-stamp.stamp-pending {
-  color: #B06000;
-  background: #FEF7E0;
-  border-color: #B06000;
-}
-.receipt-stamp.stamp-refunded {
-  color: #C5221F;
-  background: #FCE8E6;
-  border-color: #C5221F;
-}
-[data-bs-theme="dark"] .receipt-stamp.stamp-paid {
-  color: #81C995;
-  background: rgba(19, 115, 51, 0.25);
-  border-color: #81C995;
-}
-[data-bs-theme="dark"] .receipt-stamp.stamp-pending {
-  color: #FDD663;
-  background: rgba(250, 163, 7, 0.22);
-  border-color: #FDD663;
-}
-[data-bs-theme="dark"] .receipt-stamp.stamp-refunded {
-  color: #F28B82;
-  background: rgba(217, 48, 37, 0.25);
-  border-color: #F28B82;
+.invoice-divider {
+  border: 0;
+  border-top: 1px solid #EAE5E3;
+  margin: 20px 0;
 }
 
-.receipt-meta-grid {
+[data-bs-theme="dark"] .invoice-divider {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.invoice-details-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px 12px;
-  font-size: 11.5px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
-.receipt-section .receipt-row,
-.receipt-totals .receipt-row {
+
+.invoice-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.invoice-table {
+  width: 100%;
+  margin-bottom: 24px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #EAE5E3;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+[data-bs-theme="dark"] .invoice-table {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.invoice-table th {
+  background: var(--paper);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #EAE5E3;
+}
+
+[data-bs-theme="dark"] .invoice-table th {
+  background: rgba(255, 255, 255, 0.03);
+  color: #A89B95;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.invoice-table td {
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #F3EFEF;
+  vertical-align: middle;
+}
+
+[data-bs-theme="dark"] .invoice-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+  color: #EDE4E0;
+}
+
+.invoice-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.invoice-summary-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
+.invoice-summary-card {
+  width: 100%;
+  max-width: 320px;
+  background: var(--paper);
+  border: 1px solid #EAE5E3;
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+}
+
+[data-bs-theme="dark"] .invoice-summary-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.invoice-summary-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-.receipt-totals .receipt-row.highlight {
-  font-size: 13.5px;
-  font-weight: 800;
-  color: #160D0A;
-  padding-top: 4px;
-}
-[data-bs-theme="dark"] .receipt-totals .receipt-row.highlight {
-  color: #FFFFFF;
-}
-
-.receipt-items-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 6px 0;
-  font-size: 12px;
-}
-.receipt-items-table th {
-  padding: 4px 0;
-  border-bottom: 1px solid #160D0A;
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 10.5px;
-  color: #555;
-}
-[data-bs-theme="dark"] .receipt-items-table th {
-  border-bottom: 1px solid #4A332B;
-  color: #A39690;
-}
-.receipt-items-table td {
-  padding: 5px 0;
-  vertical-align: top;
-  border-bottom: 1px dotted #E0D9D6;
-}
-[data-bs-theme="dark"] .receipt-items-table td {
-  border-bottom-color: #38241D;
-}
-
-.receipt-footer {
-  text-align: center;
-  margin-top: 14px;
-}
-.receipt-barcode {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  font-size: 13px;
   margin-bottom: 8px;
 }
-.barcode-lines {
-  width: 170px;
-  height: 36px;
-  background: repeating-linear-gradient(
-    90deg,
-    #160D0A 0,
-    #160D0A 2px,
-    transparent 2px,
-    transparent 4px,
-    #160D0A 4px,
-    #160D0A 7px,
-    transparent 7px,
-    transparent 9px,
-    #160D0A 9px,
-    #160D0A 10px,
-    transparent 10px,
-    transparent 13px
-  );
+
+.invoice-summary-row.total-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #EAE5E3;
+  font-size: 16px;
+  font-weight: 800;
 }
-[data-bs-theme="dark"] .barcode-lines {
-  background: repeating-linear-gradient(
-    90deg,
-    #EDE4E0 0,
-    #EDE4E0 2px,
-    transparent 2px,
-    transparent 4px,
-    #EDE4E0 4px,
-    #EDE4E0 7px,
-    transparent 7px,
-    transparent 9px,
-    #EDE4E0 9px,
-    #EDE4E0 10px,
-    transparent 10px,
-    transparent 13px
-  );
+
+[data-bs-theme="dark"] .invoice-summary-row.total-row {
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
-.barcode-num {
-  font-size: 10.5px;
-  letter-spacing: 2px;
-  margin-top: 4px;
-  color: #666;
+
+.invoice-footer {
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px solid #EAE5E3;
+  font-size: 12px;
+  color: var(--text-muted);
 }
-[data-bs-theme="dark"] .barcode-num {
-  color: #A39690;
+
+[data-bs-theme="dark"] .invoice-footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
-.receipt-notes {
-  font-size: 10.5px;
-  color: #777;
-  margin: 0;
-  line-height: 1.4;
-}
-[data-bs-theme="dark"] .receipt-notes {
-  color: #A39690;
+
+@media (max-width: 576px) {
+  .invoice-paper {
+    padding: 20px 16px;
+  }
+  .invoice-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .invoice-meta {
+    text-align: left;
+  }
+  .invoice-details-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .invoice-summary-card {
+    max-width: 100%;
+  }
 }
 
 /* Print CSS */
@@ -1546,9 +1512,9 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   #receiptModal .modal-dialog,
   #receiptModal .modal-content,
   #receiptModal .modal-body,
-  #receiptModal .receipt-container,
-  #receiptModal .receipt-paper,
-  #receiptModal .receipt-paper * {
+  #receiptModal .invoice-container,
+  #receiptModal .invoice-paper,
+  #receiptModal .invoice-paper * {
     visibility: visible !important;
   }
   #receiptModal {
@@ -1574,16 +1540,16 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
     box-shadow: none !important;
     background: transparent !important;
   }
-  #receiptModal .receipt-paper {
+  #receiptModal .invoice-paper {
     box-shadow: none !important;
     border: none !important;
-    max-width: 380px !important;
-    margin: 0 auto !important;
-    padding: 10px !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
     color: #000000 !important;
     background: #ffffff !important;
   }
-  #receiptModal .receipt-paper * {
+  #receiptModal .invoice-paper * {
     color: #000000 !important;
   }
 }
