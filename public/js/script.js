@@ -869,51 +869,10 @@ document.addEventListener("DOMContentLoaded", () => {
       delMsg: (r) => `Archive order <strong>#${ord(r.order_id)}</strong>?`,
       async act(a, r) {
         if (a === "archive") {
-          if (await ask("Archive Order?", `Archive Order <strong>#${ord(r.order_id)}</strong>? It can be viewed or restored in Order History.`, "Archive")) {
+          if (await ask("Archive Order?", `Archive Order <strong>#${ord(r.order_id)}</strong>? It can be viewed or restored in Archived Records.`, "Archive")) {
             const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
             if (!res.ok) throw new Error("Failed to archive order");
             toast(`Order #${ord(r.order_id)} archived successfully.`);
-            await init();
-          }
-        }
-      }
-    },
-    history: {
-      name: "orders?include_archived=true", id: "order_id",
-      filter: (rows, f) => rows.filter((r) => {
-        const qMatch = !f.q || (r.customer_name + " " + ord(r.order_id)).toLowerCase().includes(f.q);
-        const typeMatch = !f.type || (r.release_type || "Pickup").toLowerCase() === f.type;
-        const stMatch = !f.st || (r.order_status || "Received").toLowerCase() === f.st;
-        const isArchived = Boolean(r.is_archived);
-        const archMatch = !f.arch || (f.arch === "archived" ? isArchived : !isArchived);
-        return qMatch && typeMatch && stMatch && archMatch;
-      }),
-      draw: (list) => list.map((o) => {
-        const items = [
-          `<button class="dropdown-item" data-act="invoice" data-id="${o.order_id}" type="button"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Invoice</button>`
-        ];
-        if (o.is_archived) {
-          items.push(`<button class="dropdown-item text-success" data-act="unarchive" data-id="${o.order_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Unarchive</button>`);
-        } else {
-          items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${o.order_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
-        }
-        const actsHtml = actionsDropdown(items);
-        const payStatusCls = o.payment_status === "Paid" ? "ok" : (o.payment_status === "Refunded" ? "bad" : "mute");
-        return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td><td><span class="badge ${o.is_archived ? "mute" : "ok"}">${o.is_archived ? "Archived" : "Active"}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
-      }).join(""),
-      async act(a, r) {
-        if (a === "archive") {
-          if (await ask("Archive Order?", `Archive Order <strong>#${ord(r.order_id)}</strong>?`, "Archive")) {
-            const res = await fetch(`/api/orders/${r.order_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to archive order");
-            toast(`Order #${ord(r.order_id)} archived successfully.`);
-            await init();
-          }
-        } else if (a === "unarchive") {
-          if (await ask("Restore Order?", `Restore Order <strong>#${ord(r.order_id)}</strong> back to active orders?`, "Restore")) {
-            const res = await fetch(`/api/orders/${r.order_id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to restore order");
-            toast(`Order #${ord(r.order_id)} restored to active orders.`);
             await init();
           }
         }
@@ -1840,6 +1799,352 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function initArchive() {
+    const isMgr = isManager();
+    const staffSection = $("#section-staff");
+    const staffOpt = $("#opt-staff");
+    const staffChip = $("#chip-staff");
+    if (!isMgr) {
+      if (staffSection) staffSection.style.display = "none";
+      if (staffOpt) staffOpt.style.display = "none";
+      if (staffChip) staffChip.style.display = "none";
+    }
+
+    let allData = { orders: [], payments: [], deliveries: [], customers: [], staff: [] };
+
+    async function loadArchiveData() {
+      try {
+        const [orders, payments, deliveries, customers, staffList] = await Promise.all([
+          db.list("orders?include_archived=true").catch(() => []),
+          db.list("payments?include_archived=true").catch(() => []),
+          db.list("deliveries?include_archived=true").catch(() => []),
+          db.list("customers?include_archived=true").catch(() => []),
+          isMgr ? db.list("staff?include_archived=true").catch(() => []) : Promise.resolve([])
+        ]);
+
+        allData.orders = (orders || []).filter(o => Boolean(o.is_archived));
+        allData.payments = (payments || []).filter(p => Boolean(p.is_archived));
+        allData.deliveries = (deliveries || []).filter(d => Boolean(d.is_archived));
+        allData.customers = (customers || []).filter(c => Boolean(c.is_archived));
+        allData.staff = (staffList || []).filter(s => Boolean(s.is_archived));
+
+        renderArchivedTables();
+      } catch (err) {
+        toast("Error loading archived records: " + err.message, 1);
+      }
+    }
+
+    function renderArchivedTables() {
+      const q = ($("#arch_q")?.value || "").trim().toLowerCase();
+      const selCat = ($("#arch_cat")?.value || "").trim().toLowerCase();
+
+      // Update counters
+      const totalCount = allData.orders.length + allData.payments.length + allData.deliveries.length + allData.customers.length + (isMgr ? allData.staff.length : 0);
+      if ($("#count-all")) $("#count-all").textContent = totalCount;
+      if ($("#count-orders")) $("#count-orders").textContent = allData.orders.length;
+      if ($("#count-payments")) $("#count-payments").textContent = allData.payments.length;
+      if ($("#count-deliveries")) $("#count-deliveries").textContent = allData.deliveries.length;
+      if ($("#count-customers")) $("#count-customers").textContent = allData.customers.length;
+      if ($("#count-staff")) $("#count-staff").textContent = allData.staff.length;
+
+      if ($("#badge-orders")) $("#badge-orders").textContent = allData.orders.length;
+      if ($("#badge-payments")) $("#badge-payments").textContent = allData.payments.length;
+      if ($("#badge-deliveries")) $("#badge-deliveries").textContent = allData.deliveries.length;
+      if ($("#badge-customers")) $("#badge-customers").textContent = allData.customers.length;
+      if ($("#badge-staff")) $("#badge-staff").textContent = allData.staff.length;
+
+      // Filtered lists
+      const filteredOrders = allData.orders.filter(o => {
+        if (!q) return true;
+        const text = `${ord(o.order_id)} ${o.customer_name || ''} ${o.release_type || ''} ${o.order_status || ''} ${o.payment_status || ''}`.toLowerCase();
+        return text.includes(q);
+      });
+
+      const filteredPayments = allData.payments.filter(p => {
+        if (!q) return true;
+        const text = `${pay(p.payment_id)} ${ord(p.order_id)} ${p.customer_name || ''} ${p.method || p.payment_method || ''} ${p.reference_no || ''} ${p.status || ''}`.toLowerCase();
+        return text.includes(q);
+      });
+
+      const filteredDeliveries = allData.deliveries.filter(d => {
+        if (!q) return true;
+        const text = `${ord(d.order_id)} ${d.type || ''} ${d.rider || ''} ${d.customer_name || ''} ${d.address || ''} ${d.street || ''} ${d.barangay || ''} ${d.status || ''}`.toLowerCase();
+        return text.includes(q);
+      });
+
+      const filteredCustomers = allData.customers.filter(c => {
+        if (!q) return true;
+        const text = `${c.full_name || `${c.first_name || ''} ${c.last_name || ''}`} ${c.contact || c.phone || ''} ${c.address || ''}`.toLowerCase();
+        return text.includes(q);
+      });
+
+      const filteredStaff = allData.staff.filter(s => {
+        if (!q) return true;
+        const text = `#${s.staff_id} ${s.full_name || `${s.first_name || ''} ${s.last_name || ''}`} ${s.role || ''} ${s.email || ''} ${s.phone || ''}`.toLowerCase();
+        return text.includes(q);
+      });
+
+      // Show/hide sections based on category selection
+      const showSection = (secId, catKey) => {
+        const sec = $(secId);
+        if (!sec) return;
+        if (catKey === "staff" && !isMgr) {
+          sec.style.display = "none";
+          return;
+        }
+        sec.style.display = (!selCat || selCat === catKey) ? "" : "none";
+      };
+
+      showSection("#section-orders", "orders");
+      showSection("#section-payments", "payments");
+      showSection("#section-deliveries", "deliveries");
+      showSection("#section-customers", "customers");
+      showSection("#section-staff", "staff");
+
+      // 1. Render Orders Table
+      const outOrders = $("#out-orders");
+      if (outOrders) {
+        if (filteredOrders.length === 0) {
+          outOrders.innerHTML = `<tr class="empty-row"><td colspan="8" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No archived orders found.</p></div></td></tr>`;
+        } else {
+          outOrders.innerHTML = filteredOrders.map(o => {
+            const items = [
+              `<button class="dropdown-item" data-act="invoice" data-id="${o.order_id}" type="button"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Invoice</button>`,
+              `<button class="dropdown-item text-success" data-act="unarchive-order" data-id="${o.order_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Order</button>`
+            ];
+            const payStatusCls = o.payment_status === "Paid" ? "ok" : (o.payment_status === "Refunded" ? "bad" : "mute");
+            return `<tr>
+              <td><strong>${ord(o.order_id)}</strong></td>
+              <td>${esc(o.customer_name)}</td>
+              <td>${formatDate(o.order_date)}</td>
+              <td>${orderTypeBadge(o.release_type)}</td>
+              <td>${orderStatusBadge(o.order_status, o.order_id)}</td>
+              <td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td>
+              <td class="num">${peso(o.total)}</td>
+              <td>${actionsDropdown(items)}</td>
+            </tr>`;
+          }).join("");
+        }
+      }
+
+      // 2. Render Payments Table
+      const outPayments = $("#out-payments");
+      if (outPayments) {
+        if (filteredPayments.length === 0) {
+          outPayments.innerHTML = `<tr class="empty-row"><td colspan="9" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No archived payments found.</p></div></td></tr>`;
+        } else {
+          outPayments.innerHTML = filteredPayments.map(p => {
+            const items = [
+              `<button class="dropdown-item" data-act="receipt" data-id="${p.payment_id}" type="button"><i class="bi bi-receipt me-2 text-primary"></i>Receipt</button>`,
+              `<button class="dropdown-item text-success" data-act="unarchive-payment" data-id="${p.payment_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Payment</button>`
+            ];
+            const badgeCls = { Paid: "ok", Pending: "warn", Refunded: "bad" }[p.status] || "mute";
+            return `<tr>
+              <td><strong>${pay(p.payment_id)}</strong></td>
+              <td><strong>${ord(p.order_id)}</strong></td>
+              <td>${esc(p.customer_name || nameOf(p))}</td>
+              <td>${esc(p.method || p.payment_method)}</td>
+              <td>${p.reference_no ? `<span class="font-monospace">${esc(p.reference_no)}</span>` : '<span class="text-muted">-</span>'}</td>
+              <td>${formatDate(p.paid_at || p.payment_date)}</td>
+              <td class="num"><strong>${peso(p.amount || p.amount_paid)}</strong></td>
+              <td><span class="badge ${badgeCls}">${esc(p.status || "Paid")}</span></td>
+              <td>${actionsDropdown(items)}</td>
+            </tr>`;
+          }).join("");
+        }
+      }
+
+      // 3. Render Deliveries Table
+      const outDeliveries = $("#out-deliveries");
+      if (outDeliveries) {
+        if (filteredDeliveries.length === 0) {
+          outDeliveries.innerHTML = `<tr class="empty-row"><td colspan="8" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No archived transport runs found.</p></div></td></tr>`;
+        } else {
+          outDeliveries.innerHTML = filteredDeliveries.map(d => {
+            const items = [
+              `<button class="dropdown-item text-success" data-act="unarchive-delivery" data-id="${d.delivery_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Run</button>`
+            ];
+            const statusCls = { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[d.status] || "mute";
+            const addr = d.address || `${d.street || ''}, ${d.barangay || ''}`.trim() || '-';
+            return `<tr>
+              <td><strong>${ord(d.order_id)}</strong></td>
+              <td>${orderTypeBadge(d.type)}</td>
+              <td>${formatDate(d.scheduled_date)}</td>
+              <td>${esc(d.time_slot)}</td>
+              <td>${esc(d.rider || "Unassigned")}</td>
+              <td><strong>${esc(d.customer_name || "Unknown")}</strong><br><small class="text-muted">${esc(addr)}</small></td>
+              <td><span class="badge ${statusCls}">${esc(d.status)}</span></td>
+              <td>${actionsDropdown(items)}</td>
+            </tr>`;
+          }).join("");
+        }
+      }
+
+      // 4. Render Customers Table
+      const outCustomers = $("#out-customers");
+      if (outCustomers) {
+        if (filteredCustomers.length === 0) {
+          outCustomers.innerHTML = `<tr class="empty-row"><td colspan="5" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No archived customers found.</p></div></td></tr>`;
+        } else {
+          outCustomers.innerHTML = filteredCustomers.map(c => {
+            const items = [
+              `<button class="dropdown-item text-success" data-act="unarchive-customer" data-id="${c.customer_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Customer</button>`
+            ];
+            const addr = c.address || `${c.street || ''}, ${c.barangay || ''}`.trim() || '-';
+            return `<tr>
+              <td><strong>${esc(c.full_name || `${c.first_name || ''} ${c.last_name || ''}`.trim())}</strong></td>
+              <td>${esc(c.contact || c.phone || '-')}</td>
+              <td>${esc(addr)}</td>
+              <td><span class="badge mute">Archived</span></td>
+              <td>${actionsDropdown(items)}</td>
+            </tr>`;
+          }).join("");
+        }
+      }
+
+      // 5. Render Staff Table
+      const outStaff = $("#out-staff");
+      if (outStaff && isMgr) {
+        if (filteredStaff.length === 0) {
+          outStaff.innerHTML = `<tr class="empty-row"><td colspan="7" class="text-center py-4"><div class="empty-placeholder text-center"><i class="bi bi-inbox fs-4 text-muted mb-1 d-block"></i><p class="text-muted small mb-0">No archived staff accounts found.</p></div></td></tr>`;
+        } else {
+          outStaff.innerHTML = filteredStaff.map(s => {
+            const items = [
+              `<button class="dropdown-item text-success" data-act="unarchive-staff" data-id="${s.staff_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Staff</button>`
+            ];
+            const roleBadgeCls = { Manager: "bad", Cashier: "warn", Washer: "info", Folder: "washing", Rider: "ok" }[s.role] || "mute";
+            return `<tr>
+              <td><strong>#${s.staff_id}</strong></td>
+              <td><strong>${esc(s.full_name || `${s.first_name || ''} ${s.last_name || ''}`.trim())}</strong></td>
+              <td><span class="badge ${roleBadgeCls}">${esc(s.role)}</span></td>
+              <td>${esc(s.email)}</td>
+              <td>${esc(s.phone || '-')}</td>
+              <td><span class="badge mute">Archived</span></td>
+              <td>${actionsDropdown(items)}</td>
+            </tr>`;
+          }).join("");
+        }
+      }
+
+      initTablesSorting();
+    }
+
+    // Attach event listeners for toolbar and chips
+    const searchInput = $("#arch_q");
+    if (searchInput) searchInput.addEventListener("input", debounce(renderArchivedTables, 150));
+
+    const catSelect = $("#arch_cat");
+    if (catSelect) {
+      catSelect.addEventListener("change", () => {
+        const val = catSelect.value;
+        document.querySelectorAll(".arch-chip").forEach(ch => {
+          ch.classList.toggle("active", ch.dataset.category === val);
+        });
+        renderArchivedTables();
+      });
+    }
+
+    const clearBtn = $("#arch_clear");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (searchInput) searchInput.value = "";
+        if (catSelect) catSelect.value = "";
+        document.querySelectorAll(".arch-chip").forEach(ch => {
+          ch.classList.toggle("active", ch.dataset.category === "");
+        });
+        renderArchivedTables();
+      });
+    }
+
+    document.querySelectorAll(".arch-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const cat = chip.dataset.category;
+        document.querySelectorAll(".arch-chip").forEach(ch => ch.classList.remove("active"));
+        chip.classList.add("active");
+        if (catSelect) catSelect.value = cat;
+        renderArchivedTables();
+      });
+    });
+
+    // Handle clicks inside main content for actions
+    const mainView = $("#view");
+    if (mainView) {
+      mainView.addEventListener("click", async (ev) => {
+        const b = ev.target.closest("[data-act]");
+        if (!b) return;
+        const act = b.dataset.act;
+        const id = b.dataset.id;
+
+        if (act === "invoice") {
+          return openReceipt({ orderId: id, isInvoice: true });
+        }
+        if (act === "receipt") {
+          return openReceipt({ paymentId: id, isInvoice: false });
+        }
+
+        if (act === "unarchive-order") {
+          if (await ask("Restore Order?", `Restore Order <strong>#${ord(id)}</strong> back to active orders?`, "Restore")) {
+            const res = await fetch(`/api/orders/${id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to restore order");
+            toast(`Order #${ord(id)} restored to active orders.`);
+            await loadArchiveData();
+          }
+          return;
+        }
+
+        if (act === "unarchive-payment") {
+          const p = allData.payments.find(x => x.payment_id == id);
+          const amtText = p ? ` of ${peso(p.amount || p.amount_paid)}` : "";
+          if (await ask("Restore Payment?", `Restore payment <strong>#${pay(id)}${amtText}</strong> back to active payments?`, "Restore")) {
+            const res = await fetch(`/api/payments/${id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to restore payment");
+            toast(`Payment #${pay(id)} restored to active payments.`);
+            await loadArchiveData();
+          }
+          return;
+        }
+
+        if (act === "unarchive-delivery") {
+          const d = allData.deliveries.find(x => x.delivery_id == id);
+          const ordText = d ? ` for Order <strong>#${ord(d.order_id)}</strong>` : "";
+          if (await ask("Restore Transport Run?", `Restore transport run${ordText} back to active schedule?`, "Restore")) {
+            const res = await fetch(`/api/deliveries/${id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to restore transport run");
+            toast("Transport run restored to active schedule.");
+            await loadArchiveData();
+          }
+          return;
+        }
+
+        if (act === "unarchive-customer") {
+          const c = allData.customers.find(x => x.customer_id == id);
+          const nameText = c ? ` <strong>"${esc(c.full_name || `${c.first_name || ''} ${c.last_name || ''}`.trim())}"</strong>` : "";
+          if (await ask("Restore Customer?", `Restore customer${nameText} to active customers?`, "Restore")) {
+            const res = await fetch(`/api/customers/${id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to restore customer");
+            toast(`Customer restored to active customers.`);
+            await loadArchiveData();
+          }
+          return;
+        }
+
+        if (act === "unarchive-staff") {
+          const s = allData.staff.find(x => x.staff_id == id);
+          const nameText = s ? ` <strong>"${esc(s.full_name || `${s.first_name || ''} ${s.last_name || ''}`.trim())}"</strong>` : "";
+          if (await ask("Restore Staff Member?", `Restore staff account${nameText}?`, "Restore")) {
+            const res = await fetch(`/api/staff/${id}/unarchive`, { method: "PUT", headers: getAuthHeaders() });
+            if (!res.ok) throw new Error("Failed to restore staff");
+            toast(`Staff member restored to active staff.`);
+            await loadArchiveData();
+          }
+          return;
+        }
+      });
+    }
+
+    await loadArchiveData();
+  }
+
   // Staff login handler
   const loginForm = document.querySelector(".login-form-container form");
   if (loginForm) {
@@ -1934,7 +2239,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   applyRoleNavVisibility();
 
-  if (ENT[cur]) init(true);
+  if (ENT[cur] && cur !== "history") init(true);
   if (cur === "dashboard") initDashboard();
+  if (cur === "history") initArchive();
   initTablesSorting();
 });

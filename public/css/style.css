@@ -1632,4 +1632,76 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
   #receiptModal .invoice-paper * {
     color: #000000 !important;
   }
+}
+
+/* Archived Records Page */
+.arch-chip {
+  background: #fff;
+  border: 1px solid #EAE5E3;
+  color: var(--text-main);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+.arch-chip:hover {
+  background: #F9F7F6;
+  border-color: var(--text-muted);
+  color: var(--text-main);
+}
+.arch-chip .badge {
+  background: #F2EBE9;
+  color: var(--text-main);
+  font-size: 11px;
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+}
+.arch-chip.active {
+  background: var(--volcanic-100) !important;
+  color: #fff !important;
+  border-color: var(--volcanic-100) !important;
+}
+.arch-chip.active .badge {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #fff !important;
+}
+[data-bs-theme="dark"] .arch-chip {
+  background: #20130E;
+  border-color: #3D251D;
+  color: #F2EBE9;
+}
+[data-bs-theme="dark"] .arch-chip:hover {
+  background: #2B1812;
+  border-color: #5C382C;
+  color: #fff;
+}
+[data-bs-theme="dark"] .arch-chip .badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #F2EBE9;
+}
+[data-bs-theme="dark"] .arch-chip.active {
+  background: var(--magma-500) !important;
+  border-color: var(--magma-500) !important;
+  color: #fff !important;
+}
+[data-bs-theme="dark"] .arch-chip.active .badge {
+  background: rgba(0, 0, 0, 0.25) !important;
+  color: #fff !important;
+}
+
+.archive-section {
+  transition: opacity 0.2s ease;
+}
+.archive-section .table-header {
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  background: #fff;
+}
+[data-bs-theme="dark"] .archive-section .table-header {
+  background: #20130E;
 }
