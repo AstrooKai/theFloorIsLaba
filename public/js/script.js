@@ -466,18 +466,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (mainContent && !mainContent.querySelector(".content-footer")) {
     const footer = document.createElement("footer");
     footer.className = "content-footer";
-    footer.innerHTML = `
-      <div class="footer-left">
-        <span class="footer-brand">The Floor Is <b>Laba.</b></span>
-        <span class="footer-dot">•</span>
-        <span>&copy; 2026 Laundromat Management System</span>
-      </div>
-      <div class="footer-right">
-        <span class="footer-status"><span class="status-pulse"></span> Systems Active</span>
-        <span class="footer-dot">•</span>
-        <span>Laguna Branch</span>
-      </div>
-    `;
+    footer.innerHTML = `<span class="footer-brand">The Floor Is <b>Laba.</b></span> <span class="footer-dot">•</span> <span>&copy; 2026 Laundromat Management System</span>`;
     const toasts = mainContent.querySelector("#toasts");
     if (toasts) {
       mainContent.insertBefore(footer, toasts);
