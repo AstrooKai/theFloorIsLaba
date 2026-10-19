@@ -31,6 +31,7 @@ const isCloud = Boolean(
 const poolConfig = parsedUrl
     ? {
         ...parsedUrl,
+        multipleStatements: true,
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
@@ -42,6 +43,7 @@ const poolConfig = parsedUrl
         user: process.env.DB_USER || 'root',
         password: process.env.DB_PASSWORD || '',
         database: dbName,
+        multipleStatements: true,
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
@@ -67,15 +69,20 @@ async function initDB() {
             await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
 
             const [tables] = await rootConn.query(
-                'SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = ?',
+                "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = ? AND table_name = 'staff'",
                 [dbName]
             );
 
-            if (tables[0].count === 0) {
+            if (Number(tables[0]?.count || 0) === 0) {
                 const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
+                const seedPath = path.join(__dirname, '..', 'database', 'seed.sql');
                 if (fs.existsSync(schemaPath)) {
                     await rootConn.query(fs.readFileSync(schemaPath, 'utf8'));
                     console.log(`Database [${dbName}] tables initialized.`);
+                }
+                if (fs.existsSync(seedPath)) {
+                    await rootConn.query(fs.readFileSync(seedPath, 'utf8'));
+                    console.log(`Database [${dbName}] seed data initialized.`);
                 }
             }
 
@@ -85,17 +92,26 @@ async function initDB() {
             // Cloud deployment mode: verify tables on provisioned database
             const conn = await pool.getConnection();
             const [tables] = await conn.query(
-                'SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = ?',
-                [dbName]
+                "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'staff'"
             );
 
-            if (tables[0].count === 0) {
+            if (Number(tables[0]?.count || 0) === 0) {
+                console.log(`Staff table missing in cloud database. Auto-initializing schema & seed...`);
                 const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
+                const seedPath = path.join(__dirname, '..', 'database', 'seed.sql');
+
                 if (fs.existsSync(schemaPath)) {
                     let schemaSql = fs.readFileSync(schemaPath, 'utf8');
                     schemaSql = schemaSql.replace(/CREATE DATABASE[\s\S]*?;/gi, '').replace(/USE\s+[`\w]+;/gi, '');
                     await conn.query(schemaSql);
-                    console.log(`Cloud database [${dbName}] tables initialized.`);
+                    console.log(`Cloud database tables initialized.`);
+                }
+
+                if (fs.existsSync(seedPath)) {
+                    let seedSql = fs.readFileSync(seedPath, 'utf8');
+                    seedSql = seedSql.replace(/USE\s+[`\w]+;/gi, '');
+                    await conn.query(seedSql);
+                    console.log(`Cloud database sample seed data inserted.`);
                 }
             }
 
@@ -122,6 +138,7 @@ async function testConnection() {
 }
 
 module.exports = pool;
+module.exports.initDB = initDB;
 module.exports.testConnection = testConnection;
 
 

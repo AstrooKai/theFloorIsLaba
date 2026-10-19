@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { testConnection } = require('./config/db');
+const { initDB, testConnection } = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,6 +12,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(require('./middleware/auth').authenticate);
+
+// Auto-initialize database tables and seed data if missing (essential for serverless/Vercel)
+let dbReady = false;
+let dbInitPromise = null;
+app.use(async (req, res, next) => {
+    if (!dbReady && req.path.startsWith('/api')) {
+        if (!dbInitPromise) {
+            dbInitPromise = initDB()
+                .then(() => { dbReady = true; })
+                .catch(err => { console.warn('Database auto-init note:', err.message); });
+        }
+        await dbInitPromise;
+    }
+    next();
+});
 
 // Redirect old /login and /staff-login.html to root (index.html now contains the login page)
 app.get(['/login', '/staff-login.html'], (req, res) => {
