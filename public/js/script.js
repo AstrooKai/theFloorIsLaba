@@ -2532,12 +2532,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Staff login handler
-  const loginForm = document.querySelector(".login-form-container form");
+  const loginForm = document.querySelector(".login-form-container form") || document.getElementById("loginForm");
   if (loginForm) {
-    const showToggle = loginForm.querySelector(".form-group span");
-    const passInput = loginForm.querySelector('input[type="password"]');
-    const emailInput = loginForm.querySelector('input[type="email"]');
+    const showToggle = document.getElementById("togglePasswordBtn") || loginForm.querySelector(".pass-toggle-btn") || loginForm.querySelector(".form-group span");
+    const passInput = document.getElementById("loginPassword") || loginForm.querySelector('input[type="password"]') || loginForm.querySelector('input[name="password"]');
+    const emailInput = document.getElementById("loginEmail") || loginForm.querySelector('input[type="email"]') || loginForm.querySelector('input[name="email"]');
     const errorEl = document.getElementById("loginError");
+    const submitBtn = document.getElementById("signInBtn") || loginForm.querySelector("button[type='submit']");
 
     const clearError = () => {
       if (errorEl) {
@@ -2559,15 +2560,43 @@ document.addEventListener("DOMContentLoaded", () => {
       showToggle.addEventListener("click", () => {
         const isPass = passInput.type === "password";
         passInput.type = isPass ? "text" : "password";
-        showToggle.textContent = isPass ? "Hide" : "Show";
+        showToggle.innerHTML = isPass
+          ? '<i class="bi bi-eye-slash"></i> <span>Hide</span>'
+          : '<i class="bi bi-eye"></i> <span>Show</span>';
       });
     }
+
+    // Demo Autofill Chips
+    document.querySelectorAll(".demo-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        if (emailInput && chip.dataset.email) emailInput.value = chip.dataset.email;
+        if (passInput && chip.dataset.pass) passInput.value = chip.dataset.pass;
+        document.querySelectorAll(".demo-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        clearError();
+        if (emailInput) emailInput.focus();
+      });
+    });
 
     loginForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       clearError();
       const email = emailInput ? emailInput.value.trim() : "";
       const password = passInput ? passInput.value : "";
+      if (!email || !password) {
+        if (errorEl) {
+          errorEl.textContent = "Please enter both email and password.";
+          errorEl.style.display = "block";
+        }
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = "0.75";
+        submitBtn.style.pointerEvents = "none";
+      }
+
       try {
         const res = await fetch("/api/staff/login", {
           method: "POST",
@@ -2586,6 +2615,12 @@ document.addEventListener("DOMContentLoaded", () => {
           errorEl.style.display = "block";
         } else {
           toast(err.message, 1);
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = "";
+          submitBtn.style.pointerEvents = "";
         }
       }
     });
