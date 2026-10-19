@@ -54,8 +54,13 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
-app.listen(PORT, async () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    await testConnection();
-});
+// Start server locally (ignored when imported as a Vercel serverless function)
+if (require.main === module) {
+    app.listen(PORT, async () => {
+        console.log(`Server running at http://localhost:${PORT}`);
+        await testConnection();
+    });
+}
+
+module.exports = app;
+
