@@ -649,7 +649,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn-signout { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-pill); color: var(--text-muted); font-weight: 500; font-size: 13px; background: transparent; border: none; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; white-space: nowrap; }
 .btn-signout:hover { color: var(--hazard); background: rgba(255, 74, 74, 0.1); }
 .btn-signout svg { flex-shrink: 0; }
-.main-content { padding: 40px 48px; max-width: 1200px; width: 100%; margin: 0 auto; }
+.main-content {
+  padding: 36px 20px;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
 
 /* Collapsed Sidebar (Icons-only Mode) */
 body.sidebar-collapsed .app-layout {
@@ -993,7 +999,7 @@ body.sidebar-collapsed .btn-signout span {
   margin-bottom: 24px;
 }
 .table-header {
-  padding: 22px 36px;
+  padding: 20px 32px;
   border-bottom: 1px solid #E2DAD6;
   display: flex;
   justify-content: space-between;
@@ -1035,9 +1041,10 @@ th, thead th, .table thead th, .tw table th, .table > :not(caption) > * > th {
   color: #160D0A !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 14px 22px !important;
+  padding: 13px 16px !important;
   background: #F4EFEB;
   border-bottom: 2px solid #E2DAD6;
+  white-space: nowrap;
 }
 th.sortable-th {
   cursor: pointer;
@@ -1078,10 +1085,10 @@ th.sortable-th:hover .sort-neutral {
 
 /* Table Cells */
 td, tbody td, .table tbody td, .tw table td, .table > :not(caption) > * > td {
-  padding: 18px 22px !important;
+  padding: 15px 16px !important;
   border-bottom: 1px solid #EAE5E3;
   vertical-align: middle;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-main);
   background: #FFFFFF;
@@ -1090,13 +1097,24 @@ td, tbody td, .table tbody td, .tw table td, .table > :not(caption) > * > td {
 /* Left & Right Side Outer Edge Padding for All Tables (between first/last column and card border) */
 th:first-child, thead th:first-child, .table thead th:first-child, .tw table th:first-child, .table > :not(caption) > * > th:first-child,
 td:first-child, tbody td:first-child, .table tbody td:first-child, .tw table td:first-child, .table > :not(caption) > * > td:first-child {
-  padding-left: 36px !important;
+  padding-left: 32px !important;
 }
 
 th:last-child, thead th:last-child, .table thead th:last-child, .tw table th:last-child, .table > :not(caption) > * > th:last-child,
 td:last-child, tbody td:last-child, .table tbody td:last-child, .tw table td:last-child, .table > :not(caption) > * > td:last-child {
-  padding-right: 36px !important;
+  padding-right: 32px !important;
   text-align: right;
+}
+
+/* Prevent unwanted line-breaking on critical table data items */
+.num,
+td.num,
+th.num,
+.badge,
+.status-clickable,
+.action-dropdown-btn,
+.tw table td:first-child strong {
+  white-space: nowrap;
 }
 
 tbody tr { background: #FFFFFF; transition: background-color 0.15s ease; }
@@ -2360,7 +2378,7 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
 
   /* Main Content Area on Tablet */
   .main-content {
-    padding: 28px 24px !important;
+    padding: 24px 16px !important;
     max-width: 100% !important;
     width: 100% !important;
     overflow-x: hidden;
@@ -2449,7 +2467,7 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
    -------------------------------------------------------- */
 @media (max-width: 767.98px) {
   .main-content {
-    padding: 20px 16px !important;
+    padding: 18px 12px !important;
   }
 
   /* Login View on Mobile Phones (< 768px) */
