@@ -275,10 +275,19 @@ function toggleTheme() {
 
 function updateThemeToggleUI(theme) {
   const btn = $("#themeToggleBtn");
-  if (!btn) return;
-  btn.innerHTML = theme === "dark"
-    ? `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg><span>Light Mode</span>`
-    : `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg><span>Dark Mode</span>`;
+  if (btn) {
+    btn.innerHTML = theme === "dark"
+      ? `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg><span>Light Mode</span>`
+      : `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg><span>Dark Mode</span>`;
+  }
+  const mobileBtn = $("#mobileThemeBtn");
+  if (mobileBtn) {
+    mobileBtn.innerHTML = theme === "dark"
+      ? `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`
+      : `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+    mobileBtn.setAttribute("title", theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode");
+    mobileBtn.setAttribute("aria-label", theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode");
+  }
 }
 
 initTheme();
@@ -291,6 +300,147 @@ function initSidebar() {
   }
 }
 initSidebar();
+
+// Responsive Navigation & Mobile Drawer Management
+function initResponsiveNavigation() {
+  const appLayout = document.querySelector(".app-layout");
+  const sidebar = document.querySelector(".sidebar");
+  if (!appLayout || !sidebar) return;
+
+  // Insert mobile topbar if not already present
+  if (!document.querySelector(".mobile-topbar")) {
+    const staff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+    const role = (staff && staff.role ? staff.role : "Manager").toLowerCase();
+    const defaultPage = (ROLE_DEFAULT_PAGES && ROLE_DEFAULT_PAGES[role]) ? ROLE_DEFAULT_PAGES[role] : "dashboard.html";
+    const initial = staff ? (staff.first_name || "A")[0].toUpperCase() : "A";
+    const staffTitle = staff ? `${staff.full_name || staff.first_name || "Staff Member"} (${staff.role || "Staff"})` : "Staff";
+
+    const topbar = document.createElement("header");
+    topbar.className = "mobile-topbar";
+    topbar.setAttribute("role", "banner");
+    topbar.innerHTML = `
+      <div class="mobile-topbar-left">
+        <button type="button" id="mobileMenuBtn" class="btn-mobile-menu" aria-label="Open navigation menu" title="Open navigation menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <a href="${esc(defaultPage)}" class="mobile-brand" title="The Floor is Laba">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--magma-500)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+          </svg>
+          <span>The Floor is Laba</span>
+        </a>
+      </div>
+      <div class="mobile-topbar-right">
+        <button type="button" id="mobileThemeBtn" class="btn-mobile-theme" aria-label="Toggle theme" title="Toggle color theme">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <div id="mobileAvatar" class="mobile-avatar" title="${esc(staffTitle)}">${esc(initial)}</div>
+      </div>
+    `;
+    appLayout.prepend(topbar);
+  }
+
+  // Insert backdrop if not already present
+  if (!document.querySelector(".sidebar-backdrop")) {
+    const backdrop = document.createElement("div");
+    backdrop.className = "sidebar-backdrop";
+    backdrop.setAttribute("aria-hidden", "true");
+    document.body.appendChild(backdrop);
+  }
+
+  // Insert close button inside sidebar header if not present
+  const sidebarLogo = sidebar.querySelector(".sidebar-logo");
+  if (sidebarLogo && !sidebarLogo.querySelector("#sidebarCloseBtn")) {
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.id = "sidebarCloseBtn";
+    closeBtn.className = "btn-sidebar-close";
+    closeBtn.setAttribute("aria-label", "Close navigation menu");
+    closeBtn.setAttribute("title", "Close navigation");
+    closeBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    `;
+    sidebarLogo.appendChild(closeBtn);
+  }
+
+  // Toggle handlers
+  const openSidebar = () => {
+    document.body.classList.add("sidebar-open");
+    const mBtn = $("#mobileMenuBtn");
+    if (mBtn) mBtn.setAttribute("aria-expanded", "true");
+  };
+
+  const closeSidebar = () => {
+    document.body.classList.remove("sidebar-open");
+    const mBtn = $("#mobileMenuBtn");
+    if (mBtn) mBtn.setAttribute("aria-expanded", "false");
+  };
+
+  const toggleSidebar = () => {
+    if (document.body.classList.contains("sidebar-open")) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  };
+
+  const menuBtn = $("#mobileMenuBtn");
+  if (menuBtn) {
+    menuBtn.onclick = toggleSidebar;
+  }
+
+  const closeBtn = $("#sidebarCloseBtn");
+  if (closeBtn) {
+    closeBtn.onclick = closeSidebar;
+  }
+
+  const backdrop = document.querySelector(".sidebar-backdrop");
+  if (backdrop) {
+    backdrop.onclick = closeSidebar;
+  }
+
+  // Auto-close on link navigation when screen width is mobile/tablet
+  sidebar.querySelectorAll(".side-nav a").forEach(link => {
+    link.addEventListener("click", () => {
+      if (window.innerWidth < 992) {
+        closeSidebar();
+      }
+    });
+  });
+
+  // Mobile theme toggle button
+  const mobileThemeBtn = $("#mobileThemeBtn");
+  if (mobileThemeBtn) {
+    mobileThemeBtn.onclick = toggleTheme;
+  }
+
+  // Close with Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("sidebar-open")) {
+      closeSidebar();
+    }
+  });
+
+  // Auto close if window is resized past mobile/tablet width
+  window.addEventListener("resize", () => {
+    if (window.innerWidth >= 992 && document.body.classList.contains("sidebar-open")) {
+      closeSidebar();
+    }
+  });
+
+  // Sync theme icon initially
+  const theme = document.documentElement.getAttribute("data-bs-theme") || "light";
+  updateThemeToggleUI(theme);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const themeBtn = $("#themeToggleBtn");
@@ -330,6 +480,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (cancelSignOut && signOutModal) {
     cancelSignOut.addEventListener("click", () => closeModal(signOutModal));
   }
+
+  initResponsiveNavigation();
 });
 
 const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id", staff: "staff_id" };
@@ -2469,6 +2621,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (roleEl) roleEl.textContent = staff.role || "Active Staff";
     if (avatarEl) avatarEl.textContent = (staff.first_name || "A")[0].toUpperCase();
     if (profileEl) profileEl.setAttribute("title", `${staff.full_name || staff.first_name || "Staff Member"} (${staff.role || "Active Staff"})`);
+
+    const mobileAvatarEl = document.querySelector("#mobileAvatar");
+    if (mobileAvatarEl) {
+      mobileAvatarEl.textContent = (staff.first_name || "A")[0].toUpperCase();
+      mobileAvatarEl.setAttribute("title", `${staff.full_name || staff.first_name || "Staff Member"} (${staff.role || "Active Staff"})`);
+    }
   }
 
   applyRoleNavVisibility();
