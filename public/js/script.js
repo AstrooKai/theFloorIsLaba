@@ -449,6 +449,18 @@ document.addEventListener("DOMContentLoaded", () => {
     updateThemeToggleUI(document.documentElement.getAttribute("data-bs-theme") || "light");
   }
 
+  // Ensure sidebar navigation has scrolling wrapper while keeping logo and bottom fixed
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar && !sidebar.querySelector(".sidebar-nav-scroll")) {
+    const navGroups = Array.from(sidebar.querySelectorAll(":scope > .nav-group"));
+    if (navGroups.length > 0) {
+      const scrollWrapper = document.createElement("div");
+      scrollWrapper.className = "sidebar-nav-scroll";
+      sidebar.insertBefore(scrollWrapper, navGroups[0]);
+      navGroups.forEach(g => scrollWrapper.appendChild(g));
+    }
+  }
+
   const sidebarToggle = $("#sidebarToggleBtn");
   if (sidebarToggle) {
     const syncToggleBtn = () => {
