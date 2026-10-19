@@ -518,29 +518,25 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .btn-login {
   width: 100%;
-  background: linear-gradient(135deg, var(--magma-500), var(--magma-600));
+  background: var(--magma-500);
   color: #fff;
   border: none;
-  padding: 14px 20px;
+  padding: 13px 20px;
   border-radius: var(--radius-sm);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(232, 93, 4, 0.3);
+  display: block;
+  text-align: center;
+  transition: background-color 0.2s ease;
   margin-top: 10px;
 }
 .btn-login:hover {
-  background: linear-gradient(135deg, var(--magma-600), #B22200);
-  box-shadow: 0 6px 20px rgba(232, 93, 4, 0.4);
-  transform: translateY(-1px);
+  background: var(--magma-600);
 }
-.btn-login:active {
-  transform: translateY(1px);
+.btn-login:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .login-footer-security {
   display: flex;

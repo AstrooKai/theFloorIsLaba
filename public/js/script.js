@@ -2603,7 +2603,10 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
+        if (!data) {
+          throw new Error(`Server returned status ${res.status}. Please check your database connection or try again.`);
+        }
         if (!res.ok) throw new Error(data.error || "Login failed");
         sessionStorage.setItem("current_staff", JSON.stringify(data.staff));
         const role = (data.staff.role || "Manager").toLowerCase();
