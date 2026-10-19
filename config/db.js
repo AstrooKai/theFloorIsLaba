@@ -3,21 +3,38 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const dbName = process.env.DB_NAME || 'laundry_shop_db';
+function parseDatabaseUrl(urlStr) {
+    try {
+        const u = new URL(urlStr);
+        return {
+            host: u.hostname,
+            port: u.port ? Number(u.port) : 3306,
+            user: decodeURIComponent(u.username),
+            password: decodeURIComponent(u.password),
+            database: u.pathname ? u.pathname.replace(/^\//, '') : undefined,
+            ssl: { rejectUnauthorized: false }
+        };
+    } catch {
+        return { uri: urlStr, ssl: { rejectUnauthorized: false } };
+    }
+}
+
+const parsedUrl = process.env.DATABASE_URL ? parseDatabaseUrl(process.env.DATABASE_URL) : null;
+const dbName = parsedUrl?.database || process.env.DB_NAME || 'laundry_shop_db';
 
 const isCloud = Boolean(
     process.env.DATABASE_URL ||
     (process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1')
 );
 
-// Connection configuration supporting local MySQL and cloud databases (TiDB Cloud, Aiven, Railway, etc.)
-const poolConfig = process.env.DATABASE_URL
+// Connection pool configuration: supports single DATABASE_URL or individual env vars
+const poolConfig = parsedUrl
     ? {
-        uri: process.env.DATABASE_URL,
+        ...parsedUrl,
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        ssl: process.env.DB_SSL === 'false' ? undefined : { rejectUnauthorized: false }
+        ...(process.env.DB_SSL === 'false' ? { ssl: undefined } : { ssl: { rejectUnauthorized: false } })
     }
     : {
         host: process.env.DB_HOST || 'localhost',

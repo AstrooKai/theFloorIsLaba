@@ -22,6 +22,23 @@ if (fs.existsSync(cloudEnvPath)) {
     require('dotenv').config();
 }
 
+function parseDatabaseUrl(urlStr) {
+    try {
+        const u = new URL(urlStr);
+        return {
+            host: u.hostname,
+            port: u.port ? Number(u.port) : 3306,
+            user: decodeURIComponent(u.username),
+            password: decodeURIComponent(u.password),
+            database: u.pathname ? u.pathname.replace(/^\//, '') : undefined,
+            multipleStatements: true,
+            ssl: { rejectUnauthorized: false }
+        };
+    } catch {
+        return { uri: urlStr, multipleStatements: true, ssl: { rejectUnauthorized: false } };
+    }
+}
+
 async function seedCloud() {
     console.log('--- The Floor Is Laba: Cloud Database Seeder ---');
 
@@ -33,18 +50,18 @@ async function seedCloud() {
     if (!isCloud) {
         console.error('Error: DB_HOST is set to localhost or no cloud credentials provided.');
         console.error('To seed your cloud database:');
-        console.error('  1. Create a .env.cloud file with your cloud DB credentials, OR');
+        console.error('  1. Create a .env.cloud file with DATABASE_URL="mysql://...", OR');
         console.error('  2. Run with: DATABASE_URL="mysql://..." npm run db:cloud:seed');
         process.exit(1);
     }
 
-    const dbName = process.env.DB_NAME || 'laundry_shop_db';
+    const parsedUrl = process.env.DATABASE_URL ? parseDatabaseUrl(process.env.DATABASE_URL) : null;
+    const dbName = parsedUrl?.database || process.env.DB_NAME || 'laundry_shop_db';
 
-    const connConfig = process.env.DATABASE_URL
+    const connConfig = parsedUrl
         ? {
-            uri: process.env.DATABASE_URL,
-            multipleStatements: true,
-            ssl: process.env.DB_SSL === 'false' ? undefined : { rejectUnauthorized: false }
+            ...parsedUrl,
+            ...(process.env.DB_SSL === 'false' ? { ssl: undefined } : { ssl: { rejectUnauthorized: false } })
         }
         : {
             host: process.env.DB_HOST,
