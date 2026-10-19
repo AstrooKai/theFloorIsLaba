@@ -576,30 +576,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   font-family: var(--font-sans);
-  font-size: 20px;
-  font-weight: 700;
   margin-bottom: 24px;
-  padding: 0 4px;
+  padding: 0;
   flex-shrink: 0;
+  min-width: 0;
 }
 .logo-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
   color: inherit;
   text-decoration: none;
   min-width: 0;
-  overflow: hidden;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
 }
-.logo-brand svg {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-}
+.logo-brand .logo-text,
 .logo-brand span {
   white-space: nowrap;
+  overflow: visible;
 }
 .btn-sidebar-toggle {
   display: inline-flex;
@@ -700,14 +697,13 @@ body.sidebar-collapsed .sidebar-nav-scroll {
 }
 body.sidebar-collapsed .sidebar-logo {
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
   padding: 0;
   margin-bottom: 24px;
   justify-content: center;
   align-items: center;
 }
-body.sidebar-collapsed .logo-brand .logo-text,
-body.sidebar-collapsed .logo-brand span {
+body.sidebar-collapsed .logo-brand {
   display: none !important;
 }
 body.sidebar-collapsed .btn-sidebar-toggle svg {
@@ -2355,6 +2351,9 @@ dialog::backdrop { background: rgba(22, 13, 10, 0.6); backdrop-filter: blur(4px)
     justify-content: space-between !important;
     align-items: center !important;
     margin-bottom: 32px !important;
+  }
+  body.sidebar-collapsed .logo-brand {
+    display: flex !important;
   }
   body.sidebar-collapsed .logo-brand .logo-text,
   body.sidebar-collapsed .logo-brand span {
