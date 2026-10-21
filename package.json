@@ -8,9 +8,7 @@
         "dev": "nodemon server.js",
         "db:reset": "node scripts/seed-db.js",
         "db:seed": "node scripts/seed-db.js",
-        "db:cloud:seed": "node scripts/seed-cloud.js",
-        "test:count": "node scripts/update-test-summary.js",
-        "test:watch": "node scripts/update-test-summary.js --watch"
+        "db:cloud:seed": "node scripts/seed-cloud.js"
     },
     "repository": {
         "type": "git",
