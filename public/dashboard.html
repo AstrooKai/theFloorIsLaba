@@ -118,7 +118,7 @@
             <span class="stat-title">Completed orders</span>       
           </div>
           <strong>5</strong>       
-          <span class="stat-desc">Ready for pickup or completed</span>     
+          <span class="stat-desc">All completed orders</span>     
         </div>   
       </div>   
       <div class="tw">     
@@ -153,8 +153,8 @@
           </div>
           <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
           <div class="modal-footer border-0 pt-0">
-            <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" value="1" type="button" id="cOk">Confirm</button>
+            <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal" id="cCancel">Cancel</button>
+            <button class="btn btn-primary btn-confirm-primary" value="1" type="button" id="cOk">Confirm</button>
           </div>
         </div>
       </div>
@@ -168,8 +168,8 @@
           </div>       
           <div class="modal-body py-3"><p class="mb-0">Are you sure you want to <strong>sign out</strong>?</p></div>       
           <div class="modal-footer border-0 pt-0">         
-            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>         
-            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>       
+            <button class="btn btn-success btn-confirm-keep" id="cancelSignOut" type="button" data-bs-dismiss="modal">Stay Signed In</button>         
+            <button class="btn btn-danger btn-confirm-danger" id="confirmSignOut" type="button">Sign Out</button>       
           </div>     
         </div>
       </div>

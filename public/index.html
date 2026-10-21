@@ -9,14 +9,14 @@
   <link rel="stylesheet" href="css/style.css"> 
 </head> 
 <body class="login-page">   
-  <!-- Floating Theme Switcher -->
+  <!-- Theme toggle -->
   <button class="login-theme-toggle" id="themeToggleBtn" type="button" aria-label="Toggle theme" title="Toggle color theme">
     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     <span>Dark Mode</span>
   </button>
 
   <div class="login-layout">     
-    <!-- Left Promotional Hero (Desktop & Tablet) -->
+    <!-- Hero banner -->
     <div class="login-left">       
       <div class="login-left-header">         
         <div class="brand-logo">           
@@ -43,10 +43,10 @@
       </div>     
     </div>     
 
-    <!-- Right Login Form Area -->
+    <!-- Login form -->
     <div class="login-right">       
       <div class="login-card">
-        <!-- Compact Brand Header for Mobile Viewports (< 768px) -->
+        <!-- Mobile header -->
         <div class="login-mobile-brand">
           <div class="mobile-brand-icon">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -62,26 +62,6 @@
             <h2>Staff Sign In<span>.</span></h2>         
             <p>Enter your staff credentials to access your station.</p>
           </div>         
-
-          <!-- Demo Quick Sign-In Pills -->
-          <div class="login-demo-bar">
-            <span class="demo-label"><i class="bi bi-lightning-charge-fill"></i> Quick Demo Autofill:</span>
-            <div class="demo-chips">
-              <button type="button" class="demo-chip" data-email="rosa.mendoza@laba.ph" data-pass="admin123" title="Sign in as Manager">
-                Manager
-              </button>
-              <button type="button" class="demo-chip" data-email="maria.santos@laba.ph" data-pass="admin123" title="Sign in as Cashier">
-                Cashier
-              </button>
-              <button type="button" class="demo-chip" data-email="jose.delacruz@laba.ph" data-pass="admin123" title="Sign in as Washer">
-                Washer
-              </button>
-              <button type="button" class="demo-chip" data-email="pedro.ramos@laba.ph" data-pass="admin123" title="Sign in as Rider">
-                Rider
-              </button>
-            </div>
-          </div>
-
           <form action="dashboard.html" id="loginForm" novalidate>           
             <div id="loginError" class="alert alert-danger py-2 px-3 small mb-3" style="display:none;" role="alert"></div>
             
@@ -96,7 +76,7 @@
             <div class="form-group">             
               <div class="form-group-head">               
                 <label for="loginPassword">Password</label>               
-                <button type="button" id="togglePasswordBtn" class="pass-toggle-btn" aria-label="Toggle password visibility">
+                <button type="button" id="togglePasswordBtn" class="pass-toggle-btn" tabindex="-1" aria-label="Toggle password visibility">
                   <i class="bi bi-eye"></i> <span>Show</span>
                 </button>             
               </div>             

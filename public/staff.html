@@ -65,7 +65,7 @@
       <section class="toolbar" role="search">
         <div class="tf grow"><label>Search Staff</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by name, email, or role..."></div>
         <div class="tf"><label>Role</label><select id="fl_role" data-flt="role"><option value="">All Roles</option><option value="manager">Manager</option><option value="cashier">Cashier</option><option value="washer">Washer</option><option value="folder">Folder</option><option value="rider">Rider</option></select></div>
-        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="active">Active</option><option value="deactivated">Deactivated</option></select></div>
         <button class="btn" data-act="clear" type="button">Clear</button>
       </section>
       <p class="count" id="count" aria-live="polite"></p>
@@ -107,7 +107,7 @@
                       <option value="Rider">Rider</option>
                     </select>
                   </div>
-                  <div class="field" data-f="phone"><label>Contact Number</label><input name="phone" class="form-control" placeholder="0918XXXXXXX"></div>
+                  <div class="field" data-f="phone"><label>Contact Number</label><input name="phone" type="tel" inputmode="numeric" class="form-control" placeholder="0918XXXXXXX"></div>
                   <div class="field full" data-f="email"><label>Email Address <span class="req">*</span></label><input name="email" type="email" class="form-control" placeholder="e.g. name@laba.ph" required></div>
                   <div class="field full" data-f="password"><label>Password</label><input name="password" type="password" class="form-control" placeholder="Enter password"><small class="form-text text-muted" id="pwdHelp">Default: admin123 (or enter a custom password).</small></div>
                   <div class="field full" data-f="status" style="display: none;">
@@ -118,8 +118,8 @@
                         <label class="form-check-label" for="st_active">Active</label>
                       </div>
                       <div class="form-check">
-                        <input class="form-check-input" type="radio" name="status" id="st_inactive" value="Inactive">
-                        <label class="form-check-label" for="st_inactive">Inactive</label>
+                        <input class="form-check-input" type="radio" name="status" id="st_deactivated" value="Deactivated">
+                        <label class="form-check-label text-danger" for="st_deactivated">Deactivated</label>
                       </div>
                     </div>
                   </div>
@@ -143,8 +143,8 @@
             </div>
             <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
             <div class="modal-footer border-0 pt-0">
-              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn btn-danger" value="1" type="button" id="cOk">Confirm</button>
+              <button class="btn btn-success btn-confirm-keep" value="0" type="button" data-bs-dismiss="modal" id="cCancel">Keep It</button>
+              <button class="btn btn-danger btn-confirm-danger" value="1" type="button" id="cOk">Confirm</button>
             </div>
           </div>
         </div>
@@ -165,8 +165,8 @@
           </div>
           <div class="modal-body py-3"><p class="mb-0">Are you sure you want to <strong>sign out</strong>?</p></div>
           <div class="modal-footer border-0 pt-0">
-            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>
+            <button class="btn btn-success btn-confirm-keep" id="cancelSignOut" type="button" data-bs-dismiss="modal">Stay Signed In</button>
+            <button class="btn btn-danger btn-confirm-danger" id="confirmSignOut" type="button">Sign Out</button>
           </div>
         </div>
       </div>

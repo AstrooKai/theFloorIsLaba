@@ -65,7 +65,7 @@
       <section class="toolbar" role="search">
         <div class="tf grow"><label>Search Orders</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by customer name or order ID..."></div>
         <div class="tf"><label>Type</label><select id="fl_type" data-flt="type"><option value="">All Types</option><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>
-        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="received">Received</option><option value="washing">Washing</option><option value="ready for pickup">Ready for Pickup</option><option value="out for delivery">Out for Delivery</option><option value="completed">Completed</option></select></div>
+        <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="received">Received</option><option value="washing">Washing</option><option value="folding">Folding</option><option value="ready for pickup">Ready for Pickup</option><option value="out for delivery">Out for Delivery</option><option value="completed">Completed</option></select></div>
         <button class="btn" data-act="clear" type="button">Clear</button>
       </section>
       <p class="count" id="count" aria-live="polite"></p>   
@@ -85,9 +85,16 @@
               </div>       
               <div class="modal-body py-4">         
                 <div class="grid">           
+                  <div class="field full" data-f="customer_id">
+                    <label>Select Customer</label>
+                    <select name="customer_id" id="f_customer_id" class="form-select" data-fill="customers">
+                      <option value="">+ New Customer (Enter details below)</option>
+                    </select>
+                    <span class="hint" id="h_customer_id">Choose an existing customer to auto-fill details, or enter details below for a new customer.</span>
+                  </div>
                   <div class="field" data-f="first_name"><label>First Name <span class="req">*</span></label><input name="first_name" class="form-control" required></div>           
                   <div class="field" data-f="last_name"><label>Last Name <span class="req">*</span></label><input name="last_name" class="form-control" required></div>           
-                  <div class="field" data-f="contact"><label>Contact Number <span class="req">*</span></label><input name="contact" class="form-control" placeholder="0917XXXXXXX" required></div>           
+                  <div class="field" data-f="contact"><label>Contact Number <span class="req">*</span></label><input name="contact" type="tel" inputmode="numeric" class="form-control" placeholder="0917XXXXXXX" required></div>           
                   <div class="field" data-f="release_type"><label>Release Type</label><select name="release_type" class="form-select"><option value="Pickup">Pickup</option><option value="Delivery">Delivery</option></select></div>
                   <div class="field" data-f="street"><label>Street Address <span class="req">*</span></label><input name="street" class="form-control" placeholder="House/Unit #, Street Name" required></div>           
                   <div class="field" data-f="barangay"><label>Barangay <span class="req">*</span></label>
@@ -135,8 +142,8 @@
             </div>
             <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
             <div class="modal-footer border-0 pt-0">
-              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Keep it</button>
-              <button class="btn btn-danger" value="1" type="button" id="cOk">Delete</button>
+              <button class="btn btn-success btn-confirm-keep" value="0" type="button" data-bs-dismiss="modal" id="cCancel">Keep It</button>
+              <button class="btn btn-danger btn-confirm-danger" value="1" type="button" id="cOk">Delete</button>
             </div>
           </div>
         </div>
@@ -157,8 +164,8 @@
           </div>       
           <div class="modal-body py-3"><p class="mb-0">Are you sure you want to <strong>sign out</strong>?</p></div>       
           <div class="modal-footer border-0 pt-0">         
-            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>         
-            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>       
+            <button class="btn btn-success btn-confirm-keep" id="cancelSignOut" type="button" data-bs-dismiss="modal">Stay Signed In</button>         
+            <button class="btn btn-danger btn-confirm-danger" id="confirmSignOut" type="button">Sign Out</button>       
           </div>     
         </div>
       </div>

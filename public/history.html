@@ -67,7 +67,7 @@
         <button class="btn" id="arch_clear" type="button">Clear</button>
       </section>
 
-      <!-- Category Filter Pills / Counts Bar -->
+      <!-- Category filters -->
       <div class="d-flex flex-wrap gap-2 mb-4 align-items-center" id="arch-category-chips">
         <button class="btn btn-sm arch-chip active" data-category="" type="button">
           All Records <span class="badge ms-1" id="count-all">0</span>
@@ -89,7 +89,7 @@
         </button>
       </div>
 
-      <!-- DEDICATED TABLE 1: ARCHIVED ORDERS -->
+      <!-- Archived orders -->
       <section class="archive-section mb-4" id="section-orders">
         <div class="tw">
           <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -108,7 +108,7 @@
         </div>
       </section>
 
-      <!-- DEDICATED TABLE 2: ARCHIVED PAYMENTS -->
+      <!-- Archived payments -->
       <section class="archive-section mb-4" id="section-payments">
         <div class="tw">
           <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -127,7 +127,7 @@
         </div>
       </section>
 
-      <!-- DEDICATED TABLE 3: ARCHIVED TRANSPORT RUNS -->
+      <!-- Archived deliveries -->
       <section class="archive-section mb-4" id="section-deliveries">
         <div class="tw">
           <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -146,7 +146,7 @@
         </div>
       </section>
 
-      <!-- DEDICATED TABLE 4: ARCHIVED CUSTOMERS -->
+      <!-- Archived customers -->
       <section class="archive-section mb-4" id="section-customers">
         <div class="tw">
           <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -165,7 +165,7 @@
         </div>
       </section>
 
-      <!-- DEDICATED TABLE 5: ARCHIVED STAFF ACCOUNTS -->
+      <!-- Archived staff -->
       <section class="archive-section mb-4" id="section-staff">
         <div class="tw">
           <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -194,8 +194,8 @@
             </div>
             <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
             <div class="modal-footer border-0 pt-0">
-              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn btn-primary" value="1" type="button" id="cOk">Confirm</button>
+              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal" id="cCancel">Cancel</button>
+              <button class="btn btn-success btn-confirm-success" value="1" type="button" id="cOk">Restore</button>
             </div>
           </div>
         </div>
@@ -216,8 +216,8 @@
           </div>       
           <div class="modal-body py-3"><p class="mb-0">Are you sure you want to <strong>sign out</strong>?</p></div>       
           <div class="modal-footer border-0 pt-0">         
-            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>         
-            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>       
+            <button class="btn btn-success btn-confirm-keep" id="cancelSignOut" type="button" data-bs-dismiss="modal">Stay Signed In</button>         
+            <button class="btn btn-danger btn-confirm-danger" id="confirmSignOut" type="button">Sign Out</button>       
           </div>     
         </div>
       </div>

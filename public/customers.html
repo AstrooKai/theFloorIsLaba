@@ -86,7 +86,7 @@
                 <div class="grid">           
                   <div class="field" data-f="first_name"><label>First Name <span class="req">*</span></label><input name="first_name" class="form-control" required></div>           
                   <div class="field" data-f="last_name"><label>Last Name <span class="req">*</span></label><input name="last_name" class="form-control" required></div>           
-                  <div class="field" data-f="contact"><label>Contact Number <span class="req">*</span></label><input name="contact" class="form-control" placeholder="0917XXXXXXX" required></div>           
+                  <div class="field" data-f="contact"><label>Contact Number <span class="req">*</span></label><input name="contact" type="tel" inputmode="numeric" class="form-control" placeholder="0917XXXXXXX" required></div>           
                   <div class="field" data-f="barangay"><label>Barangay <span class="req">*</span></label>
                     <select name="barangay" class="form-select" required>
                       <option value="">Select Barangay</option>
@@ -111,7 +111,7 @@
                     </select>
                   </div>           
                   <div class="field full" data-f="street_address"><label>Street Address <span class="req">*</span></label><input name="street_address" class="form-control" placeholder="House/Unit #, Street Name" required></div>           
-                  <div class="field full" data-f="status">
+                  <div class="field full" data-f="status" style="display: none;">
                     <label class="d-block mb-2">Account Status</label>
                     <div class="d-flex gap-4 pt-1">
                       <div class="form-check">
@@ -143,8 +143,8 @@
             </div>
             <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
             <div class="modal-footer border-0 pt-0">
-              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Keep it</button>
-              <button class="btn btn-danger" value="1" type="button" id="cOk">Delete</button>
+              <button class="btn btn-success btn-confirm-keep" value="0" type="button" data-bs-dismiss="modal" id="cCancel">Keep It</button>
+              <button class="btn btn-danger btn-confirm-danger" value="1" type="button" id="cOk">Delete</button>
             </div>
           </div>
         </div>
@@ -165,8 +165,8 @@
           </div>       
           <div class="modal-body py-3"><p class="mb-0">Are you sure you want to <strong>sign out</strong>?</p></div>       
           <div class="modal-footer border-0 pt-0">         
-            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>         
-            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>       
+            <button class="btn btn-success btn-confirm-keep" id="cancelSignOut" type="button" data-bs-dismiss="modal">Stay Signed In</button>         
+            <button class="btn btn-danger btn-confirm-danger" id="confirmSignOut" type="button">Sign Out</button>       
           </div>     
         </div>
       </div>

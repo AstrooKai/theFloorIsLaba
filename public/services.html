@@ -64,7 +64,7 @@
       </div>   
       <section class="toolbar" role="search">     
         <div class="tf grow"><label>Search</label><input id="fl_q" data-flt="q" type="search" placeholder="Search by service name or description..."></div>     
-        <div class="tf"><label>Category</label><select id="fl_cat" data-flt="cat"><option value="">All Categories</option><option value="wash & fold">Wash & fold</option><option value="dry cleaning">Dry cleaning</option><option value="ironing">Ironing</option></select></div>     
+        <div class="tf"><label>Category</label><select id="fl_cat" data-flt="cat"><option value="">All Categories</option><option value="wash & fold">Wash & fold</option><option value="wash & dry">Wash & dry</option><option value="pressing">Pressing</option><option value="specialty care">Specialty care</option><option value="bedding & bulky">Bedding & bulky</option><option value="dry cleaning">Dry cleaning</option></select></div>     
         <div class="tf"><label>Status</label><select id="fl_st" data-flt="st"><option value="">All Statuses</option><option value="active">Active Only</option><option value="discontinued">Discontinued Only</option></select></div>     
         <button class="btn" data-act="clear" type="button">Clear</button>   
       </section>   
@@ -85,7 +85,7 @@
         </div>
       </div>
 
-      <!-- Discontinued Services Section -->
+      <!-- Inactive services -->
       <section class="mt-4" id="section-discontinued">
         <div class="tw">
           <div class="table-header d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -115,7 +115,7 @@
               <div class="modal-body py-4">         
                 <div class="grid">           
                   <div class="field full" data-f="service_name"><label>Service name <span class="req">*</span></label><input name="service_name" class="form-control"></div>           
-                  <div class="field" data-f="category"><label>Category</label><select name="category" class="form-select"><option>Wash & fold</option><option>Dry cleaning</option><option>Ironing</option></select></div>           
+                  <div class="field" data-f="category"><label>Category</label><select name="category" class="form-select"><option value="Wash & fold">Wash & fold</option><option value="Wash & dry">Wash & dry</option><option value="Pressing">Pressing</option><option value="Specialty care">Specialty care</option><option value="Bedding & bulky">Bedding & bulky</option><option value="Dry cleaning">Dry cleaning</option></select></div>           
                   <div class="field" data-f="unit"><label>Charged per</label><select name="unit" class="form-select"><option value="kg">Kilogram</option><option value="piece">Piece</option></select></div>           
                   <div class="field" data-f="price"><label>Price (₱) <span class="req">*</span></label><input name="price" type="number" class="form-control"></div>           
                   <div class="field" data-f="turnaround_hours"><label>Turnaround (hours)</label><input name="turnaround_hours" type="number" class="form-control"></div>           
@@ -140,8 +140,8 @@
             </div>
             <div class="modal-body py-3"><p id="cM" class="mb-0"></p></div>
             <div class="modal-footer border-0 pt-0">
-              <button class="btn btn-outline-secondary" value="0" type="button" data-bs-dismiss="modal">Keep it</button>
-              <button class="btn btn-danger" value="1" type="button" id="cOk">Delete</button>
+              <button class="btn btn-success btn-confirm-keep" value="0" type="button" data-bs-dismiss="modal" id="cCancel">Keep It</button>
+              <button class="btn btn-danger btn-confirm-danger" value="1" type="button" id="cOk">Delete</button>
             </div>
           </div>
         </div>
@@ -162,8 +162,8 @@
           </div>       
           <div class="modal-body py-3"><p class="mb-0">Are you sure you want to <strong>sign out</strong>?</p></div>       
           <div class="modal-footer border-0 pt-0">         
-            <button class="btn btn-outline-secondary" id="cancelSignOut" type="button" data-bs-dismiss="modal">Cancel</button>         
-            <button class="btn btn-danger" id="confirmSignOut" type="button">Sign Out</button>       
+            <button class="btn btn-success btn-confirm-keep" id="cancelSignOut" type="button" data-bs-dismiss="modal">Stay Signed In</button>         
+            <button class="btn btn-danger btn-confirm-danger" id="confirmSignOut" type="button">Sign Out</button>       
           </div>     
         </div>
       </div>
