@@ -1,6 +1,35 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 
+// Check if a staff member is the sole active manager
+async function isSoleActiveManager(targetStaffId, requesterStaffId = null) {
+    const [targetRows] = await pool.query(
+        "SELECT staff_id, role, status, is_archived FROM staff WHERE staff_id = ?",
+        [targetStaffId]
+    );
+    if (targetRows.length === 0) return false;
+    const target = targetRows[0];
+    const isTargetManager = String(target.role || '').toLowerCase() === 'manager';
+    if (!isTargetManager) return false;
+
+    const [countRows] = await pool.query(`
+        SELECT COUNT(*) AS total 
+        FROM staff 
+        WHERE LOWER(role) = 'manager' 
+          AND (is_archived IS NULL OR is_archived = FALSE)
+          AND (status IS NULL OR status = 'Active')
+    `);
+    const totalActiveManagers = countRows[0]?.total || 0;
+
+    if (totalActiveManagers <= 1) {
+        if (requesterStaffId) {
+            return Number(requesterStaffId) === Number(targetStaffId);
+        }
+        return true;
+    }
+    return false;
+}
+
 exports.getAllStaff = async (req, res) => {
     try {
         const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
@@ -15,7 +44,7 @@ exports.getAllStaff = async (req, res) => {
                 role,
                 email,
                 phone,
-                COALESCE(status, 'Active') AS status,
+                CASE WHEN status = 'Inactive' THEN 'Deactivated' ELSE COALESCE(status, 'Active') END AS status,
                 COALESCE(is_archived, FALSE) AS is_archived,
                 created_at
             FROM staff
@@ -63,7 +92,7 @@ exports.getStaffById = async (req, res) => {
                 role,
                 email,
                 phone,
-                COALESCE(status, 'Active') AS status,
+                CASE WHEN status = 'Inactive' THEN 'Deactivated' ELSE COALESCE(status, 'Active') END AS status,
                 COALESCE(is_archived, FALSE) AS is_archived,
                 created_at
             FROM staff
@@ -92,10 +121,39 @@ exports.createStaff = async (req, res) => {
             return res.status(400).json({ error: 'First name is required' });
         }
 
+        if (phone) {
+            if (/[a-zA-Z]/.test(phone)) {
+                return res.status(400).json({ error: 'Contact number cannot contain letters' });
+            }
+            if (!/^\+?[0-9\s-]+$/.test(phone)) {
+                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+            }
+            const phoneDigits = phone.replace(/\D/g, '');
+            if (phoneDigits.length !== 11) {
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+            }
+            if (!phoneDigits.startsWith('09')) {
+                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+            }
+        }
+
         const finalEmail = (email || `${first_name.toLowerCase()}.${(last_name || 'staff').toLowerCase()}@laba.ph`).trim().toLowerCase();
+
+        // Check for duplicate email
+        const [existingEmail] = await pool.query(
+            'SELECT staff_id FROM staff WHERE LOWER(email) = LOWER(?)',
+            [finalEmail]
+        );
+        if (existingEmail.length > 0) {
+            return res.status(400).json({
+                error: 'A staff member with this email address already exists. Please use a unique email.',
+                field: 'email'
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password || 'password123', 10);
 
-        // Newly added staff accounts are strictly Active initially
+        // Initial status: Active
         const [result] = await pool.query(
             'INSERT INTO staff (first_name, last_name, role, email, password, phone, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, "Active", FALSE)',
             [first_name, last_name || '', role, finalEmail, hashedPassword, phone || '']
@@ -113,6 +171,12 @@ exports.createStaff = async (req, res) => {
             is_archived: false
         });
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+            return res.status(400).json({
+                error: 'A staff member with this email address already exists. Please use a unique email.',
+                field: 'email'
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -120,6 +184,10 @@ exports.createStaff = async (req, res) => {
 exports.updateStaff = async (req, res) => {
     try {
         const { id } = req.params;
+        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        if (await isSoleActiveManager(id, requesterId)) {
+            return res.status(400).json({ error: 'A manager cannot edit their own account when they are the only manager.' });
+        }
         let { first_name, last_name, full_name, role, email, password, phone, status } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
@@ -143,8 +211,19 @@ exports.updateStaff = async (req, res) => {
             params.push(role);
         }
         if (email) {
+            const cleanEmail = email.trim().toLowerCase();
+            const [existingEmail] = await pool.query(
+                'SELECT staff_id FROM staff WHERE LOWER(email) = LOWER(?) AND staff_id != ?',
+                [cleanEmail, id]
+            );
+            if (existingEmail.length > 0) {
+                return res.status(400).json({
+                    error: 'A staff member with this email address already exists. Please use a unique email.',
+                    field: 'email'
+                });
+            }
             updates.push('email = ?');
-            params.push(email.trim().toLowerCase());
+            params.push(cleanEmail);
         }
         if (password && password.trim()) {
             const hashedPassword = await bcrypt.hash(password.trim(), 10);
@@ -152,12 +231,28 @@ exports.updateStaff = async (req, res) => {
             params.push(hashedPassword);
         }
         if (phone !== undefined) {
+            if (phone) {
+                if (/[a-zA-Z]/.test(phone)) {
+                    return res.status(400).json({ error: 'Contact number cannot contain letters' });
+                }
+                if (!/^\+?[0-9\s-]+$/.test(phone)) {
+                    return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+                }
+                const phoneDigits = phone.replace(/\D/g, '');
+                if (phoneDigits.length !== 11) {
+                    return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+                }
+                if (!phoneDigits.startsWith('09')) {
+                    return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+                }
+            }
             updates.push('phone = ?');
             params.push(phone);
         }
         if (status) {
+            const normStatus = status === 'Inactive' ? 'Deactivated' : status;
             updates.push('status = ?');
-            params.push(status);
+            params.push(normStatus);
         }
 
         if (updates.length === 0) {
@@ -179,9 +274,15 @@ exports.updateStaff = async (req, res) => {
             role,
             email,
             phone,
-            status
+            status: status === 'Inactive' ? 'Deactivated' : status
         });
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+            return res.status(400).json({
+                error: 'A staff member with this email address already exists. Please use a unique email.',
+                field: 'email'
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -189,8 +290,12 @@ exports.updateStaff = async (req, res) => {
 exports.archiveStaff = async (req, res) => {
     try {
         const { id } = req.params;
+        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        if (await isSoleActiveManager(id, requesterId)) {
+            return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
+        }
         const [result] = await pool.query(
-            "UPDATE staff SET is_archived = TRUE, status = 'Inactive' WHERE staff_id = ?",
+            "UPDATE staff SET is_archived = TRUE, status = 'Deactivated' WHERE staff_id = ?",
             [id]
         );
 
@@ -225,12 +330,16 @@ exports.unarchiveStaff = async (req, res) => {
 exports.toggleStaffStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        if (await isSoleActiveManager(id, requesterId)) {
+            return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
+        }
         const [rows] = await pool.query('SELECT status FROM staff WHERE staff_id = ?', [id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Staff member not found' });
         }
         const currentStatus = rows[0].status || 'Active';
-        const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+        const newStatus = currentStatus === 'Active' ? 'Deactivated' : 'Active';
         await pool.query('UPDATE staff SET status = ? WHERE staff_id = ?', [newStatus, id]);
         res.json({ success: true, staff_id: Number(id), status: newStatus });
     } catch (error) {
@@ -241,8 +350,12 @@ exports.toggleStaffStatus = async (req, res) => {
 exports.deleteStaff = async (req, res) => {
     try {
         const { id } = req.params;
-        // Soft-archive by default to safeguard historical orders and delivery run references
-        const [result] = await pool.query("UPDATE staff SET is_archived = TRUE, status = 'Inactive' WHERE staff_id = ?", [id]);
+        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        if (await isSoleActiveManager(id, requesterId)) {
+            return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
+        }
+        // Soft-archive staff
+        const [result] = await pool.query("UPDATE staff SET is_archived = TRUE, status = 'Deactivated' WHERE staff_id = ?", [id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Staff member not found' });
@@ -283,7 +396,7 @@ exports.loginStaff = async (req, res) => {
 
         const staffMember = rows[0];
 
-        if (staffMember.status === 'Inactive' || staffMember.is_archived) {
+        if (staffMember.status === 'Inactive' || staffMember.status === 'Deactivated' || staffMember.is_archived) {
             return res.status(401).json({ error: 'Account is deactivated. Please contact your manager.' });
         }
 

@@ -23,6 +23,7 @@ exports.getAllDeliveries = async (req, res) => {
                 d.notes,
                 COALESCE(d.is_archived, FALSE) AS is_archived,
                 CONCAT(r.first_name, ' ', r.last_name) AS rider,
+                CONCAT(r.first_name, ' ', r.last_name) AS rider_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS customer_name
             FROM deliveries d
             JOIN orders o ON d.order_id = o.order_id
@@ -83,7 +84,8 @@ exports.createDelivery = async (req, res) => {
         }
 
         const [orderRows] = await pool.query(`
-            SELECT o.order_id, o.status_id, os.status_name 
+            SELECT o.order_id, o.status_id, os.status_name,
+                   (SELECT COUNT(*) FROM deliveries d WHERE d.order_id = o.order_id AND d.status = 'Completed' AND (d.is_archived IS NULL OR d.is_archived = FALSE)) AS completed_runs_count
             FROM orders o 
             JOIN order_statuses os ON o.status_id = os.status_id 
             WHERE o.order_id = ?
@@ -93,8 +95,8 @@ exports.createDelivery = async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        if (orderRows[0].status_id === 5 || (orderRows[0].status_name || '').toLowerCase() === 'completed') {
-            return res.status(400).json({ error: 'Completed orders cannot be scheduled for pickup or delivery runs' });
+        if (orderRows[0].status_id === 5 || (orderRows[0].status_name || '').toLowerCase() === 'completed' || orderRows[0].completed_runs_count > 0) {
+            return res.status(400).json({ error: 'Orders that have already been picked up or delivered cannot be scheduled for a run' });
         }
 
         let resolvedRiderId = rider_id || null;
@@ -114,6 +116,23 @@ exports.createDelivery = async (req, res) => {
         const finalStreet = (street || street_address || (address && address.split(',')[0]) || '').trim();
         const finalBarangay = (barangay || (address && address.split(',')[1]) || '').trim();
         const finalContact = contact || '09170000000';
+
+        if (contact) {
+            if (/[a-zA-Z]/.test(contact)) {
+                return res.status(400).json({ error: 'Contact number cannot contain letters' });
+            }
+            if (!/^\+?[0-9\s-]+$/.test(contact)) {
+                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+            }
+            const phoneDigits = contact.replace(/\D/g, '');
+            if (phoneDigits.length !== 11) {
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+            }
+            if (!phoneDigits.startsWith('09')) {
+                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+            }
+        }
+
         const displayAddress = finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : (finalStreet || finalBarangay || 'Cabuyao, Laguna');
 
         const [result] = await pool.query(`
@@ -232,6 +251,21 @@ exports.updateDelivery = async (req, res) => {
             params.push(barangay);
         }
         if (contact !== undefined) {
+            if (contact) {
+                if (/[a-zA-Z]/.test(contact)) {
+                    return res.status(400).json({ error: 'Contact number cannot contain letters' });
+                }
+                if (!/^\+?[0-9\s-]+$/.test(contact)) {
+                    return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+                }
+                const phoneDigits = contact.replace(/\D/g, '');
+                if (phoneDigits.length !== 11) {
+                    return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+                }
+                if (!phoneDigits.startsWith('09')) {
+                    return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+                }
+            }
             updates.push('contact = ?');
             params.push(contact);
         }
@@ -247,6 +281,16 @@ exports.updateDelivery = async (req, res) => {
         if (updates.length > 0) {
             params.push(id);
             await pool.query(`UPDATE deliveries SET ${updates.join(', ')} WHERE delivery_id = ?`, params);
+        }
+
+        if (status === 'Completed') {
+            await pool.query(
+                `UPDATE orders 
+                 SET status_id = 5, 
+                     release_date = COALESCE(release_date, CURRENT_DATE) 
+                 WHERE order_id = (SELECT order_id FROM deliveries WHERE delivery_id = ?)`,
+                [id]
+            );
         }
 
         res.json({

@@ -79,6 +79,23 @@ exports.createCustomer = async (req, res) => {
             return res.status(400).json({ error: 'First name is required' });
         }
 
+        if (!finalPhone || !finalPhone.trim()) {
+            return res.status(400).json({ error: 'Contact number is required' });
+        }
+        if (/[a-zA-Z]/.test(finalPhone)) {
+            return res.status(400).json({ error: 'Contact number cannot contain letters' });
+        }
+        if (!/^\+?[0-9\s-]+$/.test(finalPhone)) {
+            return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+        }
+        const phoneDigits = finalPhone.replace(/\D/g, '');
+        if (phoneDigits.length !== 11) {
+            return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+        }
+        if (!phoneDigits.startsWith('09')) {
+            return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+        }
+
         const [result] = await pool.query(
             'INSERT INTO customers (first_name, last_name, phone, street_address, barangay, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
             [first_name, last_name || '', finalPhone, finalStreetAddress, finalBarangay, finalStatus]
@@ -129,6 +146,37 @@ exports.updateCustomer = async (req, res) => {
         const finalStatus = status !== undefined ? status : (current.status || 'Active');
         const finalArchived = is_archived !== undefined ? Boolean(is_archived) : Boolean(current.is_archived);
 
+        if (finalPhone) {
+            if (/[a-zA-Z]/.test(finalPhone)) {
+                return res.status(400).json({ error: 'Contact number cannot contain letters' });
+            }
+            if (!/^\+?[0-9\s-]+$/.test(finalPhone)) {
+                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+            }
+            const phoneDigits = finalPhone.replace(/\D/g, '');
+            if (phoneDigits.length !== 11) {
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+            }
+            if (!phoneDigits.startsWith('09')) {
+                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+            }
+        }
+
+        if (finalArchived && !current.is_archived) {
+            const [activeOrders] = await pool.query(`
+                SELECT o.order_id, os.status_name 
+                FROM orders o 
+                JOIN order_statuses os ON o.status_id = os.status_id 
+                WHERE o.customer_id = ? AND os.status_name != 'Completed' AND o.is_archived = FALSE
+            `, [id]);
+            if (activeOrders.length > 0) {
+                const orderList = activeOrders.map(o => `#${o.order_id} (${o.status_name})`).join(', ');
+                return res.status(400).json({ 
+                    error: `Cannot archive customer with active ongoing orders (${orderList}). Orders must be Completed before archiving.` 
+                });
+            }
+        }
+
         await pool.query(
             'UPDATE customers SET first_name = ?, last_name = ?, phone = ?, street_address = ?, barangay = ?, status = ?, is_archived = ? WHERE customer_id = ?',
             [finalFirstName, finalLastName, finalPhone, finalStreetAddress, finalBarangay, finalStatus, finalArchived, id]
@@ -156,6 +204,23 @@ exports.updateCustomer = async (req, res) => {
 exports.archiveCustomer = async (req, res) => {
     try {
         const { id } = req.params;
+        const [customerRows] = await pool.query('SELECT * FROM customers WHERE customer_id = ?', [id]);
+        if (customerRows.length === 0) return res.status(404).json({ error: 'Customer not found' });
+
+        const [activeOrders] = await pool.query(`
+            SELECT o.order_id, os.status_name 
+            FROM orders o 
+            JOIN order_statuses os ON o.status_id = os.status_id 
+            WHERE o.customer_id = ? AND os.status_name != 'Completed' AND o.is_archived = FALSE
+        `, [id]);
+
+        if (activeOrders.length > 0) {
+            const orderList = activeOrders.map(o => `#${o.order_id} (${o.status_name})`).join(', ');
+            return res.status(400).json({ 
+                error: `Cannot archive customer with active ongoing orders (${orderList}). Orders must be Completed before archiving.` 
+            });
+        }
+
         const [result] = await pool.query(
             "UPDATE customers SET is_archived = TRUE, status = 'Inactive' WHERE customer_id = ?",
             [id]

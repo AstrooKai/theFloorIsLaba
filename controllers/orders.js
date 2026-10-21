@@ -26,6 +26,13 @@ exports.getAllOrders = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
+                (
+                    SELECT COUNT(*) 
+                    FROM deliveries d 
+                    WHERE d.order_id = o.order_id 
+                      AND d.status = 'Completed' 
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ) AS completed_runs_count,
                 MAX(oi.service_id) AS service_id,
                 COALESCE(SUM(oi.weight_kg), 1.00) AS weight_kg,
                 COALESCE(SUM(oi.subtotal), 0) AS total_amount,
@@ -84,6 +91,13 @@ exports.getOrderById = async (req, res) => {
                 CONCAT(s.first_name, ' ', s.last_name) AS staff_name,
                 os.status_id,
                 os.status_name AS order_status,
+                (
+                    SELECT COUNT(*) 
+                    FROM deliveries d 
+                    WHERE d.order_id = o.order_id 
+                      AND d.status = 'Completed' 
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ) AS completed_runs_count,
                 COALESCE(SUM(oi.subtotal), 0) AS total,
                 COALESCE(SUM(oi.subtotal), 0) AS total_amount,
                 COALESCE(pay.total_paid, 0) AS total_paid,
@@ -188,12 +202,50 @@ exports.createOrder = async (req, res) => {
         } = req.body;
 
         // Resolve customer
-        let finalCustomerId = customer_id;
+        let finalCustomerId = customer_id ? Number(customer_id) : null;
         let firstName = (req.body.first_name || '').trim();
         let lastName = (req.body.last_name || '').trim();
         const contactNo = (contact || req.body.phone || '').trim();
         const streetAddr = (req.body.street_address || req.body.street || '').trim();
         const barangayVal = (req.body.barangay || '').trim();
+
+        if (contactNo) {
+            if (/[a-zA-Z]/.test(contactNo)) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Contact number cannot contain letters' });
+            }
+            if (!/^\+?[0-9\s-]+$/.test(contactNo)) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+            }
+            const digits = contactNo.replace(/\D/g, '');
+            if (digits.length !== 11) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+            }
+            if (!digits.startsWith('09')) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+            }
+        }
+
+        if (finalCustomerId) {
+            const [custRows] = await conn.query('SELECT customer_id FROM customers WHERE customer_id = ?', [finalCustomerId]);
+            if (custRows.length > 0) {
+                if (streetAddr || barangayVal || contactNo) {
+                    await conn.query(
+                        'UPDATE customers SET street_address = COALESCE(NULLIF(?, ""), street_address), barangay = COALESCE(NULLIF(?, ""), barangay), phone = COALESCE(NULLIF(?, ""), phone) WHERE customer_id = ?',
+                        [streetAddr, barangayVal, contactNo, finalCustomerId]
+                    );
+                }
+            } else {
+                finalCustomerId = null;
+            }
+        }
 
         if (!finalCustomerId) {
             if (!firstName && customer_name) {
@@ -202,10 +254,20 @@ exports.createOrder = async (req, res) => {
                 lastName = parts.slice(1).join(' ') || 'Customer';
             }
 
-            const [found] = await conn.query(
-                'SELECT customer_id FROM customers WHERE (first_name = ? AND last_name = ?) OR (phone = ? AND phone != "") LIMIT 1',
-                [firstName, lastName, contactNo]
-            );
+            let found = [];
+            if (firstName && firstName.toLowerCase() !== 'customer') {
+                const [byName] = await conn.query(
+                    'SELECT customer_id FROM customers WHERE LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?) LIMIT 1',
+                    [firstName, lastName]
+                );
+                found = byName;
+            } else if (contactNo) {
+                const [byPhone] = await conn.query(
+                    'SELECT customer_id FROM customers WHERE phone = ? AND phone != "" LIMIT 1',
+                    [contactNo]
+                );
+                found = byPhone;
+            }
 
             if (found.length > 0) {
                 finalCustomerId = found[0].customer_id;
@@ -231,12 +293,12 @@ exports.createOrder = async (req, res) => {
             finalStaffId = staffRows.length > 0 ? staffRows[0].staff_id : 1;
         }
 
-        // New orders always strictly start at 'Received' (status_id 1)
+        // Initial status: Received
         const finalStatusId = 1;
 
         const finalOrderDate = order_date || new Date().toISOString().split('T')[0];
 
-        // Insert into orders
+        // Insert order
         const [orderResult] = await conn.query(
             'INSERT INTO orders (customer_id, staff_id, status_id, order_date, release_type, release_date) VALUES (?, ?, ?, ?, ?, ?)',
             [finalCustomerId, finalStaffId, finalStatusId, finalOrderDate, release_type, release_date]
@@ -253,7 +315,7 @@ exports.createOrder = async (req, res) => {
                 );
             }
         } else {
-            // Default 1 item so junction table order_items always maintains relational integrity
+            // Default order item fallback
             const [defaultService] = await conn.query('SELECT service_id, price_per_kg FROM service_types LIMIT 1');
             const svcId = defaultService.length > 0 ? defaultService[0].service_id : 1;
             const rate = defaultService.length > 0 ? Number(defaultService[0].price_per_kg) : 45.00;
@@ -271,9 +333,9 @@ exports.createOrder = async (req, res) => {
         res.status(201).json({
             order_id: newOrderId,
             customer_id: finalCustomerId,
-            customer_name: customer_name || 'Customer',
-            contact: contact || '',
-            address: address || '',
+            customer_name: `${firstName} ${lastName}`.trim() || customer_name || 'Customer',
+            contact: contactNo || contact || '',
+            address: streetAddr || address || '',
             order_date: finalOrderDate,
             order_status: order_status || (finalStatusId === 5 ? 'Completed' : 'Received'),
             total: Number(total) || 0
@@ -300,18 +362,32 @@ exports.updateOrder = async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        let newStatusId = status_id;
-        if (!newStatusId && order_status) {
-            const statusMap = {
-                'Received': 1,
-                'Washing': 2,
-                'Ready for Pickup': 3,
-                'Out for Delivery': 4,
-                'Completed': 5
-            };
-            if (statusMap[order_status]) {
-                newStatusId = statusMap[order_status];
-            }
+        const statusMap = {
+            'Received': 1,
+            'Washing': 2,
+            'Folding': 6,
+            'Ready for Pickup': 3,
+            'Out for Delivery': 4,
+            'Completed': 5
+        };
+
+        let newStatusId = null;
+        if (order_status && statusMap[order_status]) {
+            newStatusId = statusMap[order_status];
+        } else if (status_id) {
+            newStatusId = Number(status_id);
+        }
+
+        const finalReleaseType = (release_type || existing[0].release_type || 'Pickup').trim();
+        if (finalReleaseType.toLowerCase() === 'delivery' && newStatusId === 3) {
+            await conn.rollback();
+            conn.release();
+            return res.status(400).json({ error: "Delivery orders cannot be set to 'Ready for Pickup'. Use 'Out for Delivery' instead." });
+        }
+        if (finalReleaseType.toLowerCase() === 'pickup' && newStatusId === 4) {
+            await conn.rollback();
+            conn.release();
+            return res.status(400).json({ error: "Pickup orders cannot be set to 'Out for Delivery'. Use 'Ready for Pickup' instead." });
         }
 
         const updates = [];
@@ -339,33 +415,71 @@ exports.updateOrder = async (req, res) => {
             await conn.query(`UPDATE orders SET ${updates.join(', ')} WHERE order_id = ?`, params);
         }
 
-        // Update customer details if provided
-        if (customer_name || contact || address) {
-            const customerId = existing[0].customer_id;
-            const custUpdates = [];
-            const custParams = [];
-
-            if (customer_name) {
-                const parts = customer_name.trim().split(/\s+/);
-                custUpdates.push('first_name = ?', 'last_name = ?');
-                custParams.push(parts[0] || '', parts.slice(1).join(' ') || '');
-            }
-            if (contact) {
-                custUpdates.push('phone = ?');
-                custParams.push(contact);
-            }
-            if (address) {
-                custUpdates.push('address = ?');
-                custParams.push(address);
-            }
-
-            if (custUpdates.length > 0) {
-                custParams.push(customerId);
-                await conn.query(`UPDATE customers SET ${custUpdates.join(', ')} WHERE customer_id = ?`, custParams);
-            }
+        // Update customer
+        const reqCustId = req.body.customer_id ? Number(req.body.customer_id) : null;
+        if (reqCustId && reqCustId !== existing[0].customer_id) {
+            updates.push('customer_id = ?');
+            params.push(reqCustId);
         }
 
-        // Update order items if specified
+        const targetCustId = reqCustId || existing[0].customer_id;
+        const firstName = (req.body.first_name || '').trim();
+        const lastName = (req.body.last_name || '').trim();
+        const streetVal = (req.body.street_address || req.body.street || address || '').trim();
+        const brgyVal = (req.body.barangay || '').trim();
+        const phoneVal = (contact || req.body.phone || '').trim();
+
+        const custUpdates = [];
+        const custParams = [];
+
+        if (firstName || lastName) {
+            if (firstName) { custUpdates.push('first_name = ?'); custParams.push(firstName); }
+            if (lastName) { custUpdates.push('last_name = ?'); custParams.push(lastName); }
+        } else if (customer_name) {
+            const parts = customer_name.trim().split(/\s+/);
+            custUpdates.push('first_name = ?', 'last_name = ?');
+            custParams.push(parts[0] || '', parts.slice(1).join(' ') || '');
+        }
+        if (phoneVal) {
+            if (/[a-zA-Z]/.test(phoneVal)) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Contact number cannot contain letters' });
+            }
+            if (!/^\+?[0-9\s-]+$/.test(phoneVal)) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
+            }
+            const digits = phoneVal.replace(/\D/g, '');
+            if (digits.length !== 11) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
+            }
+            if (!digits.startsWith('09')) {
+                await conn.rollback();
+                conn.release();
+                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+            }
+            custUpdates.push('phone = ?');
+            custParams.push(phoneVal);
+        }
+        if (streetVal) {
+            custUpdates.push('street_address = ?');
+            custParams.push(streetVal);
+        }
+        if (brgyVal) {
+            custUpdates.push('barangay = ?');
+            custParams.push(brgyVal);
+        }
+
+        if (custUpdates.length > 0) {
+            custParams.push(targetCustId);
+            await conn.query(`UPDATE customers SET ${custUpdates.join(', ')} WHERE customer_id = ?`, custParams);
+        }
+
+        // Update items
         if (Array.isArray(req.body.items) && req.body.items.length > 0) {
             await conn.query('DELETE FROM order_items WHERE order_id = ?', [id]);
             for (const item of req.body.items) {
@@ -383,7 +497,7 @@ exports.updateOrder = async (req, res) => {
 
         await conn.commit();
 
-        const statusNames = { 1: 'Received', 2: 'Washing', 3: 'Ready for Pickup', 4: 'Out for Delivery', 5: 'Completed' };
+        const statusNames = { 1: 'Received', 2: 'Washing', 3: 'Ready for Pickup', 4: 'Out for Delivery', 5: 'Completed', 6: 'Folding' };
         const resolvedName = order_status || statusNames[newStatusId] || 'Received';
         res.json({
             order_id: Number(id),

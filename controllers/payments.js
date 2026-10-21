@@ -80,9 +80,36 @@ exports.createPayment = async (req, res) => {
             return res.status(400).json({ error: 'order_id and amount are required' });
         }
 
-        const [orderRows] = await pool.query('SELECT order_id FROM orders WHERE order_id = ?', [order_id]);
+        const [orderRows] = await pool.query(`
+            SELECT 
+                o.order_id,
+                COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = o.order_id), 0) AS total,
+                COALESCE((
+                    SELECT SUM(amount_paid) 
+                    FROM payments 
+                    WHERE order_id = o.order_id 
+                      AND (is_archived IS NULL OR is_archived = FALSE) 
+                      AND (status IS NULL OR status = 'Paid')
+                ), 0) AS total_paid
+            FROM orders o 
+            WHERE o.order_id = ?
+        `, [order_id]);
+
         if (orderRows.length === 0) {
             return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const orderInfo = orderRows[0];
+        const orderTotal = Number(orderInfo.total || 0);
+        const orderPaid = Number(orderInfo.total_paid || 0);
+        const remainingBalance = Math.round((orderTotal - orderPaid) * 100) / 100;
+
+        if (remainingBalance <= 0) {
+            return res.status(400).json({ error: 'Order is already fully paid' });
+        }
+
+        if (Number(finalAmount) < remainingBalance) {
+            return res.status(400).json({ error: `Partial payments are not allowed. Full balance due is ₱${remainingBalance.toFixed(2)}` });
         }
 
         const [result] = await pool.query(
