@@ -1,6 +1,20 @@
-const $ = (s, r = document) => r.querySelector(s);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// DOM helpers and utility functions
+const $ = (selector, root = document) => root.querySelector(selector);
 
+// HTML entity escaping function to prevent Cross-Site Scripting (XSS)
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+const esc = escapeHtml; // Shorthand alias for template strings
+
+// Role-Based Access Control (RBAC) route permissions
 const ROLE_PERMISSIONS = {
   manager: ["dashboard.html", "customers.html", "orders.html", "services.html", "payments.html", "pickup-delivery.html", "history.html", "staff.html"],
   cashier: ["dashboard.html", "customers.html", "orders.html", "payments.html", "pickup-delivery.html", "history.html"],
@@ -17,90 +31,211 @@ const ROLE_DEFAULT_PAGES = {
   rider: "pickup-delivery.html"
 };
 
+// Retrieve currently authenticated staff user from localStorage
+function getAuthStaff() {
+  try {
+    return JSON.parse(localStorage.getItem("current_staff") || "null");
+  } catch (error) {
+    console.error("Error reading current_staff from localStorage:", error);
+    return null;
+  }
+}
+
+// Persist authenticated staff user to localStorage
+function setAuthStaff(staff) {
+  try {
+    localStorage.setItem("current_staff", JSON.stringify(staff));
+  } catch (error) {
+    console.error("Error saving current_staff to localStorage:", error);
+  }
+}
+
+// Clear authenticated staff user from localStorage (Logout)
+function clearAuthStaff() {
+  try {
+    localStorage.removeItem("current_staff");
+  } catch (error) {
+    console.error("Error clearing current_staff from localStorage:", error);
+  }
+}
+
+// Multi-tab synchronization: redirect to login if session was logged out in another tab
+window.addEventListener("storage", (event) => {
+  if (event.key === "current_staff" && !event.newValue) {
+    window.location.href = "/";
+  }
+});
+
+// Enforce authentication guards and role-based page authorization
 function enforceAuthAndRouteGuards() {
-  const path = window.location.pathname;
-  let page = path.split("/").pop();
-  if (!page || page === "") page = "index.html";
+  const currentPath = window.location.pathname;
+  let pageName = currentPath.split("/").pop();
+  if (!pageName || pageName === "") pageName = "index.html";
 
-  const WORKSPACE_PAGES = ["dashboard.html", "orders.html", "customers.html", "payments.html", "services.html", "pickup-delivery.html", "history.html", "staff.html"];
-  const isWorkspace = WORKSPACE_PAGES.includes(page);
-  const isLoginPage = (page === "index.html" || page === "login" || page === "staff-login.html" || path === "/" || path === "" || path.endsWith("/login"));
+  const WORKSPACE_PAGES = [
+    "dashboard.html",
+    "orders.html",
+    "customers.html",
+    "payments.html",
+    "services.html",
+    "pickup-delivery.html",
+    "history.html",
+    "staff.html"
+  ];
+  const isWorkspace = WORKSPACE_PAGES.includes(pageName);
+  const isLoginPage = (pageName === "index.html" || pageName === "login" || pageName === "staff-login.html" || currentPath === "/" || currentPath === "" || currentPath.endsWith("/login"));
 
-  const currentStaff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+  const currentStaff = getAuthStaff();
 
+  // Redirect unauthenticated guests attempting to access internal workspace
   if (!currentStaff && isWorkspace) {
-    sessionStorage.setItem("auth_redirect_msg", "Please sign in to access the staff workspace.");
+    localStorage.setItem("auth_redirect_msg", "Please sign in to access the staff workspace.");
     window.location.replace("/");
     return false;
   }
 
+  // Redirect already authenticated users away from the login page
   if (currentStaff && isLoginPage) {
     const role = (currentStaff.role || "Manager").toLowerCase();
-    const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
-    window.location.replace(target);
+    const targetPage = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+    window.location.replace(targetPage);
     return false;
   }
 
+  // Verify that the current user's role is allowed on this page
   if (currentStaff && isWorkspace) {
     const role = (currentStaff.role || "Manager").toLowerCase();
-    const permitted = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.manager;
+    const permittedPages = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.manager;
 
-    if (!permitted.includes(page)) {
-      const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
-      sessionStorage.setItem("auth_redirect_msg", `Access restricted: Your role (${currentStaff.role}) does not have permission to view ${page}. Redirected to your authorized workspace.`);
-      window.location.replace(target);
+    if (!permittedPages.includes(pageName)) {
+      const targetPage = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+      localStorage.setItem("auth_redirect_msg", `Access restricted: Your role (${currentStaff.role}) does not have permission to view ${pageName}. Redirected to your authorized workspace.`);
+      window.location.replace(targetPage);
       return false;
     }
   }
 
-  const redirectMsg = sessionStorage.getItem("auth_redirect_msg");
+  // Display pending redirect toast messages if present
+  const redirectMsg = localStorage.getItem("auth_redirect_msg");
   if (redirectMsg) {
-    sessionStorage.removeItem("auth_redirect_msg");
+    localStorage.removeItem("auth_redirect_msg");
     setTimeout(() => toast(redirectMsg, 1), 300);
   }
 
   return true;
 }
 
+// Execute route guards immediately before rendering
 enforceAuthAndRouteGuards();
-const getStaffRole = () => (JSON.parse(sessionStorage.getItem("current_staff") || "{}").role || "Manager").toLowerCase();
+
+// User role check helpers
+const getStaffRole = () => ((getAuthStaff() || {}).role || "Manager").toLowerCase();
 const isManager = () => getStaffRole() === "manager";
 const isCashierOrManager = () => ["cashier", "manager"].includes(getStaffRole());
 const isProductionStaff = () => ["washer", "folder"].includes(getStaffRole());
 const isRider = () => getStaffRole() === "rider";
 
-const peso = (n) => "₱" + Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const iso = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
-const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
+// Formatting and badge helpers
+
+// Format numbers as Philippine Peso currency (e.g. ₱1,250.00)
+function formatPeso(amount) {
+  return "₱" + Number(amount || 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+const peso = formatPeso;
+
+// Convert Date object to YYYY-MM-DD ISO string format
+function formatIsoDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+const iso = formatIsoDate;
+
+// Add days to current date and return formatted ISO string
+function addDays(daysCount) {
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + daysCount);
+  return formatIsoDate(targetDate);
+}
 const today = () => addDays(0);
-const fmt = (s) => { if(!s) return ""; const [y, m, d] = s.split("-"); return new Date(y, m - 1, d).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); };
-const formatDate = (val) => { const d = val ? new Date(val) : new Date(); return isNaN(d.getTime()) ? String(val || "") : d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); };
-const ord = (id) => "ORD-" + String(id).padStart(4, "0");
-const pay = (id) => "PAY-" + String(id).padStart(4, "0");
-const badge = (t, c) => `<span class="badge ${c}">${esc(t)}</span>`;
-const orderStatusBadge = (st, id) => {
-  const s = String(st || "Received").trim();
-  const cls = (s === "Completed") ? "ok"
-    : (s === "Washing") ? "info"
-    : (s === "Ready for Pickup" || s === "Out for Delivery") ? "warn"
+
+// Format date for readable UI display (e.g. "Mon, Oct 5, 2026")
+function formatReadableDate(dateString) {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split("-");
+  return new Date(year, month - 1, day).toLocaleDateString("en-PH", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+const fmt = formatReadableDate;
+
+// Format dates using standard British/Filipino long date format
+const formatDate = (val) => {
+  const d = val ? new Date(val) : new Date();
+  return isNaN(d.getTime()) ? String(val || "") : d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+};
+
+// Format standard Order ID display (e.g. ORD-0005)
+function formatOrderId(id) {
+  return "ORD-" + String(id).padStart(4, "0");
+}
+const ord = formatOrderId;
+
+// Format standard Payment ID display (e.g. PAY-0005)
+function formatPaymentId(id) {
+  return "PAY-" + String(id).padStart(4, "0");
+}
+const pay = formatPaymentId;
+
+// Render a status badge with CSS styling
+function createBadge(label, className) {
+  return `<span class="badge ${className}">${escapeHtml(label)}</span>`;
+}
+const badge = createBadge;
+
+// Render order status badge with clickable quick-advance trigger for authorized staff
+function orderStatusBadge(statusText, orderId, releaseType) {
+  const status = String(statusText || "Received").trim();
+  const statusClass = (status === "Completed") ? "ok"
+    : (status === "Washing") ? "info"
+    : (status === "Folding") ? "folding"
+    : (status === "Ready for Pickup" || status === "Out for Delivery") ? "warn"
     : "mute";
-  const canAdvance = isCashierOrManager() || (isProductionStaff() && (s === "Received" || s === "Washing"));
-  if (id && canAdvance) {
-    return `<span class="badge status-clickable ${cls}" data-act="quick-status" data-id="${id}" data-current="${esc(s)}" role="button" tabindex="0" title="Click to advance status">${esc(s)}</span>`;
+
+  const canAdvance = isCashierOrManager() || (isProductionStaff() && (status === "Received" || status === "Washing" || status === "Folding"));
+  if (orderId && canAdvance) {
+    const relAttr = releaseType ? ` data-release="${escapeHtml(releaseType)}"` : "";
+    return `<span class="badge status-clickable ${statusClass}" data-act="quick-status" data-id="${orderId}" data-current="${escapeHtml(status)}"${relAttr} role="button" tabindex="0" title="Click to advance status">${escapeHtml(status)}</span>`;
   }
-  return badge(s, cls);
-};
-const orderTypeBadge = (t) => {
-  const type = String(t || "Pickup").trim();
+  return createBadge(status, statusClass);
+}
+
+// Render order release type badge (Pickup vs Delivery)
+function orderTypeBadge(typeText) {
+  const type = String(typeText || "Pickup").trim();
   const isDelivery = type.toLowerCase() === "delivery";
-  const cls = isDelivery ? "type-delivery" : "type-pickup";
-  return `<span class="badge ${cls}">${esc(type)}</span>`;
-};
-const btn = (act, id, label, cls = "") => `<button class="btn sm ${cls}" data-act="${act}" data-id="${id}" type="button">${label}</button>`;
-const actionsDropdown = (items = [], emptyText = "View only") => {
-  const valid = items.filter(Boolean);
-  if (valid.length === 0) {
-    return `<div class="acts"><span class="text-muted small">${emptyText}</span></div>`;
+  const badgeClass = isDelivery ? "type-delivery" : "type-pickup";
+  return `<span class="badge ${badgeClass}">${escapeHtml(type)}</span>`;
+}
+
+// Generate an action button element
+function createActionButton(action, id, label, className = "") {
+  return `<button class="btn sm ${className}" data-act="${action}" data-id="${id}" type="button">${label}</button>`;
+}
+const btn = createActionButton;
+
+// Render an actions dropdown menu
+function renderActionsDropdown(menuItems = [], emptyPlaceholder = "View only") {
+  const validItems = menuItems.filter(Boolean);
+  if (validItems.length === 0) {
+    return `<div class="acts"><span class="text-muted small">${emptyPlaceholder}</span></div>`;
   }
   return `
     <div class="acts">
@@ -109,18 +244,33 @@ const actionsDropdown = (items = [], emptyText = "View only") => {
           Actions
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-          ${valid.map(it => `<li>${it}</li>`).join("")}
+          ${validItems.map(item => `<li>${item}</li>`).join("")}
         </ul>
       </div>
     </div>
   `;
-};
-const std = (r, k, extra = "") => actionsDropdown([
-  extra,
-  `<button class="dropdown-item" data-act="edit" data-id="${r[k]}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`,
-  `<button class="dropdown-item text-danger" data-act="del" data-id="${r[k]}" type="button"><i class="bi bi-trash me-2"></i>Delete</button>`
-]);
-const debounce = (f, ms = 150) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
+}
+const actionsDropdown = renderActionsDropdown;
+
+// Render standard Edit and Delete action dropdown for a table row
+function renderStandardRowActions(record, idField, extraActions = "") {
+  return renderActionsDropdown([
+    extraActions,
+    `<button class="dropdown-item" data-act="edit" data-id="${record[idField]}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`,
+    `<button class="dropdown-item text-danger" data-act="del" data-id="${record[idField]}" type="button"><i class="bi bi-trash me-2"></i>Delete</button>`
+  ]);
+}
+const std = renderStandardRowActions;
+
+// Debounce helper to limit frequency of rapid calls (e.g. search input typing)
+function debounce(fn, delayMs = 150) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delayMs);
+  };
+}
+
 
 function toast(m, err) {
   let container = $("#toasts");
@@ -201,18 +351,32 @@ function ask(title, msg, ok = "Delete") {
     const msgEl = $("#cM");
     if (msgEl) msgEl.innerHTML = msg;
     const okBtn = $("#cOk");
+    const cancelBtn = d.querySelector("#cCancel") || d.querySelector('[data-bs-dismiss="modal"]') || d.querySelector('button[value="0"]');
+    const lowerOk = String(ok || "").toLowerCase();
+    const lowerTitle = String(title || "").toLowerCase();
+
+    const isDangerous = lowerOk.includes("delete") || lowerOk.includes("archive") || lowerOk.includes("discontinue") || lowerOk.includes("deactivate") || lowerOk.includes("cancel") || lowerTitle.includes("delete") || lowerTitle.includes("archive") || lowerTitle.includes("discontinue") || lowerTitle.includes("deactivate") || lowerTitle.includes("cancel");
+
     if (okBtn) {
       okBtn.textContent = ok;
-      const lowerOk = ok.toLowerCase();
-      okBtn.className = "btn";
-      if (lowerOk.includes("delete") || lowerOk.includes("archive") || lowerOk.includes("discontinue") || lowerOk.includes("deactivate")) {
-        okBtn.classList.add("btn-danger");
+      if (isDangerous) {
+        okBtn.className = "btn btn-danger btn-confirm-danger";
       } else if (lowerOk.includes("paid") || lowerOk.includes("reactivate") || lowerOk.includes("activate") || lowerOk.includes("restore")) {
-        okBtn.classList.add("btn-success");
+        okBtn.className = "btn btn-success btn-confirm-success";
       } else if (lowerOk.includes("pending") || lowerOk.includes("unpaid")) {
-        okBtn.classList.add("btn-warning");
+        okBtn.className = "btn btn-warning btn-confirm-warning";
       } else {
-        okBtn.classList.add("btn-primary");
+        okBtn.className = "btn btn-primary btn-confirm-primary";
+      }
+    }
+
+    if (cancelBtn) {
+      if (isDangerous) {
+        cancelBtn.textContent = "Keep It";
+        cancelBtn.className = "btn btn-success btn-confirm-keep";
+      } else {
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.className = "btn btn-outline-secondary";
       }
     }
 
@@ -257,7 +421,7 @@ function ask(title, msg, ok = "Delete") {
   });
 }
 
-// Theme Management
+// Theme management
 function initTheme() {
   const saved = localStorage.getItem("theme");
   const theme = saved || "light";
@@ -292,7 +456,7 @@ function updateThemeToggleUI(theme) {
 
 initTheme();
 
-// Sidebar Collapse Management
+// Sidebar collapse
 function initSidebar() {
   const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
   if (isCollapsed && document.body) {
@@ -301,15 +465,15 @@ function initSidebar() {
 }
 initSidebar();
 
-// Responsive Navigation & Mobile Drawer Management
+// Mobile navigation
 function initResponsiveNavigation() {
   const appLayout = document.querySelector(".app-layout");
   const sidebar = document.querySelector(".sidebar");
   if (!appLayout || !sidebar) return;
 
-  // Insert mobile topbar if not already present
+  // Mobile topbar
   if (!document.querySelector(".mobile-topbar")) {
-    const staff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+    const staff = getAuthStaff();
     const role = (staff && staff.role ? staff.role : "Manager").toLowerCase();
     const defaultPage = (ROLE_DEFAULT_PAGES && ROLE_DEFAULT_PAGES[role]) ? ROLE_DEFAULT_PAGES[role] : "dashboard.html";
     const initial = staff ? (staff.first_name || "A")[0].toUpperCase() : "A";
@@ -346,7 +510,7 @@ function initResponsiveNavigation() {
     appLayout.prepend(topbar);
   }
 
-  // Insert backdrop if not already present
+  // Mobile backdrop
   if (!document.querySelector(".sidebar-backdrop")) {
     const backdrop = document.createElement("div");
     backdrop.className = "sidebar-backdrop";
@@ -354,7 +518,7 @@ function initResponsiveNavigation() {
     document.body.appendChild(backdrop);
   }
 
-  // Insert close button inside sidebar header if not present
+  // Close button
   const sidebarLogo = sidebar.querySelector(".sidebar-logo");
   if (sidebarLogo && !sidebarLogo.querySelector("#sidebarCloseBtn")) {
     const closeBtn = document.createElement("button");
@@ -408,7 +572,7 @@ function initResponsiveNavigation() {
     backdrop.onclick = closeSidebar;
   }
 
-  // Auto-close on link navigation when screen width is mobile/tablet
+  // Close on navigation
   sidebar.querySelectorAll(".side-nav a").forEach(link => {
     link.addEventListener("click", () => {
       if (window.innerWidth < 992) {
@@ -417,27 +581,27 @@ function initResponsiveNavigation() {
     });
   });
 
-  // Mobile theme toggle button
+  // Mobile theme toggle
   const mobileThemeBtn = $("#mobileThemeBtn");
   if (mobileThemeBtn) {
     mobileThemeBtn.onclick = toggleTheme;
   }
 
-  // Close with Escape key
+  // Close on escape
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && document.body.classList.contains("sidebar-open")) {
       closeSidebar();
     }
   });
 
-  // Auto close if window is resized past mobile/tablet width
+  // Close on resize
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 992 && document.body.classList.contains("sidebar-open")) {
       closeSidebar();
     }
   });
 
-  // Sync theme icon initially
+  // Sync theme icon
   const theme = document.documentElement.getAttribute("data-bs-theme") || "light";
   updateThemeToggleUI(theme);
 }
@@ -449,7 +613,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateThemeToggleUI(document.documentElement.getAttribute("data-bs-theme") || "light");
   }
 
-  // Ensure sidebar navigation has scrolling wrapper while keeping logo and bottom fixed
+  // Sidebar scroll wrapper
   const sidebar = document.querySelector(".sidebar");
   if (sidebar && !sidebar.querySelector(".sidebar-nav-scroll")) {
     const navGroups = Array.from(sidebar.querySelectorAll(":scope > .nav-group"));
@@ -461,7 +625,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Ensure main-content always has a footer
+  // Content footer fallback
   const mainContent = document.querySelector(".main-content");
   if (mainContent && !mainContent.querySelector(".content-footer")) {
     const footer = document.createElement("footer");
@@ -498,7 +662,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const confirmSignOut = $("#confirmSignOut");
   if (confirmSignOut) {
     confirmSignOut.addEventListener("click", () => {
-      sessionStorage.removeItem("current_staff");
+      clearAuthStaff();
       window.location.href = "/";
     });
   }
@@ -513,7 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
 const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id", staff: "staff_id" };
 
 const getAuthHeaders = () => {
-  const staff = JSON.parse(sessionStorage.getItem("current_staff") || "{}");
+  const staff = getAuthStaff() || {};
   const headers = {};
   if (staff.role) headers["x-staff-role"] = staff.role;
   else headers["x-staff-role"] = "Manager";
@@ -542,7 +706,9 @@ const db = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `Failed to save ${resource}`);
+      const errorObj = new Error(err.error || `Failed to save ${resource}`);
+      if (err.field) errorObj.field = err.field;
+      throw errorObj;
     }
     return await res.json();
   },
@@ -562,20 +728,94 @@ const db = {
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  const cur = document.body.dataset.page;
-  const M = $("#view") ? $("#view").dataset : {};
-  const S = { rows: [], orders: [], riders: [], services: [] };
-  let EDIT = null, feeTouched = false;
+  // Current active page identifier from <body data-page="...">
+  const currentPage = document.body.dataset.page;
+  const cur = currentPage; // Shorthand alias for backward compatibility
 
-  const orderOf = (id) => S.orders.find((o) => o.order_id == id) || {};
-  const nameOf = (r) => orderOf(r.order_id).customer_name || "Unknown customer";
-  const flt = () => Object.fromEntries([...document.querySelectorAll("[data-flt]")].map((i) => [i.dataset.flt, i.value.trim().toLowerCase()]));
-  const slots = () => [...$("#f_time_slot")?.options || []].map((o) => o.value).filter(Boolean);
+  // View configuration metadata from the #view container element
+  const viewMetadata = $("#view") ? $("#view").dataset : {};
+  const M = viewMetadata; // Shorthand alias
+
+  // Central state store for fetched entities and related lookup collections
+  const appState = {
+    rows: [],
+    orders: [],
+    riders: [],
+    services: [],
+    customers: []
+  };
+  const S = appState; // Shorthand alias for state access
+
+  // Holds the record currently being viewed or edited in the modal
+  let editingRecord = null;
+  let EDIT = null;
+  let feeTouched = false;
+
+  // Retrieve an order object from cached state by order_id
+  function getOrderById(orderId) {
+    return (appState.orders || []).find((order) => order.order_id == orderId) || {};
+  }
+  const orderOf = getOrderById;
+
+  // Retrieve customer name for a delivery record
+  function getCustomerNameForDelivery(deliveryRecord) {
+    return getOrderById(deliveryRecord.order_id).customer_name || "Unknown customer";
+  }
+  const nameOf = getCustomerNameForDelivery;
+
+  // Collect filter input values from [data-flt] inputs into an object
+  function getActiveFilters() {
+    const filters = {};
+    const filterInputs = document.querySelectorAll("[data-flt]");
+    filterInputs.forEach((input) => {
+      filters[input.dataset.flt] = input.value.trim().toLowerCase();
+    });
+    return filters;
+  }
+  const flt = getActiveFilters;
+
+  // Get list of available time slot options from the time slot select element
+  function getAvailableTimeSlots() {
+    const timeSlotSelect = $("#f_time_slot");
+    if (!timeSlotSelect) return [];
+    return Array.from(timeSlotSelect.options).map((opt) => opt.value).filter(Boolean);
+  }
+  const slots = getAvailableTimeSlots;
+
+  function validateContact(val, label = "Contact number", required = true) {
+    if (!val || !val.trim()) {
+      return required ? `${label} is required` : null;
+    }
+    const str = val.trim();
+    if (/[a-zA-Z]/.test(str)) {
+      return `${label} cannot contain letters`;
+    }
+    if (!/^\+?[0-9\s-]+$/.test(str)) {
+      return `${label} cannot contain symbols`;
+    }
+    const digits = str.replace(/\D/g, "");
+    if (digits.length !== 11) {
+      return "Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)";
+    }
+    if (!digits.startsWith("09")) {
+      return `${label} should start with 09 (e.g. 0917XXXXXXX)`;
+    }
+    return null;
+  }
 
   function fillSelects() {
     document.querySelectorAll("select[data-fill]").forEach((sel) => {
       const k = sel.dataset.fill;
-      if (k === "services") {
+      if (k === "customers") {
+        const activeCusts = (S.customers || []).filter((c) => !c.is_archived);
+        const curVal = sel.value;
+        sel.innerHTML = `<option value="">+ New Customer (Enter details below)</option>` + activeCusts.map((c) => {
+          const name = c.full_name || `${c.first_name || ''} ${c.last_name || ''}`.trim();
+          const phoneStr = c.phone || c.contact ? ` · ${c.phone || c.contact}` : '';
+          return `<option value="${c.customer_id}">${esc(name)}${esc(phoneStr)}</option>`;
+        }).join("");
+        if (curVal) sel.value = curVal;
+      } else if (k === "services") {
         const active = (S.services || []).filter(s => (s.status || "Active").toLowerCase() === "active");
         sel.innerHTML = `<option value="">Choose service</option>` + active.map(s => `<option value="${s.service_id}" data-price="${s.price || s.price_per_kg}" data-unit="${esc(s.unit || 'kg')}">${esc(s.service_name)} (${peso(s.price || s.price_per_kg)}/${esc(s.unit || 'kg')})</option>`).join("");
       } else if (k === "riders") {
@@ -595,17 +835,44 @@ document.addEventListener("DOMContentLoaded", () => {
           return `<option value="${esc(r.full_name)}">${esc(label)}</option>`;
         }).join("");
       } else if (k === "orders") {
-        // In Pickups & Deliveries, completed orders should not be selectable when creating a new run
+        // Collect order IDs that already have a completed pickup or delivery run
+        const completedOrderIds = new Set();
+        (S.rows || []).forEach((d) => {
+          if (String(d.status || "").toLowerCase() === "completed" && d.order_id) {
+            completedOrderIds.add(Number(d.order_id));
+          }
+        });
+        // Filter active orders that have not yet been picked up or delivered
         const availableOrders = (S.orders || []).filter((o) => {
-          const isCompleted = String(o.order_status || "").trim().toLowerCase() === "completed" || Number(o.status_id) === 5;
+          const isCompleted = String(o.order_status || "").trim().toLowerCase() === "completed"
+            || Number(o.status_id) === 5
+            || (o.release_date != null && String(o.release_date).trim() !== "")
+            || Number(o.completed_runs_count) > 0
+            || completedOrderIds.has(Number(o.order_id));
           if (EDIT && EDIT.order_id == o.order_id) return true;
           return !isCompleted;
         });
         const defaultPrompt = (!EDIT && availableOrders.length === 0) ? "No active orders available" : "Choose order";
         const opts = availableOrders.map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}`]);
         sel.innerHTML = `<option value="">${defaultPrompt}</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+      } else if (k === "orders-total") {
+        const curVal = sel.value || (EDIT ? String(EDIT.order_id) : "");
+        const availableOrders = (S.orders || []).filter((o) => {
+          if (EDIT && EDIT.order_id == o.order_id) return true;
+          const remaining = calculateRemainingBalance(o.order_id);
+          const isFullyPaid = String(o.payment_status || "").trim().toLowerCase() === "paid" || remaining <= 0;
+          return !isFullyPaid;
+        });
+        const defaultPrompt = (!EDIT && availableOrders.length === 0) ? "No unpaid orders available" : "Choose an order";
+        const opts = availableOrders.map((o) => {
+          const b = calculateRemainingBalance(o.order_id);
+          const balText = b > 0 ? ` (Balance: ${peso(b)})` : ` (${peso(o.total)})`;
+          return [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${balText}`];
+        });
+        sel.innerHTML = `<option value="">${defaultPrompt}</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+        if (curVal) sel.value = curVal;
       } else {
-        const opts = (S.orders || []).map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}${k === "orders-total" ? ` (${peso(o.total)})` : ""}`]);
+        const opts = (S.orders || []).map((o) => [o.order_id, `${ord(o.order_id)} - ${o.customer_name}`]);
         sel.innerHTML = `<option value="">Choose order</option>` + opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
       }
     });
@@ -616,11 +883,21 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       S.rows = await db.list(ENT[cur].name);
       if (first) {
-        [S.orders, S.riders, S.services] = await Promise.all([
+        [S.orders, S.riders, S.services, S.customers] = await Promise.all([
           db.list("orders"),
           db.list("riders"),
-          db.list("services").catch(() => [])
+          db.list("services").catch(() => []),
+          db.list("customers").catch(() => [])
         ]);
+        fillSelects();
+      } else if (cur === "orders") {
+        S.customers = await db.list("customers").catch(() => S.customers || []);
+        fillSelects();
+      } else if (cur === "deliveries") {
+        S.orders = await db.list("orders").catch(() => S.orders || []);
+        fillSelects();
+      } else if (cur === "payments") {
+        S.orders = await db.list("orders").catch(() => S.orders || []);
         fillSelects();
       }
       draw();
@@ -888,7 +1165,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Always ensure all radio groups in the form have a default selection (defaulting to "Active")
+    // Default radio selection
     const radioNames = new Set(Array.from(f.querySelectorAll('input[type="radio"]')).map((r) => r.name).filter(Boolean));
     radioNames.forEach((name) => {
       const checked = f.querySelector(`input[type="radio"][name="${name}"]:checked`);
@@ -902,25 +1179,72 @@ document.addEventListener("DOMContentLoaded", () => {
       db.list("orders").then((orders) => {
         S.orders = orders || [];
         fillSelects();
+        if (EDIT && f.elements.order_id) f.elements.order_id.value = EDIT.order_id || "";
+      }).catch(() => {});
+    }
+    if (cur === "orders") {
+      db.list("customers").then((customers) => {
+        S.customers = customers || [];
+        fillSelects();
+        if (EDIT && f.elements.customer_id) f.elements.customer_id.value = EDIT.customer_id || "";
       }).catch(() => {});
     }
     e.init && e.init(f);
     if($("#dlg")) openModal($("#dlg"));
   }
 
-  async function patch(r, ch, msg) {
-    const resourceName = ENT[cur].name.split("?")[0];
-    await db.save(resourceName, r[ENT[cur].id], { ...r, ...ch });
-    toast(msg);
+  // Helper to partially update an entity record and refresh the table
+  async function patch(record, changes, successMessage) {
+    const activeModule = ENT[cur];
+    const resourceName = activeModule.name.split("?")[0];
+    const primaryKey = activeModule.id;
+    await db.save(resourceName, record[primaryKey], { ...record, ...changes });
+    toast(successMessage);
     await init();
   }
-  const balance = (oid) => Math.round((orderOf(oid).total - S.rows.filter((p) => p.order_id == oid && p.status !== "Refunded" && p.payment_id != EDIT?.payment_id).reduce((s, p) => s + Number(p.amount), 0)) * 100) / 100;
-  const hrs = (h) => h < 24 ? `${h} hr${h === 1 ? "" : "s"}` : `${Math.round(h / 24)} day${Math.round(h / 24) === 1 ? "" : "s"}`;
 
-  const ENT = {
+  // Calculate remaining balance due on an order (Order Total minus Non-Refunded Payments)
+  function calculateRemainingBalance(orderId) {
+    const order = getOrderById(orderId);
+    const orderTotal = Number(order.total || 0);
+
+    if (cur === "payments" && Array.isArray(appState.rows)) {
+      // Sum all payments for this order, excluding refunds and the currently open payment record
+      const applicablePayments = appState.rows.filter((payment) => {
+        const matchesOrder = payment.order_id == orderId;
+        const isNotRefunded = payment.status !== "Refunded";
+        const isNotEditingCurrent = payment.payment_id != EDIT?.payment_id;
+        return matchesOrder && isNotRefunded && isNotEditingCurrent;
+      });
+
+      const totalPaid = applicablePayments.reduce((total, payment) => total + Number(payment.amount || payment.amount_paid || 0), 0);
+      return Math.round((orderTotal - totalPaid) * 100) / 100;
+    }
+
+    const totalPaid = Number(order.total_paid || 0);
+    return Math.round((orderTotal - totalPaid) * 100) / 100;
+  }
+  const balance = calculateRemainingBalance; // Shorthand alias
+
+  // Format estimated turnaround hours into human-readable hours or days
+  function formatTurnaroundHours(hours) {
+    if (hours < 24) {
+      return `${hours} hr${hours === 1 ? "" : "s"}`;
+    }
+    const days = Math.round(hours / 24);
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
+  const hrs = formatTurnaroundHours; // Shorthand alias
+
+  // Configuration and handlers for each entity module (Customers, Orders, Payments, etc.)
+  const entityModules = {
     customers: {
       name: "customers", id: "customer_id", defaults: () => ({ status: "Active" }),
       init: (f) => {
+        const statusField = f.querySelector('[data-f="status"]');
+        if (statusField) {
+          statusField.style.display = EDIT ? "block" : "none";
+        }
         if (EDIT) {
           if (EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
           if (EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
@@ -959,7 +1283,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const e = {};
         if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
         if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
-        if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
+        const contactErr = validateContact(d.contact, "Contact number", true);
+        if (contactErr) e.contact = contactErr;
         const st = (d.street_address || d.street || "").trim();
         if (!st) {
           if ("street_address" in d) e.street_address = "Street address is required";
@@ -986,11 +1311,29 @@ document.addEventListener("DOMContentLoaded", () => {
       delMsg: (r) => `Archive customer <strong>"${esc(r.full_name)}"</strong>?`,
       async act(a, r) {
         if (a === "archive") {
+          if (Array.isArray(S.orders)) {
+            const active = S.orders.filter(o => 
+              Number(o.customer_id) === Number(r.customer_id) && 
+              (o.order_status || "").toLowerCase() !== "completed" && 
+              !o.is_archived
+            );
+            if (active.length > 0) {
+              const orderList = active.map(o => `#${ord(o.order_id)} (${o.order_status})`).join(", ");
+              return toast(`Cannot archive customer with active ongoing orders (${orderList}). Orders must be Completed first.`, 1);
+            }
+          }
           if (await ask("Archive Customer?", `Archive customer <strong>"${esc(r.full_name)}"</strong>? Their profile will be deactivated.`, "Archive")) {
-            const res = await fetch(`/api/customers/${r.customer_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to archive customer");
-            toast(`Customer "${r.full_name}" archived successfully.`);
-            await init();
+            try {
+              const res = await fetch(`/api/customers/${r.customer_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                return toast(data.error || "Failed to archive customer", 1);
+              }
+              toast(`Customer "${r.full_name}" archived successfully.`);
+              await init();
+            } catch (err) {
+              toast(err.message, 1);
+            }
           }
         }
       }
@@ -1001,15 +1344,21 @@ document.addEventListener("DOMContentLoaded", () => {
       init: (f) => {
         fillSelects();
         if (EDIT) {
+          if (f.elements.customer_id) f.elements.customer_id.value = EDIT.customer_id || "";
           if (f.elements.first_name && EDIT.first_name) f.elements.first_name.value = EDIT.first_name;
           if (f.elements.last_name && EDIT.last_name) f.elements.last_name.value = EDIT.last_name;
-          if (f.elements.contact && (EDIT.contact || EDIT.phone)) f.elements.contact.value = EDIT.contact || EDIT.phone;
+          if (f.elements.contact && (EDIT.contact || EDIT.phone || EDIT.customer_phone)) f.elements.contact.value = EDIT.contact || EDIT.phone || EDIT.customer_phone;
           if (f.elements.street) f.elements.street.value = EDIT.street_address || EDIT.street || EDIT.address || "";
           if (f.elements.barangay && EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
           if (f.elements.service_id && EDIT.service_id) f.elements.service_id.value = EDIT.service_id;
           if (f.elements.weight_kg) f.elements.weight_kg.value = EDIT.weight_kg || "1.0";
           if (f.elements.release_type && EDIT.release_type) f.elements.release_type.value = EDIT.release_type;
+          const hint = $("#h_customer_id");
+          if (hint) hint.textContent = "Customer linked to this order.";
         } else {
+          if (f.elements.customer_id) f.elements.customer_id.value = "";
+          const hint = $("#h_customer_id");
+          if (hint) hint.textContent = "Choose an existing customer to auto-fill details, or enter details below for a new customer.";
           if (f.elements.service_id && !f.elements.service_id.value) {
             const firstOpt = f.elements.service_id.options[1];
             if (firstOpt) f.elements.service_id.value = firstOpt.value;
@@ -1018,6 +1367,37 @@ document.addEventListener("DOMContentLoaded", () => {
         ENT.orders.calcTotal();
       },
       change(e) {
+        const f = $("#form");
+        if (e.target.name === "customer_id") {
+          const custId = e.target.value;
+          const hint = $("#h_customer_id");
+          if (custId) {
+            const cust = (S.customers || []).find((c) => String(c.customer_id) === String(custId));
+            if (cust) {
+              if (f.elements.first_name) f.elements.first_name.value = cust.first_name || "";
+              if (f.elements.last_name) f.elements.last_name.value = cust.last_name || "";
+              if (f.elements.contact) f.elements.contact.value = cust.phone || cust.contact || "";
+              if (f.elements.street) f.elements.street.value = cust.street_address || cust.street || cust.address || "";
+              if (f.elements.barangay) f.elements.barangay.value = cust.barangay || "";
+              if (hint) hint.textContent = `Auto-filled details for ${cust.full_name || cust.first_name}.`;
+            }
+          } else if (!EDIT) {
+            if (f.elements.first_name) f.elements.first_name.value = "";
+            if (f.elements.last_name) f.elements.last_name.value = "";
+            if (f.elements.contact) f.elements.contact.value = "";
+            if (f.elements.street) f.elements.street.value = "";
+            if (f.elements.barangay) f.elements.barangay.value = "";
+            if (hint) hint.textContent = "Enter details below to register a new customer.";
+          }
+        }
+        if ((e.target.name === "first_name" || e.target.name === "last_name") && f && f.elements.customer_id && f.elements.customer_id.value) {
+          const selCust = (S.customers || []).find((c) => String(c.customer_id) === String(f.elements.customer_id.value));
+          if (selCust && (selCust.first_name !== f.elements.first_name.value || selCust.last_name !== f.elements.last_name.value)) {
+            f.elements.customer_id.value = "";
+            const hint = $("#h_customer_id");
+            if (hint) hint.textContent = "Registering as a new customer.";
+          }
+        }
         if (e.target.name === "service_id" || e.target.name === "weight_kg") {
           ENT.orders.calcTotal();
         }
@@ -1064,14 +1444,15 @@ document.addEventListener("DOMContentLoaded", () => {
           const payBadgeHtml = isCashierMgr
             ? `<span class="badge status-clickable ${payStatusCls}" data-act="quick-payment" data-id="${o.order_id}" data-current="${esc(payStatus)}" role="button" tabindex="0" title="Click to mark as ${nextPayStatus}">${esc(payStatus)}</span>`
             : `<span class="badge ${payStatusCls}">${esc(payStatus)}</span>`;
-          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id)}</td><td>${payBadgeHtml}</td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
+          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id, o.release_type)}</td><td>${payBadgeHtml}</td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
       validate(d) {
         const e = {};
         if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
         if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
-        if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
+        const contactErr = validateContact(d.contact, "Contact number", true);
+        if (contactErr) e.contact = contactErr;
         if (!d.street || !d.street.trim()) e.street = "Street address is required";
         if (!d.barangay || !d.barangay.trim()) e.barangay = "Please select a barangay";
         if (!d.service_id) e.service_id = "Please select a service";
@@ -1083,13 +1464,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const weight = Number(d.weight_kg) || 1.0;
         const totalVal = Number(d.total) || 0;
         return {
-          first_name: d.first_name,
-          last_name: d.last_name,
+          customer_id: d.customer_id ? Number(d.customer_id) : null,
+          first_name: (d.first_name || '').trim(),
+          last_name: (d.last_name || '').trim(),
           customer_name: `${d.first_name || ''} ${d.last_name || ''}`.trim(),
-          contact: d.contact,
-          street_address: d.street,
-          street: d.street,
-          barangay: d.barangay,
+          contact: (d.contact || '').trim(),
+          phone: (d.contact || '').trim(),
+          street_address: (d.street || '').trim(),
+          street: (d.street || '').trim(),
+          barangay: (d.barangay || '').trim(),
           address: `${d.street || ''}, ${d.barangay || ''}`.trim(),
           release_type: d.release_type || "Pickup",
           total: totalVal,
@@ -1112,6 +1495,22 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     services: {
       name: "services", id: "service_id",
+      defaults: () => ({ category: "Wash & fold", unit: "kg", turnaround_hours: 24, status: "Active" }),
+      init: (f) => {
+        if (f.elements.category && Array.isArray(S.rows)) {
+          const existing = new Set(Array.from(f.elements.category.options).map(o => o.value.trim().toLowerCase()));
+          S.rows.forEach(r => {
+            const cat = (r.category || "").trim();
+            if (cat && !existing.has(cat.toLowerCase())) {
+              const opt = document.createElement("option");
+              opt.value = cat;
+              opt.textContent = cat;
+              f.elements.category.appendChild(opt);
+              existing.add(cat.toLowerCase());
+            }
+          });
+        }
+      },
       filter: (rows, f) => {
         const q = (f.q || "").toLowerCase();
         const cat = (f.cat || "").toLowerCase();
@@ -1129,6 +1528,21 @@ document.addEventListener("DOMContentLoaded", () => {
       draw: (list) => {
         const isMgr = isManager();
         const filterSt = (flt().st || "").toLowerCase();
+
+        const catFilter = $("#fl_cat");
+        if (catFilter && Array.isArray(S.rows)) {
+          const existingFilterVals = new Set(Array.from(catFilter.options).map(o => o.value.trim().toLowerCase()));
+          S.rows.forEach(r => {
+            const cat = (r.category || "").trim();
+            if (cat && !existingFilterVals.has(cat.toLowerCase())) {
+              const opt = document.createElement("option");
+              opt.value = cat.toLowerCase();
+              opt.textContent = cat;
+              catFilter.appendChild(opt);
+              existingFilterVals.add(cat.toLowerCase());
+            }
+          });
+        }
 
         const activeList = list.filter((r) => {
           const s = (r.status || "Active").toLowerCase();
@@ -1238,6 +1652,9 @@ document.addEventListener("DOMContentLoaded", () => {
       name: "payments", id: "payment_id", defaults: () => ({ paid_at: today(), method: "Cash", status: "Paid" }),
       init: (f) => {
         f.elements.paid_at.max = today();
+        if (f.elements.amount) {
+          f.elements.amount.readOnly = true;
+        }
         if (f.elements.method) {
           if (!EDIT && !f.elements.method.value) f.elements.method.value = "Cash";
           ENT.payments.change({ target: f.elements.method });
@@ -1248,7 +1665,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const f = $("#form");
         if (e.target.name === "method") {
           const methodVal = e.target.value;
-          const isNonCash = methodVal === "E-Wallet" || methodVal === "Card";
+          const isNonCash = methodVal !== "" && methodVal !== "Cash";
           const refField = $("#f_ref_field") || (f.elements.reference_no ? f.elements.reference_no.closest(".field") : null);
           if (refField) {
             refField.style.display = isNonCash ? "block" : "none";
@@ -1259,10 +1676,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (e.target.name === "order_id") {
           const id = EDIT ? EDIT.order_id : e.target.value, h = $("#h_order_id");
-          if (!id) return void (h && (h.textContent = ""));
+          if (!id) {
+            if (f.elements.amount) f.elements.amount.value = "";
+            return void (h && (h.textContent = ""));
+          }
           const b = balance(id);
+          const o = getOrderById(id);
+          const isFullyPaid = String(o?.payment_status || "").trim().toLowerCase() === "paid" || b <= 0;
+          if (!EDIT && isFullyPaid) {
+            e.target.value = "";
+            if (f.elements.amount) f.elements.amount.value = "";
+            if (h) h.textContent = "";
+            toast("This order is already fully paid.", 1);
+            return;
+          }
           if(h) h.textContent = b > 0 ? `Balance due: ${peso(b)}` : "Already paid.";
-          if (prefill && b > 0 && !f.elements.amount.value) f.elements.amount.value = b.toFixed(2);
+          if (f.elements.amount) {
+            const amountVal = EDIT ? Number(EDIT.amount || EDIT.amount_paid || b || 0) : (b > 0 ? b : Number(o.total || 0));
+            f.elements.amount.value = amountVal.toFixed(2);
+            f.elements.amount.readOnly = true;
+          }
         }
       },
       filter: (rows, f) => rows.filter((p) => (!f.q || `${p.customer_name || nameOf(p)} ${pay(p.payment_id)} PAY-${p.payment_id} ${p.payment_id} ${ord(p.order_id)} ORD-${p.order_id} ${p.order_id} ${p.reference_no || ''}`.toLowerCase().includes(f.q)) && (!f.m || p.method.toLowerCase() === f.m) && (!f.st || p.status.toLowerCase() === f.st) && (!f.from || p.paid_at >= f.from) && (!f.to || p.paid_at <= f.to)).sort((a, b) => b.paid_at.localeCompare(a.paid_at) || b.payment_id - a.payment_id),
@@ -1315,8 +1748,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!d.order_id) e.order_id = "Please choose an order";
         if (!d.amount || Number(d.amount) <= 0) e.amount = "Valid amount is required";
         if (!d.method) e.method = "Payment method is required";
-        if ((d.method === "E-Wallet" || d.method === "Card") && (!d.reference_no || !d.reference_no.trim())) {
+        if (d.method && d.method !== "Cash" && (!d.reference_no || !d.reference_no.trim())) {
           e.reference_no = "Reference number is required";
+        }
+        if (!EDIT && d.order_id) {
+          const b = calculateRemainingBalance(d.order_id);
+          const o = getOrderById(d.order_id);
+          const isFullyPaid = String(o?.payment_status || "").trim().toLowerCase() === "paid" || b <= 0;
+          if (isFullyPaid) {
+            e.order_id = "This order is already fully paid";
+          } else if (Number(d.amount) < b) {
+            e.amount = `Partial payments are not allowed. Full balance due is ${peso(b)}`;
+          }
         }
         return e;
       },
@@ -1327,7 +1770,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: d.method,
         payment_method: d.method,
         reference_no: (d.method === "Cash") ? "" : (d.reference_no || "").trim(),
-        status: d.status || "Paid",
+        status: d.status || (EDIT ? (EDIT.status || "Paid") : "Paid"),
         paid_at: d.paid_at || today(),
         payment_date: d.paid_at || today()
       }),
@@ -1388,10 +1831,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.target.name === "fee") feeTouched = true;
         if (e.target.name === "order_id" && e.target.value) {
           const o = orderOf(e.target.value);
-          const isCompleted = String(o?.order_status || "").trim().toLowerCase() === "completed" || Number(o?.status_id) === 5;
+          const hasCompletedRun = (S.rows || []).some(d => d.order_id == e.target.value && String(d.status || "").toLowerCase() === "completed");
+          const isCompleted = String(o?.order_status || "").trim().toLowerCase() === "completed"
+            || Number(o?.status_id) === 5
+            || (o?.release_date != null && String(o?.release_date).trim() !== "")
+            || Number(o?.completed_runs_count) > 0
+            || hasCompletedRun;
           if (isCompleted && !EDIT) {
             e.target.value = "";
-            toast("Completed orders cannot be scheduled for pickup or delivery runs.", 1);
+            toast("Orders that have already been picked up or delivered cannot be scheduled for a new run.", 1);
             return;
           }
           if (f.elements.contact && (!f.elements.contact.value || !EDIT)) f.elements.contact.value = o.contact || o.customer_phone || "";
@@ -1400,9 +1848,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
       filter: (rows, f) => {
-        const staff = JSON.parse(sessionStorage.getItem("current_staff") || "{}");
+        const staff = getAuthStaff() || {};
         const isR = isRider();
-        return rows.filter((r) => {
+        const filtered = rows.filter((r) => {
           if (isR) {
             const staffName = (staff.full_name || `${staff.first_name || ''} ${staff.last_name || ''}`).trim().toLowerCase();
             const rRider = (r.rider || "").toLowerCase();
@@ -1410,8 +1858,49 @@ document.addEventListener("DOMContentLoaded", () => {
             const matchesName = staffName && rRider && rRider === staffName;
             if (!matchesId && !matchesName) return false;
           }
-          return (!f.q || `${nameOf(r)} ${ord(r.order_id)} ${r.address} ${r.rider}`.toLowerCase().includes(f.q)) && (!f.type || r.type.toLowerCase() === f.type) && (!f.rider || (r.rider && r.rider.toLowerCase() === f.rider)) && (!f.st || r.status.toLowerCase() === f.st) && (!f.date || r.scheduled_date === f.date);
-        }).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date) || slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot));
+          const displayAddress = r.street && r.barangay ? `${r.street}, ${r.barangay}` : (r.address || "");
+          const searchable = `${r.customer_name || nameOf(r) || ''} ${ord(r.order_id)} ORD-${r.order_id} ${r.order_id} ${displayAddress} ${r.rider || ''} ${r.contact || ''}`.toLowerCase();
+          return (!f.q || searchable.includes(f.q)) && (!f.type || (r.type || "").toLowerCase() === f.type) && (!f.rider || (r.rider && r.rider.toLowerCase() === f.rider)) && (!f.st || (r.status || "").toLowerCase() === f.st) && (!f.date || r.scheduled_date === f.date);
+        });
+
+        const sortMode = (f.sort || "closest").trim().toLowerCase();
+
+        const getClosestWeight = (dStr) => {
+          if (!dStr) return 999999;
+          const d = new Date(dStr + "T00:00:00");
+          const t = new Date(today() + "T00:00:00");
+          const diffDays = Math.round((d - t) / 86400000);
+          const abs = Math.abs(diffDays);
+          return diffDays >= 0 ? abs * 2 : abs * 2 + 1;
+        };
+
+        return filtered.sort((a, b) => {
+          if (sortMode === "date-asc") {
+            return (a.scheduled_date || "").localeCompare(b.scheduled_date || "") || (slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot)) || (a.order_id - b.order_id);
+          }
+          if (sortMode === "date-desc") {
+            return (b.scheduled_date || "").localeCompare(a.scheduled_date || "") || (slots().indexOf(b.time_slot) - slots().indexOf(a.time_slot)) || (b.order_id - a.order_id);
+          }
+          if (sortMode === "order-asc") {
+            return (Number(a.order_id) || 0) - (Number(b.order_id) || 0);
+          }
+          if (sortMode === "order-desc") {
+            return (Number(b.order_id) || 0) - (Number(a.order_id) || 0);
+          }
+          if (sortMode === "customer-asc") {
+            const nameA = (a.customer_name || nameOf(a) || "").toLowerCase();
+            const nameB = (b.customer_name || nameOf(b) || "").toLowerCase();
+            return nameA.localeCompare(nameB);
+          }
+          if (sortMode === "status") {
+            return (a.status || "").localeCompare(b.status || "") || (a.order_id - b.order_id);
+          }
+          // Default: "closest" date to today
+          const wA = getClosestWeight(a.scheduled_date);
+          const wB = getClosestWeight(b.scheduled_date);
+          if (wA !== wB) return wA - wB;
+          return (slots().indexOf(a.time_slot) - slots().indexOf(b.time_slot)) || (b.order_id - a.order_id);
+        });
       },
       stats() { const all = ENT.deliveries.filter(S.rows, { ...flt(), st: "" }); return Object.fromEntries(["Scheduled", "On the way", "Completed", "Cancelled"].map((s) => [s, all.filter((r) => r.status === s).length])); },
       draw(list) {
@@ -1427,37 +1916,124 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        const g = {}; list.forEach((r) => (g[r.scheduled_date] ||= []).push(r));
-        const label = (d) => d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
-        return Object.keys(g).sort().map((d) => `<section class="day"><h2>${label(d)}<small>${fmt(d)}</small></h2>${g[d].map((r) => {
+        const f = flt();
+        const sortMode = (f.sort || "closest").trim().toLowerCase();
+        const isDateSort = sortMode === "closest" || sortMode === "date-asc" || sortMode === "date-desc" || sortMode === "";
+
+        const renderTicket = (r) => {
           const act = r.status === "Scheduled" || r.status === "On the way";
           const isPickup = (r.type || "").toLowerCase() === "pickup";
 
           const activeRun = (r.rider_id && occupiedRiderMap[Number(r.rider_id)]) || (r.rider && occupiedRiderMap[r.rider.toLowerCase().trim()]);
           const isRiderOccupied = Boolean(activeRun && activeRun.delivery_id !== r.delivery_id);
 
-          let startBtn = "";
+          const items = [];
           if (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) {
             if (isRiderOccupied) {
-              startBtn = `<button class="btn sm btn-outline-warning" disabled title="Rider ${esc(r.rider)} is currently on active delivery #${ord(activeRun.order_id)}" type="button"><i class="bi bi-clock-history me-1"></i>Rider Busy</button>`;
+              items.push(`<button class="dropdown-item text-warning disabled" type="button" disabled title="Rider ${esc(r.rider)} is currently on active delivery #${ord(activeRun.order_id)}"><i class="bi bi-clock-history me-2"></i>Rider Busy</button>`);
             } else if (!r.rider) {
-              startBtn = `<button class="btn sm btn-outline-secondary" disabled title="Please assign a rider before starting this delivery run" type="button">No Rider</button>`;
+              items.push(`<button class="dropdown-item text-muted disabled" type="button" disabled title="Please assign a rider before starting this delivery run"><i class="bi bi-person-x me-2"></i>No Rider</button>`);
             } else {
-              startBtn = btn("start", r.delivery_id, "Start run", "btn-warning");
+              items.push(`<button class="dropdown-item text-warning fw-semibold" data-act="start" data-id="${r.delivery_id}" type="button"><i class="bi bi-play-circle me-2"></i>Start Run</button>`);
             }
           }
 
-          const doneBtn = ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) ? btn("done", r.delivery_id, "Mark completed", "btn-success") : "";
-          const editBtn = ((r.status !== "Completed" && r.status !== "Cancelled") && isCashierMgr) ? btn("edit", r.delivery_id, "Edit") : "";
-          const cancelBtn = (act && isCashierMgr) ? btn("cancel", r.delivery_id, isPickup ? "Cancel pickup" : "Cancel run", "btn-danger") : "";
-          const archiveBtn = (r.status === "Completed" && isMgr) ? btn("archive", r.delivery_id, "Archive", "btn-outline-secondary") : "";
-          const acts = (startBtn || doneBtn || editBtn || cancelBtn || archiveBtn)
-            ? `${startBtn}${doneBtn}${editBtn}${cancelBtn}${archiveBtn}`
-            : `<span class="text-muted small">View only</span>`;
+          if ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) {
+            items.push(`<button class="dropdown-item text-success fw-semibold" data-act="done" data-id="${r.delivery_id}" type="button"><i class="bi bi-check-circle me-2"></i>${isPickup ? "Complete Pickup" : "Mark Completed"}</button>`);
+          }
+
+          if (r.status !== "Completed" && r.status !== "Cancelled" && isCashierMgr) {
+            items.push(`<button class="dropdown-item" data-act="edit" data-id="${r.delivery_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
+          }
+
+          if (act && isCashierMgr) {
+            items.push(`<button class="dropdown-item text-danger" data-act="cancel" data-id="${r.delivery_id}" type="button"><i class="bi bi-x-circle me-2"></i>${isPickup ? "Cancel Pickup" : "Cancel Run"}</button>`);
+          }
+
+          if (r.status === "Completed" && isMgr) {
+            items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${r.delivery_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
+          }
+
+          let quickBtn = "";
+          if (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) {
+            if (isRiderOccupied) {
+              quickBtn = `<button class="btn sm btn-outline-warning" disabled title="Rider is currently on active delivery #${ord(activeRun.order_id)}" type="button"><i class="bi bi-clock-history me-1"></i>Busy</button>`;
+            } else if (!r.rider) {
+              quickBtn = `<button class="btn sm btn-outline-secondary" disabled title="Assign rider first" type="button">No Rider</button>`;
+            } else {
+              quickBtn = btn("start", r.delivery_id, `<i class="bi bi-play-fill me-1"></i>Start`, "btn-warning");
+            }
+          } else if ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) {
+            quickBtn = btn("done", r.delivery_id, `<i class="bi bi-check2 me-1"></i>${isPickup ? "Pickup" : "Done"}`, "btn-success");
+          }
+
+          const actsHtml = `
+            <div class="acts">
+              ${quickBtn}
+              ${items.length > 0 ? `
+                <div class="dropdown">
+                  <button class="btn sm btn-outline-secondary dropdown-toggle action-dropdown-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-popper-config='{"strategy":"fixed"}'>
+                    Actions
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                    ${items.map(item => `<li>${item}</li>`).join("")}
+                  </ul>
+                </div>
+              ` : `<span class="text-muted small">View only</span>`}
+            </div>
+          `;
+
           const displayAddress = r.street && r.barangay ? `${r.street}, ${r.barangay}` : (r.address || "Cabuyao, Laguna");
-          const riderBadge = isRiderOccupied ? `<span class="badge warn" style="font-size:9.5px; padding:1px 5px; margin-left:4px;" title="Currently doing another delivery">Busy on Run</span>` : "";
-          return `<article class="ticket ${r.status.split(" ")[0]}"><div class="stub"><b>${esc(r.time_slot)}</b><span>${esc(r.type)}</span></div><div class="tm"><div class="tt"><strong>${esc(r.customer_name || nameOf(r))}</strong>${badge(r.status, { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status])}</div><p class="muted">${esc(displayAddress)}</p><div class="meta"><span><i>Order</i><b>${ord(r.order_id)}</b></span><span><i>Contact</i><b>${esc(r.contact)}</b></span><span><i>Rider</i><b>${r.rider ? esc(r.rider) : "Not assigned"}</b>${riderBadge}</span></div><div class="acts" style="justify-content:flex-start">${acts}</div></div></article>`;
-        }).join("")}</section>`).join("");
+          const riderBadge = isRiderOccupied ? `<span class="badge warn ms-1" style="font-size:9.5px; padding:1px 5px;" title="Currently doing another delivery">Busy</span>` : "";
+          const statusCls = { Scheduled: "warn", "On the way": "info", Completed: "ok", Cancelled: "mute" }[r.status] || "mute";
+          const typeBadge = orderTypeBadge(r.type);
+          const rawDate = r.scheduled_date;
+          const dateLabel = rawDate === today() ? "Today" : rawDate === addDays(1) ? "Tomorrow" : rawDate === addDays(-1) ? "Yesterday" : fmt(rawDate);
+
+          return `<article class="ticket ${r.status.split(" ")[0]}">
+            <div class="stub">
+              <span class="stub-date"><i class="bi bi-calendar3"></i> ${esc(dateLabel)}</span>
+              <b>${esc(r.time_slot)}</b>
+            </div>
+            <div class="tm">
+              <div class="tt">
+                <div class="tt-left">
+                  <span class="ticket-order-badge">#${ord(r.order_id)}</span>
+                  <strong>${esc(r.customer_name || nameOf(r) || "Unknown")}</strong>
+                  ${typeBadge}
+                  <span class="badge ${statusCls}">${esc(r.status)}</span>
+                </div>
+                ${actsHtml}
+              </div>
+              <div class="meta">
+                <span class="meta-item addr" title="${esc(displayAddress)}"><i class="bi bi-geo-alt"></i> ${esc(displayAddress)}</span>
+                <span class="meta-item" title="Contact"><i class="bi bi-telephone"></i> ${esc(r.contact || "—")}</span>
+                ${(!isPickup || r.rider) ? `<span class="meta-item" title="Rider"><i class="bi bi-bicycle"></i> <b>${esc(r.rider || "Unassigned")}</b>${riderBadge}</span>` : ""}
+                ${Number(r.fee) > 0 ? `<span class="meta-item" title="Fee"><i class="bi bi-cash"></i> ${peso(r.fee)}</span>` : ""}
+              </div>
+            </div>
+          </article>`;
+        };
+
+        if (isDateSort) {
+          const dayMap = new Map();
+          list.forEach((r) => {
+            const d = r.scheduled_date || "Unknown";
+            if (!dayMap.has(d)) dayMap.set(d, []);
+            dayMap.get(d).push(r);
+          });
+
+          return Array.from(dayMap.entries()).map(([d, runs]) => {
+            const dayLabel = d === today() ? "Today" : d === addDays(1) ? "Tomorrow" : d === addDays(-1) ? "Yesterday" : fmt(d);
+            const countLabel = `${runs.length} run${runs.length === 1 ? '' : 's'}`;
+            return `<section class="day">
+              <h2><span>${dayLabel} <small>${fmt(d)}</small></span><small class="badge bg-light text-dark border">${countLabel}</small></h2>
+              ${runs.map(renderTicket).join("")}
+            </section>`;
+          }).join("");
+        } else {
+          return list.map(renderTicket).join("");
+        }
       },
       validate(d) {
         const e = {};
@@ -1471,7 +2047,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (!d.street || !d.street.trim()) e.street = "Street address is required";
         if (!d.barangay) e.barangay = "Please select a barangay";
-        if (!d.contact || !d.contact.trim()) e.contact = "Contact number is required";
+        const contactErr = validateContact(d.contact, "Contact number", true);
+        if (contactErr) e.contact = contactErr;
         if (d.type === "Delivery" && !d.rider) e.rider = "Rider is required for delivery";
         return e;
       },
@@ -1532,21 +2109,36 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     staff: {
       name: "staff", id: "staff_id", defaults: () => ({ role: "Cashier", status: "Active" }),
-      filter: (rows, f) => rows.filter((r) => (!f.q || (r.full_name + " " + r.email + " " + (r.phone || "") + " " + r.role).toLowerCase().includes(f.q)) && (!f.role || r.role.toLowerCase() === f.role) && (!f.st || (r.status || "Active").toLowerCase() === f.st)).sort((a, b) => a.staff_id - b.staff_id),
+      filter: (rows, f) => rows.filter((r) => {
+        const normStatus = (r.status === "Inactive" || r.status === "Deactivated") ? "deactivated" : (r.status || "Active").toLowerCase();
+        return (!f.q || (r.full_name + " " + r.email + " " + (r.phone || "") + " " + r.role).toLowerCase().includes(f.q)) &&
+               (!f.role || r.role.toLowerCase() === f.role) &&
+               (!f.st || normStatus === f.st || (f.st === "deactivated" && (r.status || "").toLowerCase() === "inactive"));
+      }).sort((a, b) => a.staff_id - b.staff_id),
       draw: (list) => {
         const isMgr = isManager();
+        const currentStaff = getAuthStaff() || {};
+        const activeManagers = (S.rows || []).filter(x => (x.role || "").toLowerCase() === "manager" && (x.status || "Active") === "Active" && !x.is_archived);
+        const isSoleManager = activeManagers.length <= 1;
+
         return list.map((s) => {
-          const roleBadgeCls = s.role === "Manager" ? "ok" : s.role === "Rider" ? "info" : s.role === "Cashier" ? "warn" : "mute";
-          const statusCls = (s.status || "Active") === "Active" ? "ok" : "mute";
-          const statusBadge = isMgr
-            ? `<span class="badge status-clickable ${statusCls}" data-act="quick-status" data-id="${s.staff_id}" data-current="${esc(s.status || "Active")}" role="button" tabindex="0" title="Click to toggle status">${esc(s.status || "Active")}</span>`
-            : `<span class="badge ${statusCls}">${esc(s.status || "Active")}</span>`;
+          const roleBadgeCls = s.role === "Manager" ? "bad" : s.role === "Rider" ? "ok" : s.role === "Cashier" ? "warn" : s.role === "Washer" ? "info" : s.role === "Folder" ? "folding" : "mute";
+          const statusCls = (s.status || "Active") === "Active" ? "ok" : "bad";
+          const displayStatus = (s.status === "Inactive" || s.status === "Deactivated") ? "Deactivated" : (s.status || "Active");
+
+          const isSelf = (currentStaff.staff_id && Number(currentStaff.staff_id) === Number(s.staff_id)) ||
+                         (currentStaff.email && s.email && currentStaff.email.toLowerCase() === s.email.toLowerCase());
+          const isSoleManagerSelf = isMgr && isSoleManager && isSelf && (s.role || "").toLowerCase() === "manager";
+
+          const statusBadge = (isMgr && !isSoleManagerSelf)
+            ? `<span class="badge status-clickable ${statusCls}" data-act="quick-status" data-id="${s.staff_id}" data-current="${esc(displayStatus)}" role="button" tabindex="0" title="Click to toggle status">${esc(displayStatus)}</span>`
+            : `<span class="badge ${statusCls}" title="${isSoleManagerSelf ? 'Cannot change status of the only manager' : ''}">${esc(displayStatus)}</span>`;
           const items = [];
-          if (isMgr) {
+          if (isMgr && !isSoleManagerSelf) {
             items.push(`<button class="dropdown-item" data-act="edit" data-id="${s.staff_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
             items.push(`<button class="dropdown-item text-danger" data-act="archive" data-id="${s.staff_id}" type="button"><i class="bi bi-archive me-2"></i>Archive</button>`);
           }
-          const acts = actionsDropdown(items, "View only");
+          const acts = actionsDropdown(items, isSoleManagerSelf ? "Sole Manager" : "View only");
           return `<tr><td><strong>#${s.staff_id}</strong></td><td><strong>${esc(s.full_name || `${s.first_name} ${s.last_name || ''}`)}</strong></td><td><span class="badge ${roleBadgeCls}">${esc(s.role)}</span></td><td>${esc(s.email)}</td><td>${esc(s.phone || '—')}</td><td>${statusBadge}</td><td>${acts}</td></tr>`;
         }).join("");
       },
@@ -1563,7 +2155,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if (EDIT.role) f.elements.role.value = EDIT.role;
           if (EDIT.email) f.elements.email.value = EDIT.email;
           if (EDIT.phone) f.elements.phone.value = EDIT.phone;
-          setRadioValue(f, "status", EDIT.status || "Active");
+          const currentSt = (EDIT.status === "Inactive" || EDIT.status === "Deactivated") ? "Deactivated" : "Active";
+          setRadioValue(f, "status", currentSt);
           if (f.elements.password) f.elements.password.value = "";
         } else {
           setRadioValue(f, "status", "Active");
@@ -1573,18 +2166,38 @@ document.addEventListener("DOMContentLoaded", () => {
         const e = {};
         if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
         if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
-        if (!d.email || !d.email.trim()) e.email = "Email is required";
+        if (!d.email || !d.email.trim()) {
+          e.email = "Email is required";
+        } else {
+          const normEmail = d.email.trim().toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail)) {
+            e.email = "Please enter a valid email address";
+          } else if (Array.isArray(S.rows)) {
+            const dup = S.rows.find(s => 
+              s.email && s.email.toLowerCase() === normEmail && (!EDIT || Number(s.staff_id) !== Number(EDIT.staff_id))
+            );
+            if (dup) {
+              e.email = "A staff member with this email address already exists. Please use a unique email.";
+            }
+          }
+        }
         if (!d.role) e.role = "Role is required";
+        if (d.phone && d.phone.trim()) {
+          const phoneErr = validateContact(d.phone, "Contact number", false);
+          if (phoneErr) e.phone = phoneErr;
+        }
         return e;
       },
       payload: (d) => {
+        let rawStatus = EDIT ? (d.status || EDIT.status || "Active") : "Active";
+        if (rawStatus === "Inactive") rawStatus = "Deactivated";
         const data = {
           first_name: (d.first_name || "").trim(),
           last_name: (d.last_name || "").trim(),
           role: d.role || "Cashier",
           email: (d.email || "").trim().toLowerCase(),
           phone: (d.phone || "").trim(),
-          status: EDIT ? (d.status || EDIT.status || "Active") : "Active"
+          status: rawStatus
         };
         if (d.password && d.password.trim()) {
           data.password = d.password.trim();
@@ -1594,9 +2207,19 @@ document.addEventListener("DOMContentLoaded", () => {
       delMsg: (r) => `Archive staff account for <strong>"${esc(r.full_name)}"</strong>?`,
       async act(a, r) {
         if (a === "archive") {
+          const currentStaff = getAuthStaff() || {};
+          const activeManagers = (S.rows || []).filter(x => (x.role || "").toLowerCase() === "manager" && (x.status || "Active") === "Active" && !x.is_archived);
+          const isSelf = (currentStaff.staff_id && Number(currentStaff.staff_id) === Number(r.staff_id)) ||
+                         (currentStaff.email && r.email && currentStaff.email.toLowerCase() === r.email.toLowerCase());
+          if (activeManagers.length <= 1 && isSelf && (r.role || "").toLowerCase() === "manager") {
+            return toast("A manager cannot archive their own account when they are the only manager.", 1);
+          }
           if (await ask("Archive Staff Member?", `Archive staff account for <strong>"${esc(r.full_name)}"</strong> (${esc(r.role)})? The account will be deactivated without affecting historical order records.`, "Archive")) {
             const res = await fetch(`/api/staff/${r.staff_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to archive staff");
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || "Failed to archive staff");
+            }
             toast(`Staff account "${r.full_name}" archived successfully.`);
             await init();
           }
@@ -1604,6 +2227,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   };
+  const ENT = entityModules; // Shorthand alias for entity modules
 
   if($("#view")) {
     $("#view").addEventListener("click", async (ev) => {
@@ -1647,11 +2271,22 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (cur === "staff") {
-          const next = (r.status || "Active") === "Active" ? "Inactive" : "Active";
-          const actWord = next === "Inactive" ? "Deactivate" : "Activate";
-          if (await ask(`${actWord} Staff Account?`, `${actWord} account for <strong>"${esc(r.full_name)}"</strong>? ${next === 'Inactive' ? 'They will not be able to log in until reactivated.' : 'They will be able to log in.'}`, actWord)) {
+          const currentStaff = getAuthStaff() || {};
+          const activeManagers = (S.rows || []).filter(x => (x.role || "").toLowerCase() === "manager" && (x.status || "Active") === "Active" && !x.is_archived);
+          const isSelf = (currentStaff.staff_id && Number(currentStaff.staff_id) === Number(r.staff_id)) ||
+                         (currentStaff.email && r.email && currentStaff.email.toLowerCase() === r.email.toLowerCase());
+          if (activeManagers.length <= 1 && isSelf && (r.role || "").toLowerCase() === "manager") {
+            return toast("A manager cannot change the status of their own account when they are the only manager.", 1);
+          }
+          const isAct = (r.status || "Active") === "Active";
+          const next = isAct ? "Deactivated" : "Active";
+          const actWord = next === "Deactivated" ? "Deactivate" : "Activate";
+          if (await ask(`${actWord} Staff Account?`, `${actWord} account for <strong>"${esc(r.full_name)}"</strong>? ${next === 'Deactivated' ? 'They will not be able to log in until reactivated.' : 'They will be able to log in.'}`, actWord)) {
             const res = await fetch(`/api/staff/${r.staff_id}/toggle-status`, { method: "PUT", headers: getAuthHeaders() });
-            if (!res.ok) throw new Error("Failed to update staff status");
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || "Failed to update staff status");
+            }
             toast(`Staff member "${r.full_name}" status updated to ${next}.`);
             await init();
           }
@@ -1659,24 +2294,47 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (cur === "orders" || cur === "history") {
           const curr = r.order_status || "Received";
+          const isDelivery = String(r.release_type || b.dataset.release || "").toLowerCase() === "delivery";
+          const statusMap = {
+            "Received": 1,
+            "Washing": 2,
+            "Folding": 6,
+            "Ready for Pickup": 3,
+            "Out for Delivery": 4,
+            "Completed": 5
+          };
           if (isProductionStaff()) {
-            if (curr !== "Received" && curr !== "Washing") {
-              return toast("Washers and Folders can only update orders up to 'Ready for Pickup'.", 1);
+            if (curr !== "Received" && curr !== "Washing" && curr !== "Folding") {
+              const maxLabel = isDelivery ? "'Out for Delivery'" : "'Ready for Pickup'";
+              return toast(`Washers and Folders can only update orders up to ${maxLabel}.`, 1);
             }
-            const next = curr === "Received" ? "Washing" : "Ready for Pickup";
+            const next = curr === "Received" ? "Washing" : curr === "Washing" ? "Folding" : (isDelivery ? "Out for Delivery" : "Ready for Pickup");
+            const nextId = statusMap[next];
             if (await ask("Update Order Status", `Advance Order <strong>#${ord(r.order_id)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
-              await patch(r, { order_status: next }, `Order #${ord(r.order_id)} status updated to ${next}.`);
+              await patch(r, { order_status: next, status_id: nextId }, `Order #${ord(r.order_id)} status updated to ${next}.`);
             }
             return;
           }
           if (isRider()) {
             return toast("Riders update order status via Pickup & Delivery runs.", 1);
           }
-          const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
+          const steps = isDelivery
+            ? ["Received", "Washing", "Folding", "Out for Delivery", "Completed"]
+            : ["Received", "Washing", "Folding", "Ready for Pickup", "Completed"];
           const idx = steps.indexOf(curr);
-          const next = steps[(idx + 1) % steps.length];
+          let next;
+          if (idx !== -1) {
+            next = steps[(idx + 1) % steps.length];
+          } else if (isDelivery && curr === "Ready for Pickup") {
+            next = "Out for Delivery";
+          } else if (!isDelivery && curr === "Out for Delivery") {
+            next = "Completed";
+          } else {
+            next = steps[0];
+          }
+          const nextId = statusMap[next];
           if (await ask("Update Order Status", `Advance Order <strong>#${ord(r.order_id)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
-            await patch(r, { order_status: next }, `Order #${ord(r.order_id)} status updated to ${next}.`);
+            await patch(r, { order_status: next, status_id: nextId }, `Order #${ord(r.order_id)} status updated to ${next}.`);
           }
           return;
         }
@@ -1749,7 +2407,18 @@ document.addEventListener("DOMContentLoaded", () => {
         return openReceipt({ orderId: b.dataset.id, isInvoice });
       }
       if (a === "add") return openForm();
-      if (a === "edit") return openForm(r);
+      if (a === "edit") {
+        if (cur === "staff" && r) {
+          const currentStaff = getAuthStaff() || {};
+          const activeManagers = (S.rows || []).filter(x => (x.role || "").toLowerCase() === "manager" && (x.status || "Active") === "Active" && !x.is_archived);
+          const isSelf = (currentStaff.staff_id && Number(currentStaff.staff_id) === Number(r.staff_id)) ||
+                         (currentStaff.email && r.email && currentStaff.email.toLowerCase() === r.email.toLowerCase());
+          if (activeManagers.length <= 1 && isSelf && (r.role || "").toLowerCase() === "manager") {
+            return toast("A manager cannot edit their own account when they are the only manager.", 1);
+          }
+        }
+        return openForm(r);
+      }
       if (a === "del" && await ask("Delete?", e.delMsg(r))) {
         await db.del(e.name, r[e.id]);
         const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
@@ -1811,7 +2480,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const printBtnText = isInv ? "Print Invoice" : "Print Receipt";
       const rawDate = payment ? (payment.paid_at || payment.payment_date) : (order ? order.order_date : today());
       const receiptDate = formatDate(rawDate);
-      const staffName = (order && order.staff_name) || (JSON.parse(sessionStorage.getItem("current_staff") || "{}").full_name) || "Staff on duty";
+      const staffName = (order && order.staff_name) || ((getAuthStaff() || {}).full_name) || "Staff on duty";
       const customerName = (payment && payment.customer_name) || (order && order.customer_name) || (order && nameOf(order)) || "Valued Customer";
       const contact = (payment && payment.contact) || (order && order.contact) || (order && order.customer_phone) || "N/A";
       const releaseType = (order && order.release_type) || "Pickup";
@@ -1824,7 +2493,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const paidPayments = activePayments.filter((p) => (p.status || "Paid") === "Paid");
       const totalPaidAmount = paidPayments.reduce((s, p) => s + Number(p.amount_paid !== undefined ? p.amount_paid : (p.amount || 0)), 0);
 
-      // Dynamically determine payment status
+      // Payment status
       let pStatus = "Unpaid";
       if (payment && payment.status === "Refunded") {
         pStatus = "Refunded";
@@ -1931,7 +2600,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // Update modal header & print button for invoice/receipt
+      // Invoice modal header
       const titleEl = modalEl.querySelector("#receiptModalTitle");
       if (titleEl) titleEl.innerHTML = `<i class="bi ${modalTitleIcon} me-2 text-primary"></i>${modalTitleText}`;
       const printBtn = modalEl.querySelector("#receiptPrintBtn");
@@ -2081,13 +2750,113 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     $("#form").addEventListener("input", (ev) => {
       const field = ev.target.closest(".field");
-      if (field && field.classList.contains("invalid") && ev.target.value.trim()) {
+      if (ev.target.name === "contact" || ev.target.name === "phone") {
+        const val = ev.target.value;
+        if (field) {
+          if (/[a-zA-Z]/.test(val)) {
+            field.classList.add("invalid");
+            let errEl = field.querySelector(".err");
+            if (!errEl) { errEl = document.createElement("div"); errEl.className = "err"; field.appendChild(errEl); }
+            errEl.textContent = "Contact number cannot contain letters";
+          } else if (val && !/^\+?[0-9\s-]*$/.test(val)) {
+            field.classList.add("invalid");
+            let errEl = field.querySelector(".err");
+            if (!errEl) { errEl = document.createElement("div"); errEl.className = "err"; field.appendChild(errEl); }
+            errEl.textContent = "Contact number cannot contain symbols";
+          } else {
+            const digits = val.replace(/\D/g, "");
+            if (digits.length > 11) {
+              field.classList.add("invalid");
+              let errEl = field.querySelector(".err");
+              if (!errEl) { errEl = document.createElement("div"); errEl.className = "err"; field.appendChild(errEl); }
+              errEl.textContent = "Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)";
+            } else if (digits.length === 11 && !digits.startsWith("09")) {
+              field.classList.add("invalid");
+              let errEl = field.querySelector(".err");
+              if (!errEl) { errEl = document.createElement("div"); errEl.className = "err"; field.appendChild(errEl); }
+              errEl.textContent = "Contact number should start with 09 (e.g. 0917XXXXXXX)";
+            } else if (digits.length === 11 && digits.startsWith("09")) {
+              field.classList.remove("invalid");
+              const errEl = field.querySelector(".err");
+              if (errEl) errEl.textContent = "";
+            } else if (field.classList.contains("invalid")) {
+              const currentErr = field.querySelector(".err")?.textContent || "";
+              if (!currentErr.includes("11-digit") && !currentErr.includes("start with 09")) {
+                field.classList.remove("invalid");
+                const errEl = field.querySelector(".err");
+                if (errEl) errEl.textContent = "";
+              }
+            }
+          }
+        }
+      } else if (field && field.classList.contains("invalid") && ev.target.value.trim()) {
         field.classList.remove("invalid");
         const errEl = field.querySelector(".err");
         if (errEl) errEl.textContent = "";
       }
       if (cur === "orders" && (ev.target.name === "weight_kg" || ev.target.name === "service_id")) {
         ENT.orders.calcTotal();
+      }
+      if (cur === "orders" && (ev.target.name === "first_name" || ev.target.name === "last_name")) {
+        ENT.orders.change(ev);
+      }
+    });
+    $("#form").addEventListener("blur", (ev) => {
+      if (ev.target.name === "contact" || ev.target.name === "phone") {
+        const isReq = ev.target.hasAttribute("required");
+        const err = validateContact(ev.target.value, "Contact number", isReq);
+        const field = ev.target.closest(".field");
+        if (field) {
+          field.classList.toggle("invalid", !!err);
+          let errEl = field.querySelector(".err");
+          if (err) {
+            if (!errEl) { errEl = document.createElement("div"); errEl.className = "err"; field.appendChild(errEl); }
+            errEl.textContent = err;
+          } else if (errEl) {
+            errEl.textContent = "";
+          }
+        }
+      }
+      if (cur === "staff" && ev.target.name === "email") {
+        const val = (ev.target.value || "").trim().toLowerCase();
+        let err = "";
+        if (!val) {
+          err = "Email is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+          err = "Please enter a valid email address";
+        } else if (Array.isArray(S.rows)) {
+          const dup = S.rows.find(s => 
+            s.email && s.email.toLowerCase() === val && (!EDIT || Number(s.staff_id) !== Number(EDIT.staff_id))
+          );
+          if (dup) err = "A staff member with this email address already exists. Please use a unique email.";
+        }
+        const field = ev.target.closest(".field");
+        if (field) {
+          field.classList.toggle("invalid", !!err);
+          let errEl = field.querySelector(".err");
+          if (err) {
+            if (!errEl) { errEl = document.createElement("div"); errEl.className = "err"; field.appendChild(errEl); }
+            errEl.textContent = err;
+          } else if (errEl) {
+            errEl.textContent = "";
+          }
+        }
+      }
+    }, true);
+    $("#form").addEventListener("input", (ev) => {
+      if (cur === "staff" && ev.target.name === "email") {
+        const field = ev.target.closest(".field");
+        if (field && field.classList.contains("invalid")) {
+          const val = (ev.target.value || "").trim().toLowerCase();
+          const dup = Array.isArray(S.rows) && S.rows.find(s => 
+            s.email && s.email.toLowerCase() === val && (!EDIT || Number(s.staff_id) !== Number(EDIT.staff_id))
+          );
+          if (!dup && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            field.classList.remove("invalid");
+            const errEl = field.querySelector(".err");
+            if (errEl) errEl.textContent = "";
+          }
+        }
       }
     });
     $("#form").addEventListener("submit", async (ev) => {
@@ -2096,24 +2865,36 @@ document.addEventListener("DOMContentLoaded", () => {
       ev.target.querySelectorAll("[data-lock]").forEach((i) => { if (EDIT) d[i.name] = EDIT[i.name]; });
       const errors = e.validate ? e.validate(d) : {};
       if (!setErrors(errors)) {
-        toast("Please fill in all required fields.", 1);
+        const firstErr = Object.values(errors)[0] || "Please fill in all required fields.";
+        toast(firstErr, 1);
         const firstInvalid = ev.target.querySelector(".field.invalid input, .field.invalid select, .field.invalid textarea");
         if (firstInvalid) firstInvalid.focus();
         return;
       }
-      const saved = await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
-      closeModal($("#dlg"));
-      const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
-      const msg = EDIT ? `${entityLabel} updated successfully.` : `New ${M.one || 'record'} created successfully.`;
-      toast(msg);
-      await init();
-      if (cur === "payments" && !EDIT && saved && (saved.payment_id || saved.id)) {
-        openReceipt({ paymentId: saved.payment_id || saved.id });
+      try {
+        const saved = await db.save(e.name, EDIT && EDIT[e.id], e.payload(d));
+        closeModal($("#dlg"));
+        const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
+        const msg = EDIT ? `${entityLabel} updated successfully.` : `New ${M.one || 'record'} created successfully.`;
+        toast(msg);
+        await init();
+        if (cur === "payments" && !EDIT && saved && (saved.payment_id || saved.id)) {
+          openReceipt({ paymentId: saved.payment_id || saved.id });
+        }
+      } catch (err) {
+        toast(err.message, 1);
+        if (err.field) {
+          setErrors({ [err.field]: err.message });
+          if (ev.target.elements[err.field]) ev.target.elements[err.field].focus();
+        } else if (err.message && /email/i.test(err.message)) {
+          setErrors({ email: err.message });
+          if (ev.target.elements.email) ev.target.elements.email.focus();
+        }
       }
     });
   }
 
-  // Dashboard initialization
+  // Dashboard init
   async function initDashboard() {
     try {
       const res = await fetch("/api/dashboard/summary");
@@ -2147,7 +2928,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <td><strong>${ord(o.order_id)}</strong></td>
               <td>${esc(o.customer_name)}</td>
               <td>${formatDate(o.order_date || o.formatted_date)}</td>
-              <td>${orderStatusBadge(o.order_status, o.order_id)}</td>
+              <td>${orderStatusBadge(o.order_status, o.order_id, o.release_type)}</td>
               <td class="num">${peso(o.total)}</td>
             </tr>
           `).join("");
@@ -2159,17 +2940,28 @@ document.addEventListener("DOMContentLoaded", () => {
               if (!b) return;
               const orderId = b.dataset.id;
               const curr = b.dataset.current || "Received";
+              const isDelivery = String(b.dataset.release || "").toLowerCase() === "delivery";
+              const statusMap = {
+                "Received": 1,
+                "Washing": 2,
+                "Folding": 6,
+                "Ready for Pickup": 3,
+                "Out for Delivery": 4,
+                "Completed": 5
+              };
               if (isProductionStaff()) {
-                if (curr !== "Received" && curr !== "Washing") {
-                  return toast("Washers and Folders can only update orders up to 'Ready for Pickup'.", 1);
+                if (curr !== "Received" && curr !== "Washing" && curr !== "Folding") {
+                  const maxLabel = isDelivery ? "'Out for Delivery'" : "'Ready for Pickup'";
+                  return toast(`Washers and Folders can only update orders up to ${maxLabel}.`, 1);
                 }
-                const next = curr === "Received" ? "Washing" : "Ready for Pickup";
+                const next = curr === "Received" ? "Washing" : curr === "Washing" ? "Folding" : (isDelivery ? "Out for Delivery" : "Ready for Pickup");
+                const nextId = statusMap[next];
                 if (await ask("Update Order Status", `Advance Order <strong>#${ord(orderId)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
                   try {
                     const res = await fetch(`/api/orders/${orderId}`, {
                       method: "PUT",
                       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-                      body: JSON.stringify({ order_status: next })
+                      body: JSON.stringify({ order_status: next, status_id: nextId })
                     });
                     if (!res.ok) throw new Error("Failed to update status");
                     toast(`Order #${ord(orderId)} status updated to ${next}.`);
@@ -2183,15 +2975,27 @@ document.addEventListener("DOMContentLoaded", () => {
               if (isRider()) {
                 return toast("Riders update order status via Pickup & Delivery runs.", 1);
               }
-              const steps = ["Received", "Washing", "Ready for Pickup", "Out for Delivery", "Completed"];
+              const steps = isDelivery
+                ? ["Received", "Washing", "Folding", "Out for Delivery", "Completed"]
+                : ["Received", "Washing", "Folding", "Ready for Pickup", "Completed"];
               const idx = steps.indexOf(curr);
-              const next = steps[(idx + 1) % steps.length];
+              let next;
+              if (idx !== -1) {
+                next = steps[(idx + 1) % steps.length];
+              } else if (isDelivery && curr === "Ready for Pickup") {
+                next = "Out for Delivery";
+              } else if (!isDelivery && curr === "Out for Delivery") {
+                next = "Completed";
+              } else {
+                next = steps[0];
+              }
+              const nextId = statusMap[next];
               if (await ask("Update Order Status", `Advance Order <strong>#${ord(orderId)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
                 try {
                   const res = await fetch(`/api/orders/${orderId}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-                    body: JSON.stringify({ order_status: next })
+                    body: JSON.stringify({ order_status: next, status_id: nextId })
                   });
                   if (!res.ok) throw new Error("Failed to update status");
                   toast(`Order #${ord(orderId)} status updated to ${next}.`);
@@ -2264,7 +3068,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if ($("#badge-customers")) $("#badge-customers").textContent = allData.customers.length;
       if ($("#badge-staff")) $("#badge-staff").textContent = allData.staff.length;
 
-      // Filtered lists
+      // Filter lists
       const filteredOrders = allData.orders.filter(o => {
         if (!q) return true;
         const text = `${ord(o.order_id)} ${o.customer_name || ''} ${o.release_type || ''} ${o.order_status || ''} ${o.payment_status || ''}`.toLowerCase();
@@ -2295,7 +3099,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return text.includes(q);
       });
 
-      // Show/hide sections based on category selection
+      // Filter sections
       const showSection = (secId, catKey) => {
         const sec = $(secId);
         if (!sec) return;
@@ -2312,7 +3116,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showSection("#section-customers", "customers");
       showSection("#section-staff", "staff");
 
-      // 1. Render Orders Table
+      // Render orders
       const outOrders = $("#out-orders");
       if (outOrders) {
         if (filteredOrders.length === 0) {
@@ -2329,7 +3133,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <td>${esc(o.customer_name)}</td>
               <td>${formatDate(o.order_date)}</td>
               <td>${orderTypeBadge(o.release_type)}</td>
-              <td>${orderStatusBadge(o.order_status, o.order_id)}</td>
+              <td>${orderStatusBadge(o.order_status, o.order_id, o.release_type)}</td>
               <td><span class="badge ${payStatusCls}">${esc(o.payment_status || "Unpaid")}</span></td>
               <td class="num">${peso(o.total)}</td>
               <td>${actionsDropdown(items)}</td>
@@ -2338,7 +3142,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // 2. Render Payments Table
+      // Render payments
       const outPayments = $("#out-payments");
       if (outPayments) {
         if (filteredPayments.length === 0) {
@@ -2365,7 +3169,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // 3. Render Deliveries Table
+      // Render deliveries
       const outDeliveries = $("#out-deliveries");
       if (outDeliveries) {
         if (filteredDeliveries.length === 0) {
@@ -2382,7 +3186,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <td>${orderTypeBadge(d.type)}</td>
               <td>${formatDate(d.scheduled_date)}</td>
               <td>${esc(d.time_slot)}</td>
-              <td>${esc(d.rider || "Unassigned")}</td>
+              <td>${esc(d.rider || (String(d.type).toLowerCase() === "pickup" ? "—" : "Unassigned"))}</td>
               <td><strong>${esc(d.customer_name || "Unknown")}</strong><br><small class="text-muted">${esc(addr)}</small></td>
               <td><span class="badge ${statusCls}">${esc(d.status)}</span></td>
               <td>${actionsDropdown(items)}</td>
@@ -2391,7 +3195,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // 4. Render Customers Table
+      // Render customers
       const outCustomers = $("#out-customers");
       if (outCustomers) {
         if (filteredCustomers.length === 0) {
@@ -2414,7 +3218,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // 5. Render Staff Table
+      // Render staff
       const outStaff = $("#out-staff");
       if (outStaff && isMgr) {
         if (filteredStaff.length === 0) {
@@ -2424,7 +3228,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const items = [
               `<button class="dropdown-item text-success" data-act="unarchive-staff" data-id="${s.staff_id}" type="button"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Staff</button>`
             ];
-            const roleBadgeCls = { Manager: "bad", Cashier: "warn", Washer: "info", Folder: "washing", Rider: "ok" }[s.role] || "mute";
+            const roleBadgeCls = { Manager: "bad", Cashier: "warn", Washer: "info", Folder: "folding", Rider: "ok" }[s.role] || "mute";
             return `<tr>
               <td><strong>#${s.staff_id}</strong></td>
               <td><strong>${esc(s.full_name || `${s.first_name || ''} ${s.last_name || ''}`.trim())}</strong></td>
@@ -2441,7 +3245,7 @@ document.addEventListener("DOMContentLoaded", () => {
       initTablesSorting();
     }
 
-    // Attach event listeners for toolbar and chips
+    // Filter listeners
     const searchInput = $("#arch_q");
     if (searchInput) searchInput.addEventListener("input", debounce(renderArchivedTables, 150));
 
@@ -2478,7 +3282,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    // Handle clicks inside main content for actions
+    // Action clicks
     const mainView = $("#view");
     if (mainView) {
       mainView.addEventListener("click", async (ev) => {
@@ -2557,7 +3361,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadArchiveData();
   }
 
-  // Staff login handler
+  // Login handler
   const loginForm = document.querySelector(".login-form-container form") || document.getElementById("loginForm");
   if (loginForm) {
     const showToggle = document.getElementById("togglePasswordBtn") || loginForm.querySelector(".pass-toggle-btn") || loginForm.querySelector(".form-group span");
@@ -2592,18 +3396,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Demo Autofill Chips
-    document.querySelectorAll(".demo-chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        if (emailInput && chip.dataset.email) emailInput.value = chip.dataset.email;
-        if (passInput && chip.dataset.pass) passInput.value = chip.dataset.pass;
-        document.querySelectorAll(".demo-chip").forEach(c => c.classList.remove("active"));
-        chip.classList.add("active");
-        clearError();
-        if (emailInput) emailInput.focus();
-      });
-    });
-
     loginForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       clearError();
@@ -2634,7 +3426,7 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error(`Server returned status ${res.status}. Please check your database connection or try again.`);
         }
         if (!res.ok) throw new Error(data.error || "Login failed");
-        sessionStorage.setItem("current_staff", JSON.stringify(data.staff));
+        setAuthStaff(data.staff);
         const role = (data.staff.role || "Manager").toLowerCase();
         const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
         window.location.href = target;
@@ -2656,7 +3448,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function applyRoleNavVisibility() {
-    const staff = JSON.parse(sessionStorage.getItem("current_staff") || "null");
+    const staff = getAuthStaff();
     if (!staff) return;
     const role = (staff.role || "Manager").toLowerCase();
     const permitted = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.manager;
@@ -2692,6 +3484,16 @@ document.addEventListener("DOMContentLoaded", () => {
       mobileAvatarEl.setAttribute("title", `${staff.full_name || staff.first_name || "Staff Member"} (${staff.role || "Active Staff"})`);
     }
   }
+
+  // Handle ticket dropdown z-index elevation
+  document.addEventListener("show.bs.dropdown", (e) => {
+    const ticket = e.target.closest(".ticket");
+    if (ticket) ticket.classList.add("has-open-dropdown");
+  });
+  document.addEventListener("hidden.bs.dropdown", (e) => {
+    const ticket = e.target.closest(".ticket");
+    if (ticket) ticket.classList.remove("has-open-dropdown");
+  });
 
   applyRoleNavVisibility();
 
