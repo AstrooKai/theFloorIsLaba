@@ -27,7 +27,7 @@ const isCloud = Boolean(
     (process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1')
 );
 
-// Connection pool configuration: supports single DATABASE_URL or individual env vars
+// Pool configuration
 const poolConfig = parsedUrl
     ? {
         ...parsedUrl,
@@ -57,7 +57,7 @@ const pool = mysql.createPool(poolConfig);
 async function initDB() {
     try {
         if (!isCloud) {
-            // Local presentation mode: check/create local database
+            // Local database setup
             const rootConn = await mysql.createConnection({
                 host: process.env.DB_HOST || 'localhost',
                 port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
@@ -89,7 +89,7 @@ async function initDB() {
             await rootConn.end();
             return true;
         } else {
-            // Cloud deployment mode: verify tables on provisioned database
+            // Cloud database setup
             const conn = await pool.getConnection();
             const [tables] = await conn.query(
                 "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'staff'"

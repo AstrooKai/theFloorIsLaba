@@ -1,20 +1,9 @@
-/**
- * Cloud Database Seed Script
- * 
- * Safely seeds your remote cloud MySQL database (TiDB Cloud, Aiven, Railway, etc.)
- * with the exact same schema and initial sample data as your local setup.
- * 
- * Usage:
- *   1. Create a .env.cloud file (or pass DATABASE_URL / DB_HOST via environment)
- *   2. Run: npm run db:cloud:seed
- * 
- * NOTE: This script does NOT touch your local database (laundry_shop_db on localhost).
- */
+// Cloud database seed script
 const path = require('path');
 const fs = require('fs');
 const mysql = require('mysql2/promise');
 
-// Attempt to load .env.cloud first if present, otherwise fall back to existing .env
+// Load cloud environment
 const cloudEnvPath = path.join(__dirname, '..', '.env.cloud');
 if (fs.existsSync(cloudEnvPath)) {
     require('dotenv').config({ path: cloudEnvPath });
@@ -91,7 +80,7 @@ async function seedCloud() {
 
         console.log('Applying database schema to cloud...');
         let schemaSql = fs.readFileSync(schemaPath, 'utf8');
-        // Clean up any database-level creation statements for cloud compatibility
+        // Strip database-level statements for cloud
         schemaSql = schemaSql.replace(/CREATE DATABASE[\s\S]*?;/gi, '').replace(/USE\s+[`\w]+;/gi, '');
         await conn.query(schemaSql);
         console.log('Schema applied successfully.');

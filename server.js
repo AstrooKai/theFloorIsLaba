@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(require('./middleware/auth').authenticate);
 
-// Auto-initialize database tables and seed data if missing (essential for serverless/Vercel)
+// Database auto-init
 let dbReady = false;
 let dbInitPromise = null;
 app.use(async (req, res, next) => {
@@ -28,20 +28,20 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Redirect old /login and /staff-login.html to root (index.html now contains the login page)
+// Legacy login redirect
 app.get(['/login', '/staff-login.html'], (req, res) => {
     res.redirect(302, '/');
 });
 
-// Serve frontend static files
+// Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API Routes
+// API routes
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/orders', require('./routes/orders'));
@@ -50,7 +50,7 @@ app.use('/api/staff', require('./routes/staff'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
-// 404 Fallback Handler
+// 404 handler
 app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: true, message: `API route ${req.method} ${req.originalUrl} not found` });
@@ -58,7 +58,7 @@ app.use((req, res, next) => {
     res.status(404).sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Centralized Error Handling Middleware
+// Error handler
 app.use((err, req, res, next) => {
     console.error('Unhandled server error:', err);
     const statusCode = err.status || err.statusCode || 500;
@@ -69,7 +69,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server locally (ignored when imported as a Vercel serverless function)
+// Start local server
 if (require.main === module) {
     app.listen(PORT, async () => {
         console.log(`Server running at http://localhost:${PORT}`);

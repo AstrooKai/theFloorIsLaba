@@ -1,7 +1,4 @@
-/**
- * Database Seed and Reset Script
- * Run with: npm run db:reset or npm run db:seed
- */
+// Database seed and reset script
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 const fs = require('fs');

@@ -1,10 +1,6 @@
-/**
- * Authentication & RBAC Authorization Middleware
- */
+// Auth and RBAC middleware
 
-/**
- * Extracts staff information from headers, body, or session
- */
+// Extract staff info
 const authenticate = (req, res, next) => {
     try {
         const staffRole = req.headers['x-staff-role'] || req.body?.staff_role || req.query?.staff_role;
@@ -20,11 +16,7 @@ const authenticate = (req, res, next) => {
     }
 };
 
-/**
- * RBAC authorization middleware helper
- * Validates authenticated staff session against allowed roles.
- * @param  {...string} allowedRoles Allowed staff roles (e.g. 'Manager', 'Cashier', 'Washer', 'Folder', 'Rider')
- */
+// Validate staff role
 const authorizeRoles = (...allowedRoles) => {
     return (req, res, next) => {
         const userRole = (req.staff?.role || req.headers['x-staff-role'] || '').trim().toLowerCase();
