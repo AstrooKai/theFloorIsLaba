@@ -1,22 +1,9 @@
-# The Floor is Laba 🧺
+# The Floor is Laba
 ### Laundry Shop Order Tracking & Management System
-**Course Project**: CCS110 – Information Management 1  
-**Institution**: College of Computing Studies, University of Cabuyao (Pamantasan ng Cabuyao)  
-**Academic Term**: 1st Semester, A.Y. 2026–2027  
 
 ---
 
-## 👥 Project Team (Group 1 - 2BSITB)
-* **Basco, Athena Gwyneth**
-* **Buenafe, Xzy A.**
-* **De Vera, Franz Gabriel T.**
-* **Duhaylungsod, Krysthel S.**
-* **Mangubat, Steven Kyle P.**
-* **Sangalang, Maerylle Gale J.**
-
----
-
-## 📋 Table of Contents
+## Table of Contents
 1. [System Overview](#1-system-overview)
    - [Problem Statement](#problem-statement)
    - [Proposed Solution](#proposed-solution)
@@ -40,7 +27,7 @@
    - [8. Staff Management & Sole-Manager Safeguards](#8-staff-management--sole-manager-safeguards)
    - [9. Soft Archiving & Restoration Audit Hub](#9-soft-archiving--restoration-audit-hub)
    - [10. Executive Dashboard & Real-Time Analytics](#10-executive-dashboard--real-time-analytics)
-5. [End-to-End System Flows (UI ➔ API ➔ DB ➔ UI)](#5-end-to-end-system-flows-ui--api--db--ui)
+5. [End-to-End System Flows (UI -> API -> DB -> UI)](#5-end-to-end-system-flows-ui--api--db--ui)
    - [Flow A: Creating a New Laundry Order](#flow-a-creating-a-new-laundry-order)
    - [Flow B: Advancing Laundry Order Progression](#flow-b-advancing-laundry-order-progression)
    - [Flow C: Recording Full Payment](#flow-c-recording-full-payment)
@@ -75,7 +62,7 @@ The system enforces strict Role-Based Access Control (RBAC):
 
 ### Core System Objectives
 1. **Centralize Data**: Replace fragmented paper notebooks with an ACID-compliant MySQL relational database.
-2. **End-to-End Tracking**: Track order status through an updated 6-stage lifecycle (`Received` ➔ `Washing` ➔ `Folding` ➔ `Ready for Pickup` / `Out for Delivery` ➔ `Completed`).
+2. **End-to-End Tracking**: Track order status through an updated 6-stage lifecycle (`Received` -> `Washing` -> `Folding` -> `Ready for Pickup` / `Out for Delivery` -> `Completed`).
 3. **Automate Pricing**: Dynamically calculate order totals based on certified catalog rates (per kg or per piece).
 4. **Enforce Financial Integrity**: Strictly enforce a **full-settlement policy** (disallow partial payments, auto-fill remaining balance, prevent overpayments).
 5. **Preserve Audit Trails**: Implement soft-delete archiving (`is_archived = TRUE`) so historical metrics and order histories remain preserved even when entities are retired.
@@ -203,9 +190,9 @@ Maintains laundry catalog offerings and rate parameters.
 #### 5. `orders`
 The central transaction table connecting customer, processing staff, and workflow status.
 * `order_id` (INT, PK, Auto Increment): Unique order reference (`ORD-XXXX`).
-* `customer_id` (INT, NOT NULL, FK ➔ `customers.customer_id`): Linked customer.
-* `staff_id` (INT, NOT NULL, FK ➔ `staff.staff_id`): Clerk who encoded/processed the order.
-* `status_id` (INT, NOT NULL, FK ➔ `order_statuses.status_id`): Current operational state.
+* `customer_id` (INT, NOT NULL, FK -> `customers.customer_id`): Linked customer.
+* `staff_id` (INT, NOT NULL, FK -> `staff.staff_id`): Clerk who encoded/processed the order.
+* `status_id` (INT, NOT NULL, FK -> `order_statuses.status_id`): Current operational state.
 * `order_date` (DATE, NOT NULL): Date of order placement.
 * `release_type` (VARCHAR(10), NOT NULL): Fulfillment channel (`Pickup` or `Delivery`).
 * `release_date` (DATE, NULL): Actual date garments were released/delivered.
@@ -215,15 +202,15 @@ The central transaction table connecting customer, processing staff, and workflo
 #### 6. `order_items`
 Junction table resolving the many-to-many relationship between `orders` and `service_types`.
 * `order_item_id` (INT, PK, Auto Increment): Unique line item identifier.
-* `order_id` (INT, NOT NULL, FK ➔ `orders.order_id`): Parent order.
-* `service_id` (INT, NOT NULL, FK ➔ `service_types.service_id`): Selected service.
+* `order_id` (INT, NOT NULL, FK -> `orders.order_id`): Parent order.
+* `service_id` (INT, NOT NULL, FK -> `service_types.service_id`): Selected service.
 * `weight_kg` (DECIMAL(5,2), NOT NULL): Quantity (kilograms or piece count).
 * `subtotal` (DECIMAL(10,2), NOT NULL): Precomputed line total (`weight_kg * rate`).
 
 #### 7. `payments`
 Maintains financial settlement records, method instruments, and digital audit references.
 * `payment_id` (INT, PK, Auto Increment): Unique financial transaction ID (`PAY-XXXX`).
-* `order_id` (INT, NOT NULL, FK ➔ `orders.order_id`): Linked order.
+* `order_id` (INT, NOT NULL, FK -> `orders.order_id`): Linked order.
 * `amount_paid` (DECIMAL(10,2), NOT NULL): Settlement amount in PHP.
 * `payment_method` (VARCHAR(20), NOT NULL): Instrument (`Cash`, `GCash`, `Maya`, `QRPh`, `Card`).
 * `reference_no` (VARCHAR(100), NULL): Digital transaction/approval code (required for non-cash).
@@ -235,9 +222,9 @@ Maintains financial settlement records, method instruments, and digital audit re
 #### 8. `deliveries`
 Manages logistics dispatch, assigned riders, scheduled delivery windows, and fulfillment status.
 * `delivery_id` (INT, PK, Auto Increment): Unique transport ticket identifier.
-* `order_id` (INT, NOT NULL, FK ➔ `orders.order_id`): Associated order.
+* `order_id` (INT, NOT NULL, FK -> `orders.order_id`): Associated order.
 * `type` (VARCHAR(20), NOT NULL, DEFAULT 'Delivery'): Fulfillment type (`Pickup` or `Delivery`).
-* `rider_id` (INT, NULL, FK ➔ `staff.staff_id`): Assigned delivery rider staff ID.
+* `rider_id` (INT, NULL, FK -> `staff.staff_id`): Assigned delivery rider staff ID.
 * `scheduled_date` (DATE, NOT NULL): Target dispatch/pickup date.
 * `time_slot` (VARCHAR(50), NOT NULL): Operational window (e.g. `10 AM - 12 PM`).
 * `fee` (DECIMAL(10,2), NOT NULL, DEFAULT 50.00): Logistics transport surcharge.
@@ -289,11 +276,11 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 ### Constraints & Referential Integrity Rules
 
 * **`ON DELETE CASCADE`**:
-  * Used for dependent child records: `orders` ➔ `order_items`, `payments`, and `deliveries`. Deleting or hard-purging a parent order cleanly removes its line items, financial logs, and transport tickets, preventing orphaned child rows.
+  * Used for dependent child records: `orders` -> `order_items`, `payments`, and `deliveries`. Deleting or hard-purging a parent order cleanly removes its line items, financial logs, and transport tickets, preventing orphaned child rows.
 * **`ON DELETE SET NULL`**:
-  * Used for `deliveries.rider_id` ➔ `staff.staff_id`. If an employee profile is removed, historical delivery records are preserved with rider set to `NULL` (`"—"`), maintaining route and audit history.
+  * Used for `deliveries.rider_id` -> `staff.staff_id`. If an employee profile is removed, historical delivery records are preserved with rider set to `NULL` (`"—"`), maintaining route and audit history.
 * **`ON DELETE RESTRICT`**:
-  * Used for `orders.customer_id` ➔ `customers.customer_id`, `orders.status_id` ➔ `order_statuses.status_id`, and `order_items.service_id` ➔ `service_types.service_id`. A customer or service cannot be deleted from the database if active orders currently depend on it.
+  * Used for `orders.customer_id` -> `customers.customer_id`, `orders.status_id` -> `order_statuses.status_id`, and `order_items.service_id` -> `service_types.service_id`. A customer or service cannot be deleted from the database if active orders currently depend on it.
 * **`ON UPDATE CASCADE`**:
   * Applied to all foreign keys so any identifier updates propagate seamlessly across related tables.
 
@@ -355,7 +342,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 
 ---
 
-## 5. End-to-End System Flows (UI ➔ API ➔ DB ➔ UI)
+## 5. End-to-End System Flows (UI -> API -> DB -> UI)
 
 ### Flow A: Creating a New Laundry Order
 ```
@@ -393,7 +380,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
          ▼ HTTP PUT /api/orders/101/status { status_name: "Washing" }
 [Express Backend - controllers/orders.js]
   3. Verifies transition validity in the lifecycle progression.
-  4. Matches status_name "Washing" ➔ status_id: 2.
+  4. Matches status_name "Washing" -> status_id: 2.
          │
          ▼ SQL Query
 [MySQL Database]
@@ -411,7 +398,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
   1. Cashier opens payments.html and clicks "Record Payment".
   2. Selects unpaid order #ORD-0101 (Balance due: ₱202.50).
   3. UI auto-fills Amount: ₱202.50 in a readonly input (partial payment blocked).
-  4. Selects Method: "GCash" ➔ reference_no input field appears.
+  4. Selects Method: "GCash" -> reference_no input field appears.
   5. Enters Reference #: "GCASH-78910".
   6. Clicks "Save Payment".
          │
@@ -442,7 +429,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
   2. Selects Delivery order #ORD-0102.
   3. Selects Rider: "Pedro Ramos", Date: "2026-10-22", Window: "1 - 3 PM".
   4. Clicks "Save". Run is logged with status "Scheduled".
-  5. When rider departs, cashier clicks "Start" ➔ status becomes "On the way".
+  5. When rider departs, cashier clicks "Start" -> status becomes "On the way".
   6. Upon arrival, cashier clicks "Done" (Mark Completed).
          │
          ▼ HTTP PUT /api/deliveries/12/advance { status: "Completed" }
@@ -482,7 +469,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 [User Interface]
   7. Customer is removed from customers.html active list.
   8. When opening history.html, customer record appears under the "Customers" tab.
-  9. Clicking "Restore" sends PUT /api/customers/8/restore ➔ `is_archived = FALSE`.
+  9. Clicking "Restore" sends PUT /api/customers/8/restore -> `is_archived = FALSE`.
  10. Record instantly returns to the active customer list.
 ```
 
@@ -606,6 +593,3 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 | **Washer** | `jose.delacruz@laba.ph` | `admin123` | Operational personnel record (login restricted) |
 | **Folder** | `ana.lopez@laba.ph` | `admin123` | Operational personnel record (login restricted) |
 | **Rider** | `pedro.ramos@laba.ph` | `admin123` | Logistics personnel record (login restricted) |
-
----
-*Created with dedication by Group 1 (2BSITB) for CCS110 – Information Management 1.*
