@@ -182,6 +182,10 @@ exports.getOrderStatuses = async (req, res) => {
 };
 
 exports.createOrder = async (req, res) => {
+    const staffId = Number(req.staff?.staff_id);
+    if (!Number.isSafeInteger(staffId) || staffId <= 0) {
+        return res.status(401).json({ error: 'Staff authentication required' });
+    }
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -191,7 +195,6 @@ exports.createOrder = async (req, res) => {
             customer_name,
             contact,
             address,
-            staff_id,
             status_id,
             order_status,
             release_type = 'Pickup',
@@ -286,13 +289,6 @@ exports.createOrder = async (req, res) => {
             }
         }
 
-        // Resolve staff
-        let finalStaffId = staff_id;
-        if (!finalStaffId) {
-            const [staffRows] = await conn.query('SELECT staff_id FROM staff LIMIT 1');
-            finalStaffId = staffRows.length > 0 ? staffRows[0].staff_id : 1;
-        }
-
         // Initial status: Received
         const finalStatusId = 1;
 
@@ -301,7 +297,7 @@ exports.createOrder = async (req, res) => {
         // Insert order
         const [orderResult] = await conn.query(
             'INSERT INTO orders (customer_id, staff_id, status_id, order_date, release_type, release_date) VALUES (?, ?, ?, ?, ?, ?)',
-            [finalCustomerId, finalStaffId, finalStatusId, finalOrderDate, release_type, release_date]
+            [finalCustomerId, staffId, finalStatusId, finalOrderDate, release_type, release_date]
         );
 
         const newOrderId = orderResult.insertId;

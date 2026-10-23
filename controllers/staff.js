@@ -185,7 +185,7 @@ exports.createStaff = async (req, res) => {
 exports.updateStaff = async (req, res) => {
     try {
         const { id } = req.params;
-        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        const requesterId = req.staff?.staff_id;
         if (await isSoleActiveManager(id, requesterId)) {
             return res.status(400).json({ error: 'A manager cannot edit their own account when they are the only manager.' });
         }
@@ -291,7 +291,7 @@ exports.updateStaff = async (req, res) => {
 exports.archiveStaff = async (req, res) => {
     try {
         const { id } = req.params;
-        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        const requesterId = req.staff?.staff_id;
         if (await isSoleActiveManager(id, requesterId)) {
             return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
         }
@@ -331,7 +331,7 @@ exports.unarchiveStaff = async (req, res) => {
 exports.toggleStaffStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        const requesterId = req.staff?.staff_id;
         if (await isSoleActiveManager(id, requesterId)) {
             return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
         }
@@ -351,7 +351,7 @@ exports.toggleStaffStatus = async (req, res) => {
 exports.deleteStaff = async (req, res) => {
     try {
         const { id } = req.params;
-        const requesterId = req.staff?.staff_id || req.headers['x-staff-id'];
+        const requesterId = req.staff?.staff_id;
         if (await isSoleActiveManager(id, requesterId)) {
             return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
         }
