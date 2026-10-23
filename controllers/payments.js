@@ -1,0 +1,421 @@
+const pool = require('../config/db');
+const { isValidDate, todayManila } = require('../utils/validation');
+
+exports.getAllPayments = async (req, res) => {
+    try {
+        const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
+        const archiveFilter = includeArchived ? '' : 'WHERE (p.is_archived IS NULL OR p.is_archived = FALSE)';
+
+        const [rows] = await pool.query(`
+            SELECT 
+                p.payment_id,
+                p.order_id,
+                p.amount_paid,
+                p.amount_paid AS amount,
+                p.payment_method,
+                p.payment_method AS method,
+                DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS payment_date,
+                DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS paid_at,
+                COALESCE(p.status, 'Paid') AS status,
+                COALESCE(p.reference_no, '') AS reference_no,
+                COALESCE(p.is_archived, FALSE) AS is_archived,
+                CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+                c.phone AS contact,
+                p.created_at
+            FROM payments p
+            JOIN orders o ON p.order_id = o.order_id
+            JOIN customers c ON o.customer_id = c.customer_id
+            ${archiveFilter}
+            ORDER BY p.payment_date DESC, p.payment_id DESC
+        `);
+        res.json(rows);
+    } catch (error) {
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.getPaymentById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [rows] = await pool.query(`
+            SELECT 
+                p.payment_id,
+                p.order_id,
+                p.amount_paid,
+                p.amount_paid AS amount,
+                p.payment_method,
+                p.payment_method AS method,
+                DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS payment_date,
+                DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS paid_at,
+                COALESCE(p.status, 'Paid') AS status,
+                COALESCE(p.reference_no, '') AS reference_no,
+                COALESCE(p.is_archived, FALSE) AS is_archived,
+                CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+                c.phone AS contact,
+                p.created_at
+            FROM payments p
+            JOIN orders o ON p.order_id = o.order_id
+            JOIN customers c ON o.customer_id = c.customer_id
+            WHERE p.payment_id = ?
+        `, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.createPayment = async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const { order_id, amount, amount_paid, method, payment_method, paid_at, payment_date, reference_no } = req.body;
+        const finalAmount = amount_paid !== undefined ? amount_paid : amount;
+        const finalMethod = payment_method || method || 'Cash';
+        const finalDate = payment_date || paid_at || todayManila();
+        const finalRef = finalMethod === 'Cash' ? null : String(reference_no || '').trim();
+        const supportedMethods = ['Cash', 'GCash', 'Maya', 'QRPh', 'Card'];
+
+        if (!order_id || finalAmount === undefined) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'order_id and amount are required' });
+        }
+        if (!supportedMethods.includes(finalMethod)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Unsupported payment method' });
+        }
+        if (!Number.isFinite(Number(finalAmount)) || Number(finalAmount) <= 0) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payment amount must be greater than zero' });
+        }
+        if (finalMethod !== 'Cash' && !finalRef) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'A reference number is required for non-cash payments' });
+        }
+        if (finalRef && (finalRef.length > 100 || !/^[\p{L}\p{N} ._/-]+$/u.test(finalRef))) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Reference number contains invalid characters or exceeds 100 characters.' });
+        }
+        if (!isValidDate(finalDate)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payment date must be a valid YYYY-MM-DD date' });
+        }
+
+        const [orderRows] = await conn.query(`
+            SELECT 
+                o.order_id,
+                o.is_archived,
+                COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = o.order_id), 0)
+                  + COALESCE((
+                      SELECT SUM(fee) FROM deliveries
+                      WHERE order_id = o.order_id
+                        AND type = 'Delivery'
+                        AND status <> 'Cancelled'
+                        AND (is_archived IS NULL OR is_archived = FALSE)
+                  ), 0) AS total,
+                COALESCE((
+                    SELECT SUM(amount_paid) 
+                    FROM payments 
+                    WHERE order_id = o.order_id 
+                      AND (is_archived IS NULL OR is_archived = FALSE) 
+                      AND (status IS NULL OR status = 'Paid')
+                ), 0) AS total_paid
+            FROM orders o 
+            WHERE o.order_id = ?
+            FOR UPDATE
+        `, [order_id]);
+
+        if (orderRows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const orderInfo = orderRows[0];
+        if (orderInfo.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payments cannot be added to an archived order.' });
+        }
+        const orderTotal = Number(orderInfo.total || 0);
+        const orderPaid = Number(orderInfo.total_paid || 0);
+        const remainingBalance = Math.round((orderTotal - orderPaid) * 100) / 100;
+
+        if (remainingBalance <= 0) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Order is already fully paid' });
+        }
+
+        const roundedAmount = Math.round(Number(finalAmount) * 100) / 100;
+        if (roundedAmount !== remainingBalance) {
+            await conn.rollback();
+            return res.status(400).json({ error: `Payment must equal the full balance due of ₱${remainingBalance.toFixed(2)}` });
+        }
+
+        if (finalRef) {
+            const [duplicates] = await conn.query(
+                'SELECT payment_id FROM payments WHERE payment_method = ? AND reference_no = ? LIMIT 1',
+                [finalMethod, finalRef]
+            );
+            if (duplicates.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'This reference number has already been used for this payment method' });
+            }
+        }
+
+        const [result] = await conn.query(
+            'INSERT INTO payments (order_id, amount_paid, payment_method, reference_no, payment_date, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
+            [order_id, roundedAmount, finalMethod, finalRef, finalDate, 'Paid']
+        );
+        await conn.commit();
+
+        res.status(201).json({
+            payment_id: result.insertId,
+            order_id: Number(order_id),
+            amount_paid: roundedAmount,
+            amount: roundedAmount,
+            payment_method: finalMethod,
+            method: finalMethod,
+            reference_no: finalRef,
+            payment_date: finalDate,
+            paid_at: finalDate,
+            status: 'Paid',
+            is_archived: false
+        });
+    } catch (error) {
+        await conn.rollback();
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ error: 'This reference number has already been used for this payment method' });
+        }
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
+    }
+};
+
+exports.updatePayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amount, amount_paid, method, payment_method, paid_at, payment_date, reference_no, status, is_archived } = req.body;
+        const finalDate = payment_date || paid_at;
+        if (amount !== undefined || amount_paid !== undefined || method !== undefined ||
+            payment_method !== undefined || status !== undefined || is_archived !== undefined) {
+            return res.status(400).json({ error: 'Only payment reference number and date may be corrected' });
+        }
+
+        const [paymentRows] = await pool.query(
+            'SELECT payment_id, payment_method, reference_no, payment_date FROM payments WHERE payment_id = ?',
+            [id]
+        );
+        if (paymentRows.length === 0) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        const payment = paymentRows[0];
+        const updates = [];
+        const params = [];
+        let finalReference = payment.reference_no;
+
+        if (reference_no !== undefined) {
+            finalReference = payment.payment_method === 'Cash' ? null : String(reference_no || '').trim();
+            if (payment.payment_method !== 'Cash' && !finalReference) {
+                return res.status(400).json({ error: 'A reference number is required for non-cash payments' });
+            }
+            if (finalReference && (finalReference.length > 100 || !/^[\p{L}\p{N} ._/-]+$/u.test(finalReference))) {
+                return res.status(400).json({ error: 'Reference number contains invalid characters or exceeds 100 characters.' });
+            }
+            if (finalReference) {
+                const [duplicates] = await pool.query(
+                    'SELECT payment_id FROM payments WHERE payment_method = ? AND reference_no = ? AND payment_id <> ? LIMIT 1',
+                    [payment.payment_method, finalReference, id]
+                );
+                if (duplicates.length > 0) {
+                    return res.status(400).json({ error: 'This reference number has already been used for this payment method' });
+                }
+            }
+            updates.push('reference_no = ?');
+            params.push(finalReference);
+        }
+        if (finalDate !== undefined) {
+            if (!isValidDate(finalDate)) {
+                return res.status(400).json({ error: 'Payment date must be a valid YYYY-MM-DD date' });
+            }
+            updates.push('payment_date = ?');
+            params.push(finalDate);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'Provide a payment reference number or date to correct' });
+        }
+
+        params.push(id);
+        const [result] = await pool.query(`UPDATE payments SET ${updates.join(', ')} WHERE payment_id = ?`, params);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+
+        res.json({
+            payment_id: Number(id),
+            payment_method: payment.payment_method,
+            method: payment.payment_method,
+            reference_no: finalReference,
+            payment_date: finalDate || payment.payment_date,
+            paid_at: finalDate || payment.payment_date
+        });
+    } catch (error) {
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.archivePayment = async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const { id } = req.params;
+        const [payments] = await conn.query(
+            'SELECT order_id, is_archived FROM payments WHERE payment_id = ?',
+            [id]
+        );
+        if (payments.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        const [orderRows] = await conn.query(
+            'SELECT is_archived FROM orders WHERE order_id = ? FOR UPDATE',
+            [payments[0].order_id]
+        );
+        if (orderRows[0]?.is_archived && !payments[0].is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payments on archived orders cannot be archived.' });
+        }
+        await conn.query('UPDATE payments SET is_archived = TRUE WHERE payment_id = ?', [id]);
+        await conn.commit();
+        res.json({ success: true, message: 'Payment archived successfully', payment_id: Number(id) });
+    } catch (error) {
+        await conn.rollback();
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
+    }
+};
+
+exports.unarchivePayment = async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const { id } = req.params;
+        const [payments] = await conn.query(
+            'SELECT order_id, amount_paid, status, is_archived FROM payments WHERE payment_id = ?',
+            [id]
+        );
+        if (payments.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        const payment = payments[0];
+        const [orderRows] = await conn.query(
+            'SELECT is_archived FROM orders WHERE order_id = ? FOR UPDATE',
+            [payment.order_id]
+        );
+        if (orderRows[0]?.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payments on archived orders cannot be restored.' });
+        }
+        if (!payment.is_archived) {
+            await conn.commit();
+            return res.json({ success: true, message: 'Payment is already active', payment_id: Number(id) });
+        }
+        if ((payment.status || 'Paid') === 'Paid') {
+            const [totals] = await conn.query(`
+                SELECT
+                    COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = ?), 0) +
+                    COALESCE((SELECT SUM(fee) FROM deliveries WHERE order_id = ? AND type = 'Delivery'
+                        AND status <> 'Cancelled' AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS total,
+                    COALESCE((SELECT SUM(amount_paid) FROM payments WHERE order_id = ?
+                        AND (status IS NULL OR status = 'Paid') AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS total_paid
+            `, [payment.order_id, payment.order_id, payment.order_id]);
+            if (Number(totals[0].total_paid) + Number(payment.amount_paid) > Number(totals[0].total) + 0.001) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Restoring this payment would exceed the order total.' });
+            }
+        }
+        await conn.query('UPDATE payments SET is_archived = FALSE WHERE payment_id = ?', [id]);
+        await conn.commit();
+        res.json({ success: true, message: 'Payment unarchived successfully', payment_id: Number(id) });
+    } catch (error) {
+        await conn.rollback();
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
+    }
+};
+
+exports.togglePaymentStatus = async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const { id } = req.params;
+        const [rows] = await conn.query(
+            'SELECT payment_id, order_id, amount_paid, status, is_archived FROM payments WHERE payment_id = ?',
+            [id]
+        );
+        if (rows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        if (rows[0].is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Archived payments cannot have their status changed.' });
+        }
+        if (!['Paid', 'Pending'].includes(rows[0].status || 'Paid')) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Only Paid and Pending payments can be toggled.' });
+        }
+        const [orderRows] = await conn.query(
+            'SELECT is_archived FROM orders WHERE order_id = ? FOR UPDATE',
+            [rows[0].order_id]
+        );
+        if (orderRows[0]?.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payments on archived orders cannot be changed.' });
+        }
+        const current = rows[0].status || 'Paid';
+        const next = (current === 'Paid') ? 'Pending' : 'Paid';
+
+        if (next === 'Paid') {
+            const [totals] = await conn.query(`
+                SELECT
+                    COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = ?), 0) +
+                    COALESCE((SELECT SUM(fee) FROM deliveries WHERE order_id = ? AND type = 'Delivery'
+                        AND status <> 'Cancelled' AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS total,
+                    COALESCE((SELECT SUM(amount_paid) FROM payments WHERE order_id = ? AND payment_id <> ?
+                        AND (status IS NULL OR status = 'Paid') AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS other_paid
+            `, [rows[0].order_id, rows[0].order_id, rows[0].order_id, id]);
+            if (Number(totals[0].other_paid) + Number(rows[0].amount_paid) > Number(totals[0].total) + 0.001) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Marking this payment as Paid would exceed the order total.' });
+            }
+        }
+        await conn.query('UPDATE payments SET status = ? WHERE payment_id = ?', [next, id]);
+        await conn.commit();
+
+        res.json({
+            success: true,
+            payment_id: Number(id),
+            status: next
+        });
+    } catch (error) {
+        await conn.rollback();
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
+    }
+};

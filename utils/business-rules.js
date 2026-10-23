@@ -1,0 +1,3 @@
+const REQUIRE_PAYMENT_BEFORE_COMPLETE = true;
+
+module.exports = { REQUIRE_PAYMENT_BEFORE_COMPLETE };

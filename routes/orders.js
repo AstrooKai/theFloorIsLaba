@@ -1,0 +1,14 @@
+const express = require('express');
+const router = express.Router();
+const orders = require('../controllers/orders');
+const { authorizeRoles } = require('../middleware/auth');
+
+router.get('/statuses', orders.getOrderStatuses);
+router.get('/', authorizeRoles('Washer', 'Folder', 'Cashier', 'Manager'), orders.getAllOrders);
+router.get('/:id/completion-check', authorizeRoles('Washer', 'Folder', 'Cashier', 'Manager'), orders.checkPickupCompletion);
+router.get('/:id', authorizeRoles('Washer', 'Folder', 'Cashier', 'Manager'), orders.getOrderById);
+router.post('/', authorizeRoles('Cashier', 'Manager'), orders.createOrder);
+router.put('/:id', authorizeRoles('Washer', 'Folder', 'Cashier', 'Manager'), orders.updateOrder);
+router.put('/:id/archive', authorizeRoles('Manager'), orders.archiveOrder);
+router.put('/:id/unarchive', authorizeRoles('Manager'), orders.unarchiveOrder);
+module.exports = router;

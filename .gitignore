@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env
+.env.cloud
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Course Reference Materials & Local DDL
+/refs/
+refs/
+TODO.md
+scratch/
