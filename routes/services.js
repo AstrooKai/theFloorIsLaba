@@ -8,6 +8,4 @@ router.get('/:id', services.getServiceById);
 router.post('/', authorizeRoles('Manager'), services.createService);
 router.put('/:id', authorizeRoles('Manager'), services.updateService);
 router.put('/:id/toggle-status', authorizeRoles('Manager'), services.toggleServiceStatus);
-router.delete('/:id', authorizeRoles('Manager'), services.deleteService);
-
 module.exports = router;

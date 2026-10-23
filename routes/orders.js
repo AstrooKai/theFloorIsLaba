@@ -10,6 +10,4 @@ router.post('/', authorizeRoles('Cashier', 'Manager'), orders.createOrder);
 router.put('/:id', authorizeRoles('Washer', 'Folder', 'Cashier', 'Manager'), orders.updateOrder);
 router.put('/:id/archive', authorizeRoles('Manager'), orders.archiveOrder);
 router.put('/:id/unarchive', authorizeRoles('Manager'), orders.unarchiveOrder);
-router.delete('/:id', authorizeRoles('Manager'), orders.deleteOrder);
-
 module.exports = router;

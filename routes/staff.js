@@ -21,6 +21,4 @@ router.put('/:id/archive', authorizeRoles('Manager'), staff.archiveStaff);
 router.put('/:id/unarchive', authorizeRoles('Manager'), staff.unarchiveStaff);
 router.put('/:id/toggle-status', authorizeRoles('Manager'), staff.toggleStaffStatus);
 router.put('/:id', authorizeRoles('Manager'), staff.updateStaff);
-router.delete('/:id', authorizeRoles('Manager'), staff.deleteStaff);
-
 module.exports = router;

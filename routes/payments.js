@@ -10,6 +10,4 @@ router.put('/:id', authorizeRoles('Manager'), payments.updatePayment);
 router.put('/:id/toggle-status', authorizeRoles('Manager'), payments.togglePaymentStatus);
 router.put('/:id/archive', authorizeRoles('Manager'), payments.archivePayment);
 router.put('/:id/unarchive', authorizeRoles('Manager'), payments.unarchivePayment);
-router.delete('/:id', authorizeRoles('Manager'), payments.deletePayment);
-
 module.exports = router;
