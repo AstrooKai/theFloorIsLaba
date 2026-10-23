@@ -2,6 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 const mysql = require('mysql2/promise');
+const { seedWithBootstrapCredentials } = require('../utils/secure-seed');
 
 // Load cloud environment
 const cloudEnvPath = path.join(__dirname, '..', '.env.cloud');
@@ -31,7 +32,6 @@ function parseDatabaseUrl(urlStr) {
 async function seedCloud() {
     console.log('--- The Floor Is Laba: Cloud Database Seeder ---');
     const force = process.argv.includes('--force');
-
     const isCloud = Boolean(
         process.env.DATABASE_URL ||
         (process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1')
@@ -101,7 +101,7 @@ async function seedCloud() {
         seedSql = seedSql.replace(/USE\s+[`\w]+;/gi, '');
         if (counts.every((count) => count === 0) || force) {
             console.log('Inserting initial seed data (staff, services, order statuses, samples)...');
-            await conn.query(seedSql);
+            await seedWithBootstrapCredentials(conn, seedSql);
             console.log('Seed data inserted successfully.');
         } else {
             throw new Error('Database contains non-staff data; refusing to insert duplicate sample data. Use --force only if duplicate sample rows are intended.');

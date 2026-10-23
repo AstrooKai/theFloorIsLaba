@@ -5,7 +5,17 @@ const { REQUIRE_PAYMENT_BEFORE_COMPLETE } = require('../utils/business-rules');
 exports.getAllDeliveries = async (req, res) => {
     try {
         const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
-        const archiveFilter = includeArchived ? '' : 'WHERE (d.is_archived IS NULL OR d.is_archived = FALSE)';
+        const isRider = String(req.staff?.role || '').toLowerCase() === 'rider';
+        const filters = [];
+        const params = [];
+        if (isRider) {
+            filters.push('d.rider_id = ?', '(d.is_archived IS NULL OR d.is_archived = FALSE)');
+            params.push(req.staff.staff_id);
+        } else if (!includeArchived) {
+            filters.push('(d.is_archived IS NULL OR d.is_archived = FALSE)');
+        }
+        const archiveFilter = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+        const feeColumn = isRider ? 'NULL AS fee' : 'd.fee';
 
         const [rows] = await pool.query(`
             SELECT 
@@ -15,7 +25,7 @@ exports.getAllDeliveries = async (req, res) => {
                 d.rider_id,
                 DATE_FORMAT(d.scheduled_date, '%Y-%m-%d') AS scheduled_date,
                 d.time_slot,
-                d.fee,
+                ${feeColumn},
                 d.status,
                 d.street,
                 d.street AS street_address,
@@ -33,7 +43,7 @@ exports.getAllDeliveries = async (req, res) => {
             LEFT JOIN staff r ON d.rider_id = r.staff_id
             ${archiveFilter}
             ORDER BY d.scheduled_date DESC, d.delivery_id DESC
-        `);
+        `, params);
         res.json(rows);
     } catch (error) {
         console.error('Controller error:', error);
@@ -44,6 +54,9 @@ exports.getAllDeliveries = async (req, res) => {
 exports.getDeliveryById = async (req, res) => {
     try {
         const { id } = req.params;
+        const isRider = String(req.staff?.role || '').toLowerCase() === 'rider';
+        const riderFilter = isRider ? 'AND d.rider_id = ? AND (d.is_archived IS NULL OR d.is_archived = FALSE)' : '';
+        const feeColumn = isRider ? 'NULL AS fee' : 'd.fee';
         const [rows] = await pool.query(`
             SELECT 
                 d.delivery_id,
@@ -52,7 +65,7 @@ exports.getDeliveryById = async (req, res) => {
                 d.rider_id,
                 DATE_FORMAT(d.scheduled_date, '%Y-%m-%d') AS scheduled_date,
                 d.time_slot,
-                d.fee,
+                ${feeColumn},
                 d.status,
                 d.street,
                 d.street AS street_address,
@@ -67,8 +80,8 @@ exports.getDeliveryById = async (req, res) => {
             JOIN orders o ON d.order_id = o.order_id
             JOIN customers c ON o.customer_id = c.customer_id
             LEFT JOIN staff r ON d.rider_id = r.staff_id
-            WHERE d.delivery_id = ?
-        `, [id]);
+            WHERE d.delivery_id = ? ${riderFilter}
+        `, isRider ? [id, req.staff.staff_id] : [id]);
 
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Delivery run not found' });
@@ -238,6 +251,17 @@ exports.updateDelivery = async (req, res) => {
             return res.status(404).json({ error: 'Delivery run not found' });
         }
         const current = currentRows[0];
+        if (String(req.staff?.role || '').toLowerCase() === 'rider') {
+            const keys = Object.keys(req.body || {});
+            if (Number(current.rider_id) !== Number(req.staff.staff_id) ||
+                current.type !== 'Delivery' ||
+                keys.length !== 1 ||
+                keys[0] !== 'status' ||
+                !['On the way', 'Completed'].includes(status)) {
+                await conn.rollback();
+                return res.status(403).json({ error: 'Riders may only update the status of their assigned delivery runs.' });
+            }
+        }
         if (current.order_is_archived) {
             await conn.rollback();
             return res.status(400).json({ error: 'Delivery runs on archived orders cannot be changed.' });

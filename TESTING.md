@@ -2,7 +2,7 @@
 
 <blockquote style="border-left: 4px solid #ea580c; padding: 12px 18px; background-color: rgba(234, 88, 12, 0.08); border-radius: 6px; margin: 16px 0 24px 0;">
 
-**Test Suite Summary:** **85 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **85 Pending Verification**
+**Test Suite Summary:** **94 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **94 Pending Verification**
 
 - **1. Authentication & Session Management:** verification pending
 - **2. Role-Based Access Control (RBAC):** verification pending
@@ -18,7 +18,7 @@
 - **12. UI/UX, Themes & Responsive Mobile Views:** verification pending
 - **13. Database Operations & Cloud Deployment Readiness:** verification pending
 
-**Progress:** 0.0% verified (0/85)
+**Progress:** 0.0% verified (0/94)
 
 **Test Environment:** `http://localhost:5000`
 
@@ -434,3 +434,31 @@
 - [ ] **14.17 Delivery Run Type and Customer Contact Defaults**
   - **Steps:** Attempt to create a run whose type differs from the order release type; for a matching type, omit contact and address and inspect the created run. Then try to schedule a second active run.
   - **Expected:** A mismatched type and second active run receive HTTP `400`; the first matching run uses the customer's saved phone and address rather than a placeholder.
+
+- [ ] **14.18 Revoked Staff Tokens**
+  - **Steps:** Log in as a staff member, archive or deactivate the account (or demote its role), then call a protected endpoint with the existing token.
+  - **Expected:** An archived/deactivated account receives HTTP `401`; a demoted account can no longer access endpoints reserved to its former role.
+
+- [ ] **14.19 Customer Data Role Restriction**
+  - **Steps:** Call `GET /api/customers` and `GET /api/customers/:id` as Washer, Folder, and Rider; repeat as Cashier and Manager.
+  - **Expected:** Operational roles receive HTTP `403`; Cashier and Manager can access customer records needed for their work.
+
+- [ ] **14.20 Rider Run Ownership and Field Restrictions**
+  - **Steps:** As a Rider, retrieve another Rider's run, try to update it, then try to change the fee or assignment on an assigned run before advancing its status.
+  - **Expected:** Other Riders' runs are not returned and cannot be retrieved or updated. Only the assigned Rider can advance their Delivery run status; attempts to change other fields receive HTTP `403`.
+
+- [ ] **14.21 Cloud Seed Requires Unique Bootstrap Credentials**
+  - **Steps:** Run the cloud seeder without `CLOUD_SEED_MANAGER_PASSWORD`, then seed an empty test cloud database with a unique 16–72-byte value and inspect the staff password hashes.
+  - **Expected:** Missing/invalid bootstrap credentials stop seeding; the configured secret is hashed for the Manager, and none of the seeded accounts can use the repository's default password.
+
+- [ ] **14.22 Staff Token Revocation and Current Role**
+  - **Steps:** Log in, deactivate/archive the account and try the existing token; separately demote another logged-in Manager and try a Manager-only endpoint.
+  - **Expected:** Inactive or archived accounts receive HTTP `401`; the demoted account receives HTTP `403` for Manager-only actions.
+
+- [ ] **14.23 Customer Read Role Authorization**
+  - **Steps:** Call customer list and detail endpoints with Washer, Folder, and Rider tokens, then with Cashier and Manager tokens.
+  - **Expected:** Operational roles receive HTTP `403`; Cashier and Manager retain customer read access.
+
+- [ ] **14.24 Rider Run Ownership and Update Scope**
+  - **Steps:** As a Rider, list runs, request another Rider's run by ID, and attempt to change fee, address, or assignment on an assigned run.
+  - **Expected:** The list contains only the Rider's non-archived assignments and does not expose fees; other Riders' runs are unavailable, and assigned Riders can change only run status.

@@ -581,6 +581,8 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 
    To explicitly drop and recreate the database for local testing, set `ALLOW_DB_RESET=true` and run `npm run db:reset`; this permanently deletes all data in the configured database. In PowerShell: `$env:ALLOW_DB_RESET='true'; npm run db:reset`. In Bash: `ALLOW_DB_RESET=true npm run db:reset`. The reset command refuses to run without that opt-in.
 
+   Cloud seeding and any empty remote/production initialization require `CLOUD_SEED_MANAGER_PASSWORD` set to a unique password of 16–72 UTF-8 bytes. They do not use the repository's known demo password for any remote account: the bootstrap Manager receives the configured password, and seeded non-Manager accounts receive unavailable random credentials. Keep this value in a secret manager or a protected `.env.cloud` file for `db:cloud:seed`, or the deployment environment for `db:init`; never commit it.
+
 5. **Start the Application**:
    * For production:
      ```bash
@@ -597,7 +599,9 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
    http://localhost:5000
    ```
 
-### Default Credentials for Testing
+### Local Development Demo Credentials
+
+These shared demo credentials are for local development only. Do not use them in a deployed environment.
 
 | Role | Email | Password | Access Privileges |
 | :--- | :--- | :--- | :--- |

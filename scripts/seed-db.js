@@ -2,6 +2,7 @@ require('dotenv').config();
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
+const { seedWithBootstrapCredentials } = require('../utils/secure-seed');
 
 function stripDatabaseDirectives(sql) {
     return sql
@@ -9,7 +10,7 @@ function stripDatabaseDirectives(sql) {
         .replace(/USE\s+[`'\w]+;/gi, '');
 }
 
-async function seedIfEmpty(conn, seedSql) {
+async function seedIfEmpty(conn, seedSql, secureBootstrap) {
     const tables = ['customers', 'staff', 'service_types', 'order_statuses', 'orders', 'order_items', 'payments', 'deliveries'];
     const counts = await Promise.all(tables.map(async (table) => {
         const [rows] = await conn.query(`SELECT COUNT(*) AS count FROM \`${table}\``);
@@ -17,7 +18,12 @@ async function seedIfEmpty(conn, seedSql) {
     }));
 
     if (counts.every((count) => count === 0)) {
-        await conn.query(stripDatabaseDirectives(seedSql));
+        const cleanSeedSql = stripDatabaseDirectives(seedSql);
+        if (secureBootstrap) {
+            await seedWithBootstrapCredentials(conn, cleanSeedSql);
+        } else {
+            await conn.query(cleanSeedSql);
+        }
         console.log('Seed data inserted.');
         return;
     }
@@ -79,7 +85,7 @@ async function initializeDatabase({ reset = false } = {}) {
 
         await conn.query(stripDatabaseDirectives(schemaSql));
         console.log('Database schema is up to date.');
-        await seedIfEmpty(conn, seedSql);
+        await seedIfEmpty(conn, seedSql, cloudHost || process.env.NODE_ENV === 'production');
         console.log(`Database [${dbName}] initialized.`);
     } finally {
         await conn.end();
