@@ -61,7 +61,7 @@ INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES
 -- 7. Seed payments (Only full payments allowed)
 INSERT INTO payments (order_id, amount_paid, payment_method, reference_no, payment_date, status, is_archived) VALUES
 (1, 250.00, 'Cash',  NULL,          '2026-10-03', 'Paid', FALSE),
-(2, 275.00, 'GCash', 'GCASH-98214', '2026-10-04', 'Paid', FALSE),
+(2, 325.00, 'GCash', 'GCASH-98214', '2026-10-04', 'Paid', FALSE),
 (4, 225.00, 'Maya',  'MAYA-44102',  '2026-10-06', 'Paid', FALSE);
 
 -- 8. Seed deliveries

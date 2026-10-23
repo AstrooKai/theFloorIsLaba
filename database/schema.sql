@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS customers (
     barangay       VARCHAR(50)  NULL,
     status         VARCHAR(20)  DEFAULT 'Active',
     is_archived    BOOLEAN      DEFAULT FALSE,
-    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_customers_status CHECK (status IS NOT NULL AND status IN ('Active', 'Inactive'))
 );
 
 -- Table: staff
@@ -31,7 +32,8 @@ CREATE TABLE IF NOT EXISTS staff (
     phone       VARCHAR(15)  NULL,
     status      VARCHAR(20)  DEFAULT 'Active',
     is_archived BOOLEAN      DEFAULT FALSE,
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_staff_role CHECK (role IN ('Manager', 'Cashier', 'Washer', 'Folder', 'Rider'))
 );
 
 -- Table: service_types
@@ -43,13 +45,19 @@ CREATE TABLE IF NOT EXISTS service_types (
     category         VARCHAR(50)   DEFAULT 'Wash & fold',
     turnaround_hours INT           DEFAULT 24,
     status           VARCHAR(20)   DEFAULT 'Active',
-    description      VARCHAR(255)  NULL
+    description      VARCHAR(255)  NULL,
+    CONSTRAINT chk_service_price CHECK (price_per_kg > 0),
+    CONSTRAINT chk_service_turnaround CHECK (turnaround_hours > 0),
+    CONSTRAINT chk_service_unit CHECK (unit IS NOT NULL AND unit IN ('kg', 'piece')),
+    CONSTRAINT chk_service_status CHECK (status IS NOT NULL AND status IN ('Active', 'Discontinued')),
+    CONSTRAINT chk_service_category CHECK (category IS NOT NULL AND category IN ('Wash & fold', 'Wash & dry', 'Pressing', 'Specialty care', 'Bedding & bulky', 'Dry cleaning'))
 );
 
 -- Table: order_statuses
 CREATE TABLE IF NOT EXISTS order_statuses (
     status_id   INT AUTO_INCREMENT PRIMARY KEY,
-    status_name VARCHAR(30) NOT NULL
+    status_name VARCHAR(30) NOT NULL,
+    CONSTRAINT uq_order_status_name UNIQUE (status_name)
 );
 
 -- Table: orders
@@ -63,6 +71,7 @@ CREATE TABLE IF NOT EXISTS orders (
     release_date DATE NULL,
     is_archived  BOOLEAN DEFAULT FALSE,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_order_release_type CHECK (release_type IN ('Pickup', 'Delivery')),
     CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) 
         REFERENCES customers(customer_id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_orders_staff FOREIGN KEY (staff_id) 
@@ -78,6 +87,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     service_id    INT NOT NULL,
     weight_kg     DECIMAL(5,2)  NOT NULL,
     subtotal      DECIMAL(10,2) NOT NULL,
+    CONSTRAINT chk_order_item_weight CHECK (weight_kg > 0),
+    CONSTRAINT chk_order_item_subtotal CHECK (subtotal >= 0),
     CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) 
         REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_order_items_service FOREIGN KEY (service_id) 
@@ -95,6 +106,10 @@ CREATE TABLE IF NOT EXISTS payments (
     status         VARCHAR(20)   DEFAULT 'Paid',
     is_archived    BOOLEAN       DEFAULT FALSE,
     created_at     TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_payment_method_reference UNIQUE (payment_method, reference_no),
+    CONSTRAINT chk_payment_amount CHECK (amount_paid > 0),
+    CONSTRAINT chk_payment_method CHECK (payment_method IN ('Cash', 'GCash', 'Maya', 'QRPh', 'Card')),
+    CONSTRAINT chk_payment_status CHECK (status IS NOT NULL AND status IN ('Paid', 'Pending', 'Refunded')),
     CONSTRAINT fk_payments_order FOREIGN KEY (order_id) 
         REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -115,6 +130,9 @@ CREATE TABLE IF NOT EXISTS deliveries (
     notes          TEXT NULL,
     is_archived    BOOLEAN       DEFAULT FALSE,
     created_at     TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_delivery_type CHECK (type IN ('Pickup', 'Delivery')),
+    CONSTRAINT chk_delivery_fee CHECK (fee >= 0),
+    CONSTRAINT chk_delivery_status CHECK (status IN ('Scheduled', 'On the way', 'Completed', 'Cancelled')),
     CONSTRAINT fk_deliveries_order FOREIGN KEY (order_id) 
         REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_deliveries_rider FOREIGN KEY (rider_id) 
