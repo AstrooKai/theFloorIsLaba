@@ -254,16 +254,6 @@ function renderActionsDropdown(menuItems = [], emptyPlaceholder = "View only") {
 }
 const actionsDropdown = renderActionsDropdown;
 
-// Render standard Edit and Delete action dropdown for a table row
-function renderStandardRowActions(record, idField, extraActions = "") {
-  return renderActionsDropdown([
-    extraActions,
-    `<button class="dropdown-item" data-act="edit" data-id="${record[idField]}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`,
-    `<button class="dropdown-item text-danger" data-act="del" data-id="${record[idField]}" type="button"><i class="bi bi-trash me-2"></i>Delete</button>`
-  ]);
-}
-const std = renderStandardRowActions;
-
 // Debounce helper to limit frequency of rapid calls (e.g. search input typing)
 function debounce(fn, delayMs = 150) {
   let timer;
@@ -710,18 +700,6 @@ const db = {
     }
     return await res.json();
   },
-
-  async del(resource, id) {
-    const res = await fetch(`/api/${resource}/${id}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `Failed to delete from ${resource}`);
-    }
-    return await res.json();
-  }
 };
 
 
@@ -738,11 +716,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const appState = {
     rows: [],
     orders: [],
+    statuses: [],
     riders: [],
     services: [],
     customers: []
   };
   const S = appState; // Shorthand alias for state access
+
+  async function getOrderStatusId(statusName) {
+    if (!S.statuses.length) S.statuses = await db.list("orders/statuses");
+    const status = S.statuses.find((row) => row.status_name === statusName);
+    if (!status) throw new Error(`Unknown order status: ${statusName}`);
+    return Number(status.status_id);
+  }
 
   // Holds the record currently being viewed or edited in the modal
   let editingRecord = null;
@@ -788,7 +774,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (/[a-zA-Z]/.test(str)) {
       return `${label} cannot contain letters`;
     }
-    if (!/^\+?[0-9\s-]+$/.test(str)) {
+    if (!/^[0-9\s-]+$/.test(str)) {
       return `${label} cannot contain symbols`;
     }
     const digits = str.replace(/\D/g, "");
@@ -799,6 +785,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return `${label} should start with 09 (e.g. 0917XXXXXXX)`;
     }
     return null;
+  }
+
+  function validatePersonName(val, label) {
+    const name = String(val || "").trim().replace(/\s+/g, " ");
+    return name.length > 0 && name.length <= 50 && /^[\p{L}][\p{L}\s.'-]*$/u.test(name)
+      ? null
+      : `${label} must contain valid letters and be no longer than 50 characters`;
   }
 
   function fillSelects() {
@@ -1279,8 +1272,10 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
-        if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
+        const firstNameError = validatePersonName(d.first_name, "First name");
+        const lastNameError = validatePersonName(d.last_name, "Last name");
+        if (firstNameError) e.first_name = firstNameError;
+        if (lastNameError) e.last_name = lastNameError;
         const contactErr = validateContact(d.contact, "Contact number", true);
         if (contactErr) e.contact = contactErr;
         const st = (d.street_address || d.street || "").trim();
@@ -1310,9 +1305,9 @@ document.addEventListener("DOMContentLoaded", () => {
       async act(a, r) {
         if (a === "archive") {
           if (Array.isArray(S.orders)) {
-            const active = S.orders.filter(o => 
-              Number(o.customer_id) === Number(r.customer_id) && 
-              (o.order_status || "").toLowerCase() !== "completed" && 
+            const active = S.orders.filter(o =>
+              Number(o.customer_id) === Number(r.customer_id) &&
+              (o.order_status || "").toLowerCase() !== "completed" &&
               !o.is_archived
             );
             if (active.length > 0) {
@@ -1348,8 +1343,19 @@ document.addEventListener("DOMContentLoaded", () => {
           if (f.elements.contact && (EDIT.contact || EDIT.phone || EDIT.customer_phone)) f.elements.contact.value = EDIT.contact || EDIT.phone || EDIT.customer_phone;
           if (f.elements.street) f.elements.street.value = EDIT.street_address || EDIT.street || EDIT.address || "";
           if (f.elements.barangay && EDIT.barangay) f.elements.barangay.value = EDIT.barangay;
-          if (f.elements.service_id && EDIT.service_id) f.elements.service_id.value = EDIT.service_id;
-          if (f.elements.weight_kg) f.elements.weight_kg.value = EDIT.weight_kg || "1.0";
+          if (f.elements.service_id) f.elements.service_id.disabled = true;
+          if (f.elements.weight_kg) f.elements.weight_kg.disabled = true;
+          if (f.elements.total) {
+            f.elements.total.disabled = true;
+            f.elements.total.value = Number(EDIT.total || 0).toFixed(2);
+          }
+          const lineHint = $("#h_service_lines");
+          if (lineHint) {
+            const lines = Array.isArray(EDIT.items) ? EDIT.items : [];
+            lineHint.textContent = lines.length
+              ? `Existing service lines (${lines.length}) are preserved when editing this order. Service-line changes are not supported here.`
+              : "Existing service lines are preserved when editing this order. Service-line changes are not supported here.";
+          }
           if (f.elements.release_type && EDIT.release_type) f.elements.release_type.value = EDIT.release_type;
           const hint = $("#h_customer_id");
           if (hint) hint.textContent = "Customer linked to this order.";
@@ -1443,20 +1449,21 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
-        if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
+        const firstNameError = validatePersonName(d.first_name, "First name");
+        const lastNameError = validatePersonName(d.last_name, "Last name");
+        if (firstNameError) e.first_name = firstNameError;
+        if (lastNameError) e.last_name = lastNameError;
         const contactErr = validateContact(d.contact, "Contact number", true);
         if (contactErr) e.contact = contactErr;
         if (!d.street || !d.street.trim()) e.street = "Street address is required";
         if (!d.barangay || !d.barangay.trim()) e.barangay = "Please select a barangay";
-        if (!d.service_id) e.service_id = "Please select a service";
-        if (!d.weight_kg || Number(d.weight_kg) <= 0) e.weight_kg = "Valid weight/quantity required";
+        if (!EDIT && !d.service_id) e.service_id = "Please select a service";
+        if (!EDIT && (!Number.isFinite(Number(d.weight_kg)) || Number(d.weight_kg) <= 0 || Number(d.weight_kg) > 999.99)) e.weight_kg = "Valid weight/quantity required";
         return e;
       },
       payload: (d) => {
-        const svcId = Number(d.service_id) || 1;
-        const weight = Number(d.weight_kg) || 1.0;
-        const totalVal = Number(d.total) || 0;
+        const svcId = Number(d.service_id);
+        const weight = Number(d.weight_kg);
         return {
           customer_id: d.customer_id ? Number(d.customer_id) : null,
           first_name: (d.first_name || '').trim(),
@@ -1469,10 +1476,9 @@ document.addEventListener("DOMContentLoaded", () => {
           barangay: (d.barangay || '').trim(),
           address: `${d.street || ''}, ${d.barangay || ''}`.trim(),
           release_type: d.release_type || "Pickup",
-          total: totalVal,
           order_date: d.order_date || today(),
           order_status: EDIT ? (EDIT.order_status || "Received") : "Received",
-          items: [{ service_id: svcId, weight_kg: weight, subtotal: totalVal }]
+          ...(!EDIT ? { items: [{ service_id: svcId, weight_kg: weight }] } : {})
         };
       },
       delMsg: (r) => `Archive order <strong>#${ord(r.order_id)}</strong>?`,
@@ -1598,8 +1604,9 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.service_name || !d.service_name.trim()) e.service_name = "Service name is required";
-        if (!d.price || Number(d.price) <= 0) e.price = "Valid price is required";
+        if (!d.service_name || !/^[\p{L}\s&'().,-]{1,50}$/u.test(d.service_name.trim())) e.service_name = "Enter a valid service name (maximum 50 characters)";
+        if (!Number.isFinite(Number(d.price)) || Number(d.price) <= 0 || Number(d.price) > 99999.99) e.price = "Price must be greater than 0 and no more than 99,999.99";
+        if (d.turnaround_hours !== undefined && (!Number.isInteger(Number(d.turnaround_hours)) || Number(d.turnaround_hours) <= 0)) e.turnaround_hours = "Turnaround must be a positive number of hours";
         return e;
       },
       payload: (d) => ({
@@ -1929,8 +1936,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const isRiderOccupied = Boolean(activeRun && activeRun.delivery_id !== r.delivery_id);
 
           const items = [];
-          if (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) {
-            if (isRiderOccupied) {
+          if (r.status === "Scheduled" && (isCashierMgr || isR)) {
+            if (isPickup) {
+              items.push(`<button class="dropdown-item text-warning fw-semibold" data-act="start" data-id="${r.delivery_id}" type="button"><i class="bi bi-play-circle me-2"></i>Start Pickup</button>`);
+            } else if (isRiderOccupied) {
               items.push(`<button class="dropdown-item text-warning disabled" type="button" disabled title="Rider ${esc(r.rider)} is currently on active delivery #${ord(activeRun.order_id)}"><i class="bi bi-clock-history me-2"></i>Rider Busy</button>`);
             } else if (!r.rider) {
               items.push(`<button class="dropdown-item text-muted disabled" type="button" disabled title="Please assign a rider before starting this delivery run"><i class="bi bi-person-x me-2"></i>No Rider</button>`);
@@ -1939,7 +1948,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
 
-          if ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) {
+          if (r.status === "On the way" && (isCashierMgr || isR)) {
             items.push(`<button class="dropdown-item text-success fw-semibold" data-act="done" data-id="${r.delivery_id}" type="button"><i class="bi bi-check-circle me-2"></i>${isPickup ? "Complete Pickup" : "Mark Completed"}</button>`);
           }
 
@@ -1956,15 +1965,17 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           let quickBtn = "";
-          if (!isPickup && r.status === "Scheduled" && (isCashierMgr || isR)) {
-            if (isRiderOccupied) {
+          if (r.status === "Scheduled" && (isCashierMgr || isR)) {
+            if (isPickup) {
+              quickBtn = btn("start", r.delivery_id, `<i class="bi bi-play-fill me-1"></i>Start Pickup`, "btn-warning");
+            } else if (isRiderOccupied) {
               quickBtn = `<button class="btn sm btn-outline-warning" disabled title="Rider is currently on active delivery #${ord(activeRun.order_id)}" type="button"><i class="bi bi-clock-history me-1"></i>Busy</button>`;
             } else if (!r.rider) {
               quickBtn = `<button class="btn sm btn-outline-secondary" disabled title="Assign rider first" type="button">No Rider</button>`;
             } else {
               quickBtn = btn("start", r.delivery_id, `<i class="bi bi-play-fill me-1"></i>Start`, "btn-warning");
             }
-          } else if ((r.status === "On the way" || (isPickup && r.status === "Scheduled")) && (isCashierMgr || isR)) {
+          } else if (r.status === "On the way" && (isCashierMgr || isR)) {
             quickBtn = btn("done", r.delivery_id, `<i class="bi bi-check2 me-1"></i>${isPickup ? "Pickup" : "Done"}`, "btn-success");
           }
 
@@ -2073,17 +2084,20 @@ document.addEventListener("DOMContentLoaded", () => {
       delMsg: (r) => `Archive run for Order <strong>#${ord(r.order_id)}</strong>?`,
       async act(a, r) {
         if (a === "start") {
-          if (!r.rider) return toast("Please assign a rider before starting the run.", 1);
-          const busy = (S.rows || []).find((d) =>
-            d.delivery_id !== r.delivery_id &&
-            d.status === "On the way" &&
-            (
-              (r.rider_id && d.rider_id && Number(d.rider_id) === Number(r.rider_id)) ||
-              (d.rider && r.rider && d.rider.toLowerCase().trim() === r.rider.toLowerCase().trim())
-            )
-          );
-          if (busy) {
-            return toast(`Rider ${r.rider} is currently occupied on an active delivery. Please wait until they return.`, 1);
+          const isPickup = (r.type || "").toLowerCase() === "pickup";
+          if (!isPickup) {
+            if (!r.rider) return toast("Please assign a rider before starting the run.", 1);
+            const busy = (S.rows || []).find((d) =>
+              d.delivery_id !== r.delivery_id &&
+              d.status === "On the way" &&
+              (
+                (r.rider_id && d.rider_id && Number(d.rider_id) === Number(r.rider_id)) ||
+                (d.rider && r.rider && d.rider.toLowerCase().trim() === r.rider.toLowerCase().trim())
+              )
+            );
+            if (busy) {
+              return toast(`Rider ${r.rider} is currently occupied on an active delivery. Please wait until they return.`, 1);
+            }
           }
           return patch(r, { status: "On the way" }, "Run started.");
         }
@@ -2167,8 +2181,10 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.first_name || !d.first_name.trim()) e.first_name = "First name is required";
-        if (!d.last_name || !d.last_name.trim()) e.last_name = "Last name is required";
+        const firstNameError = validatePersonName(d.first_name, "First name");
+        const lastNameError = validatePersonName(d.last_name, "Last name");
+        if (firstNameError) e.first_name = firstNameError;
+        if (lastNameError) e.last_name = lastNameError;
         if (!d.email || !d.email.trim()) {
           e.email = "Email is required";
         } else {
@@ -2176,7 +2192,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail)) {
             e.email = "Please enter a valid email address";
           } else if (Array.isArray(S.rows)) {
-            const dup = S.rows.find(s => 
+            const dup = S.rows.find(s =>
               s.email && s.email.toLowerCase() === normEmail && (!EDIT || Number(s.staff_id) !== Number(EDIT.staff_id))
             );
             if (dup) {
@@ -2303,21 +2319,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (cur === "orders" || cur === "history") {
           const curr = r.order_status || "Received";
           const isDelivery = String(r.release_type || b.dataset.release || "").toLowerCase() === "delivery";
-          const statusMap = {
-            "Received": 1,
-            "Washing": 2,
-            "Folding": 6,
-            "Ready for Pickup": 3,
-            "Out for Delivery": 4,
-            "Completed": 5
-          };
           if (isProductionStaff()) {
             if (curr !== "Received" && curr !== "Washing" && curr !== "Folding") {
-              const maxLabel = isDelivery ? "'Out for Delivery'" : "'Ready for Pickup'";
-              return toast(`Washers and Folders can only update orders up to ${maxLabel}.`, 1);
+              return toast(isDelivery
+                ? "Washers and Folders can advance delivery orders through Folding; use a delivery run for release."
+                : "Washers and Folders can only update pickup orders through Ready for Pickup.", 1);
             }
-            const next = curr === "Received" ? "Washing" : curr === "Washing" ? "Folding" : (isDelivery ? "Out for Delivery" : "Ready for Pickup");
-            const nextId = statusMap[next];
+            if (curr === "Folding" && isDelivery) {
+              return toast("Start the delivery run from Pickup & Delivery to move this order to Out for Delivery.", 1);
+            }
+            const next = curr === "Received" ? "Washing" : curr === "Washing" ? "Folding" : "Ready for Pickup";
+            const nextId = await getOrderStatusId(next);
             if (await ask("Update Order Status", `Advance Order <strong>#${ord(r.order_id)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
               await patch(r, { order_status: next, status_id: nextId }, `Order #${ord(r.order_id)} status updated to ${next}.`);
             }
@@ -2330,17 +2342,14 @@ document.addEventListener("DOMContentLoaded", () => {
             ? ["Received", "Washing", "Folding", "Out for Delivery", "Completed"]
             : ["Received", "Washing", "Folding", "Ready for Pickup", "Completed"];
           const idx = steps.indexOf(curr);
-          let next;
-          if (idx !== -1) {
-            next = steps[(idx + 1) % steps.length];
-          } else if (isDelivery && curr === "Ready for Pickup") {
-            next = "Out for Delivery";
-          } else if (!isDelivery && curr === "Out for Delivery") {
-            next = "Completed";
-          } else {
-            next = steps[0];
+          const next = steps[idx + 1];
+          if (!next) return toast("Completed orders cannot advance further.", 1);
+          if (isDelivery && (next === "Out for Delivery" || next === "Completed")) {
+            return toast(next === "Out for Delivery"
+              ? "Start the delivery run from Pickup & Delivery to move this order forward."
+              : "Complete the delivery run from Pickup & Delivery to complete this order.", 1);
           }
-          const nextId = statusMap[next];
+          const nextId = await getOrderStatusId(next);
           if (await ask("Update Order Status", `Advance Order <strong>#${ord(r.order_id)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
             await patch(r, { order_status: next, status_id: nextId }, `Order #${ord(r.order_id)} status updated to ${next}.`);
           }
@@ -2394,13 +2403,15 @@ document.addEventListener("DOMContentLoaded", () => {
             return toast("A manager cannot edit their own account when they are the only manager.", 1);
           }
         }
+        if (cur === "orders") {
+          try {
+            const details = await db.list(`orders/${r.order_id}`);
+            return openForm({ ...r, ...details });
+          } catch (error) {
+            return toast(error.message, 1);
+          }
+        }
         return openForm(r);
-      }
-      if (a === "del" && await ask("Delete?", e.delMsg(r))) {
-        await db.del(e.name, r[e.id]);
-        const entityLabel = M.one ? (M.one.charAt(0).toUpperCase() + M.one.slice(1)) : "Record";
-        toast(`${entityLabel} deleted successfully.`);
-        await init();
       }
       if (e.act) await e.act(a, r);
     });
@@ -2464,6 +2475,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const address = (order && (order.street || order.barangay || order.address)) ? `${order.street ? order.street + ', ' : ''}${order.barangay ? order.barangay + ', ' : ''}${order.address || ''}`.replace(/,\s*,/g, ', ').replace(/^,\s*|,\s*$/g, '').trim() : "";
 
       const orderTotal = Number((order && (order.total !== undefined ? order.total : order.total_amount)) || (payment && (payment.amount_paid !== undefined ? payment.amount_paid : payment.amount)) || 0);
+      const deliveryFee = Number((order && order.delivery_fee) || 0);
 
       const paymentsList = (order && Array.isArray(order.payments)) ? order.payments : (payment ? [payment] : []);
       const activePayments = paymentsList.filter((p) => !p.is_archived);
@@ -2534,7 +2546,17 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="text-muted small" style="font-size: 11.5px;">Wash, Dry & Fold</div>
             </td>
             <td class="text-center">1 load</td>
-            <td class="text-end fw-semibold">${peso(orderTotal)}</td>
+            <td class="text-end fw-semibold">${peso(Math.max(0, orderTotal - deliveryFee))}</td>
+          </tr>
+        `;
+      }
+      if (deliveryFee > 0) {
+        itemsHtml += `
+          <tr>
+            <td class="text-center text-muted">—</td>
+            <td><div class="fw-semibold">Delivery Fee</div></td>
+            <td class="text-center">1 run</td>
+            <td class="text-end fw-semibold">${peso(deliveryFee)}</td>
           </tr>
         `;
       }
@@ -2608,7 +2630,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   VAT Reg. TIN: 432-891-000-000
                 </div>
               </div>
-              
+
               <div class="invoice-meta">
                 <div class="invoice-title">${docTitle}</div>
                 <div class="invoice-number">${docNumLabel} ${esc(docNumVal)}</div>
@@ -2685,8 +2707,13 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="invoice-summary-card">
                 <div class="invoice-summary-row">
                   <span style="color: var(--text-muted);">Order Subtotal:</span>
-                  <span>${peso(orderTotal)}</span>
+                  <span>${peso(Math.max(0, orderTotal - deliveryFee))}</span>
                 </div>
+                ${deliveryFee > 0 ? `
+                <div class="invoice-summary-row">
+                  <span style="color: var(--text-muted);">Delivery Fee:</span>
+                  <span>${peso(deliveryFee)}</span>
+                </div>` : ''}
                 <div class="invoice-summary-row">
                   <span style="color: var(--text-muted);">Amount Paid:</span>
                   <span style="font-weight: 600; color: ${isPaid ? '#2e7d32' : (isRefunded ? '#d32f2f' : 'inherit')};">
@@ -2802,7 +2829,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
           err = "Please enter a valid email address";
         } else if (Array.isArray(S.rows)) {
-          const dup = S.rows.find(s => 
+          const dup = S.rows.find(s =>
             s.email && s.email.toLowerCase() === val && (!EDIT || Number(s.staff_id) !== Number(EDIT.staff_id))
           );
           if (dup) err = "A staff member with this email address already exists. Please use a unique email.";
@@ -2825,7 +2852,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const field = ev.target.closest(".field");
         if (field && field.classList.contains("invalid")) {
           const val = (ev.target.value || "").trim().toLowerCase();
-          const dup = Array.isArray(S.rows) && S.rows.find(s => 
+          const dup = Array.isArray(S.rows) && S.rows.find(s =>
             s.email && s.email.toLowerCase() === val && (!EDIT || Number(s.staff_id) !== Number(EDIT.staff_id))
           );
           if (!dup && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
@@ -2918,21 +2945,17 @@ document.addEventListener("DOMContentLoaded", () => {
               const orderId = b.dataset.id;
               const curr = b.dataset.current || "Received";
               const isDelivery = String(b.dataset.release || "").toLowerCase() === "delivery";
-              const statusMap = {
-                "Received": 1,
-                "Washing": 2,
-                "Folding": 6,
-                "Ready for Pickup": 3,
-                "Out for Delivery": 4,
-                "Completed": 5
-              };
               if (isProductionStaff()) {
                 if (curr !== "Received" && curr !== "Washing" && curr !== "Folding") {
-                  const maxLabel = isDelivery ? "'Out for Delivery'" : "'Ready for Pickup'";
-                  return toast(`Washers and Folders can only update orders up to ${maxLabel}.`, 1);
+                  return toast(isDelivery
+                    ? "Washers and Folders can advance delivery orders through Folding; use a delivery run for release."
+                    : "Washers and Folders can only update pickup orders through Ready for Pickup.", 1);
                 }
-                const next = curr === "Received" ? "Washing" : curr === "Washing" ? "Folding" : (isDelivery ? "Out for Delivery" : "Ready for Pickup");
-                const nextId = statusMap[next];
+                if (curr === "Folding" && isDelivery) {
+                  return toast("Start the delivery run from Pickup & Delivery to move this order to Out for Delivery.", 1);
+                }
+                const next = curr === "Received" ? "Washing" : curr === "Washing" ? "Folding" : "Ready for Pickup";
+                const nextId = await getOrderStatusId(next);
                 if (await ask("Update Order Status", `Advance Order <strong>#${ord(orderId)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
                   try {
                     const res = await fetch(`/api/orders/${orderId}`, {
@@ -2956,17 +2979,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? ["Received", "Washing", "Folding", "Out for Delivery", "Completed"]
                 : ["Received", "Washing", "Folding", "Ready for Pickup", "Completed"];
               const idx = steps.indexOf(curr);
-              let next;
-              if (idx !== -1) {
-                next = steps[(idx + 1) % steps.length];
-              } else if (isDelivery && curr === "Ready for Pickup") {
-                next = "Out for Delivery";
-              } else if (!isDelivery && curr === "Out for Delivery") {
-                next = "Completed";
-              } else {
-                next = steps[0];
+              const next = steps[idx + 1];
+              if (!next) return toast("Completed orders cannot advance further.", 1);
+              if (isDelivery && (next === "Out for Delivery" || next === "Completed")) {
+                return toast(next === "Out for Delivery"
+                  ? "Start the delivery run from Pickup & Delivery to move this order forward."
+                  : "Complete the delivery run from Pickup & Delivery to complete this order.", 1);
               }
-              const nextId = statusMap[next];
+              const nextId = await getOrderStatusId(next);
               if (await ask("Update Order Status", `Advance Order <strong>#${ord(orderId)}</strong> from "${curr}" to <strong>"${next}"</strong>?`, "Update Status")) {
                 try {
                   const res = await fetch(`/api/orders/${orderId}`, {

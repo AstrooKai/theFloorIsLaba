@@ -452,60 +452,127 @@ exports.updateOrder = async (req, res) => {
         await conn.beginTransaction();
 
         const { id } = req.params;
-        const { order_status, status_id, release_type, release_date, customer_name, contact, address, total } = req.body;
+        const { order_status, status_id, release_type, release_date, customer_name, contact, address } = req.body;
 
-        const [existing] = await conn.query('SELECT * FROM orders WHERE order_id = ?', [id]);
+        const [existing] = await conn.query(`
+            SELECT o.*, os.status_name
+            FROM orders o
+            JOIN order_statuses os ON os.status_id = o.status_id
+            WHERE o.order_id = ?
+            FOR UPDATE
+        `, [id]);
         if (existing.length === 0) {
             await conn.rollback();
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        const statusMap = {
-            'Received': 1,
-            'Washing': 2,
-            'Folding': 6,
-            'Ready for Pickup': 3,
-            'Out for Delivery': 4,
-            'Completed': 5
-        };
-
-        let newStatusId = null;
-        if (order_status && statusMap[order_status]) {
-            newStatusId = statusMap[order_status];
-        } else if (status_id) {
-            newStatusId = Number(status_id);
+        const currentOrder = existing[0];
+        if (currentOrder.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Archived orders must be restored before they can be changed.' });
+        }
+        const finalReleaseType = release_type || currentOrder.release_type;
+        if (!['Pickup', 'Delivery'].includes(finalReleaseType)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Release type must be Pickup or Delivery' });
+        }
+        if (release_type && release_type !== currentOrder.release_type) {
+            const [runRows] = await conn.query(
+                'SELECT delivery_id FROM deliveries WHERE order_id = ? LIMIT 1',
+                [id]
+            );
+            if (currentOrder.status_name !== 'Received' || runRows.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Release type can only change before processing starts and before a run is scheduled.' });
+            }
+        }
+        const [statusRows] = await conn.query('SELECT status_id, status_name FROM order_statuses');
+        let targetStatus = currentOrder.status_name;
+        if (order_status !== undefined) {
+            targetStatus = String(order_status);
+        } else if (status_id !== undefined) {
+            const resolved = statusRows.find(row => Number(row.status_id) === Number(status_id));
+            if (!resolved) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Invalid order status' });
+            }
+            targetStatus = resolved.status_name;
+        }
+        const targetStatusRow = statusRows.find(row => row.status_name === targetStatus);
+        if (!targetStatusRow) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Invalid order status' });
         }
 
-        const finalReleaseType = (release_type || existing[0].release_type || 'Pickup').trim();
-        if (finalReleaseType.toLowerCase() === 'delivery' && newStatusId === 3) {
+        const steps = finalReleaseType === 'Delivery'
+            ? ['Received', 'Washing', 'Folding', 'Out for Delivery', 'Completed']
+            : ['Received', 'Washing', 'Folding', 'Ready for Pickup', 'Completed'];
+        const currentIndex = steps.indexOf(currentOrder.status_name);
+        const targetIndex = steps.indexOf(targetStatus);
+        const isManager = String(req.staff?.role || '').toLowerCase() === 'manager';
+        const reopening = req.body.reopen === true;
+        if (reopening && !isManager) {
             await conn.rollback();
-            conn.release();
-            return res.status(400).json({ error: "Delivery orders cannot be set to 'Ready for Pickup'. Use 'Out for Delivery' instead." });
+            return res.status(403).json({ error: 'Only a Manager may reopen a completed order' });
         }
-        if (finalReleaseType.toLowerCase() === 'pickup' && newStatusId === 4) {
+        const isNextStep = targetStatus === currentOrder.status_name || targetIndex === currentIndex + 1;
+        const managerReopen = isManager && reopening && currentOrder.status_name === 'Completed' && targetIndex >= 0 && targetIndex < currentIndex;
+        if (!isNextStep && !managerReopen) {
             await conn.rollback();
-            conn.release();
-            return res.status(400).json({ error: "Pickup orders cannot be set to 'Out for Delivery'. Use 'Ready for Pickup' instead." });
+            return res.status(400).json({ error: 'Order status must advance by one step; Completed orders are final unless a Manager explicitly reopens them' });
+        }
+        if (targetStatus !== currentOrder.status_name && targetStatus === 'Out for Delivery' && !managerReopen) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Start the delivery run to move this order to Out for Delivery.' });
+        }
+        if (targetStatus !== currentOrder.status_name && targetStatus === 'Completed' && finalReleaseType === 'Delivery') {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Complete the delivery run to complete a Delivery order.' });
+        }
+        if (targetStatus !== currentOrder.status_name && targetStatus === 'Completed' && REQUIRE_PAYMENT_BEFORE_COMPLETE) {
+            const [balanceRows] = await conn.query(`
+                SELECT
+                    COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.order_id), 0) +
+                    COALESCE((SELECT SUM(d.fee) FROM deliveries d WHERE d.order_id = o.order_id
+                        AND d.type = 'Delivery' AND d.status <> 'Cancelled'
+                        AND (d.is_archived IS NULL OR d.is_archived = FALSE)), 0) AS total,
+                    COALESCE((SELECT SUM(p.amount_paid) FROM payments p WHERE p.order_id = o.order_id
+                        AND p.status = 'Paid' AND (p.is_archived IS NULL OR p.is_archived = FALSE)), 0) AS total_paid
+                FROM orders o
+                WHERE o.order_id = ?
+            `, [id]);
+            if (Number(balanceRows[0].total_paid) + 0.001 < Number(balanceRows[0].total)) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'The order must be fully paid before it can be completed.' });
+            }
+        }
+        if (['washer', 'folder'].includes(String(req.staff?.role || '').toLowerCase()) &&
+            targetIndex > steps.indexOf(finalReleaseType === 'Delivery' ? 'Out for Delivery' : 'Ready for Pickup')) {
+            await conn.rollback();
+            return res.status(403).json({ error: 'Washers and Folders may only advance orders up to the ready stage' });
         }
 
         const updates = [];
         const params = [];
 
-        if (newStatusId) {
+        if (targetStatus !== currentOrder.status_name) {
             updates.push('status_id = ?');
-            params.push(newStatusId);
+            params.push(targetStatusRow.status_id);
         }
         if (release_type) {
             updates.push('release_type = ?');
             params.push(release_type);
         }
-        if (release_date !== undefined) {
+        if (targetStatus === 'Completed') {
+            updates.push('release_date = ?');
+            params.push(todayManila());
+        } else if (release_date !== undefined) {
+            if (release_date !== null && !isValidDate(release_date)) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Release date must be a valid YYYY-MM-DD date' });
+            }
             updates.push('release_date = ?');
             params.push(release_date);
-        }
-        if (typeof req.body.is_archived !== 'undefined') {
-            updates.push('is_archived = ?');
-            params.push(Boolean(req.body.is_archived));
         }
 
         if (updates.length > 0) {
@@ -514,10 +581,21 @@ exports.updateOrder = async (req, res) => {
         }
 
         // Update customer
-        const reqCustId = req.body.customer_id ? Number(req.body.customer_id) : null;
+        const reqCustId = req.body.customer_id !== undefined ? Number(req.body.customer_id) : null;
+        if (req.body.customer_id !== undefined && (!Number.isSafeInteger(reqCustId) || reqCustId <= 0)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Invalid customer ID' });
+        }
         if (reqCustId && reqCustId !== existing[0].customer_id) {
-            updates.push('customer_id = ?');
-            params.push(reqCustId);
+            const [customerRows] = await conn.query(
+                "SELECT customer_id FROM customers WHERE customer_id = ? AND status = 'Active' AND (is_archived IS NULL OR is_archived = FALSE)",
+                [reqCustId]
+            );
+            if (customerRows.length === 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Customer not found or inactive' });
+            }
+            await conn.query('UPDATE orders SET customer_id = ? WHERE order_id = ?', [reqCustId, id]);
         }
 
         const targetCustId = reqCustId || existing[0].customer_id;
@@ -531,37 +609,31 @@ exports.updateOrder = async (req, res) => {
         const custParams = [];
 
         if (firstName || lastName) {
-            if (firstName) { custUpdates.push('first_name = ?'); custParams.push(firstName); }
-            if (lastName) { custUpdates.push('last_name = ?'); custParams.push(lastName); }
+            const finalFirstName = cleanName(firstName || existing[0].first_name);
+            const finalLastName = cleanName(lastName || existing[0].last_name);
+            if (!isValidPersonName(finalFirstName) || !isValidPersonName(finalLastName)) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Names can only contain letters, spaces, apostrophes, periods and hyphens.' });
+            }
+            if (firstName) { custUpdates.push('first_name = ?'); custParams.push(finalFirstName); }
+            if (lastName) { custUpdates.push('last_name = ?'); custParams.push(finalLastName); }
         } else if (customer_name) {
-            const parts = customer_name.trim().split(/\s+/);
+            const parts = cleanName(customer_name).split(' ');
+            if (!isValidPersonName(parts[0] || '') || !isValidPersonName(parts.slice(1).join(' '))) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Names can only contain letters, spaces, apostrophes, periods and hyphens.' });
+            }
             custUpdates.push('first_name = ?', 'last_name = ?');
             custParams.push(parts[0] || '', parts.slice(1).join(' ') || '');
         }
         if (phoneVal) {
-            if (/[a-zA-Z]/.test(phoneVal)) {
+            const normalizedPhone = normalizePhone(phoneVal);
+            if (!normalizedPhone) {
                 await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Contact number cannot contain letters' });
-            }
-            if (!/^\+?[0-9\s-]+$/.test(phoneVal)) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-            }
-            const digits = phoneVal.replace(/\D/g, '');
-            if (digits.length !== 11) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-            }
-            if (!digits.startsWith('09')) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number starting with 09' });
             }
             custUpdates.push('phone = ?');
-            custParams.push(phoneVal);
+            custParams.push(normalizedPhone);
         }
         if (streetVal) {
             custUpdates.push('street_address = ?');
@@ -577,30 +649,86 @@ exports.updateOrder = async (req, res) => {
             await conn.query(`UPDATE customers SET ${custUpdates.join(', ')} WHERE customer_id = ?`, custParams);
         }
 
-        // Update items
-        if (Array.isArray(req.body.items) && req.body.items.length > 0) {
-            await conn.query('DELETE FROM order_items WHERE order_id = ?', [id]);
+        let pricedItems = null;
+        if (req.body.items !== undefined) {
+            if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'At least one service item is required' });
+            }
+            const [activePaymentRows] = await conn.query(
+                'SELECT payment_id FROM payments WHERE order_id = ? AND (is_archived IS NULL OR is_archived = FALSE) LIMIT 1',
+                [id]
+            );
+            if (activePaymentRows.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Service lines cannot be changed while active payment records exist.' });
+            }
+            pricedItems = [];
             for (const item of req.body.items) {
+                const serviceId = Number(item.service_id);
+                const weight = Number(item.weight_kg);
+                if (!Number.isSafeInteger(serviceId) || !Number.isFinite(weight) || weight <= 0 || weight > 999.99) {
+                    await conn.rollback();
+                    return res.status(400).json({ error: 'Each service item needs a valid service and a weight greater than 0 and no more than 999.99' });
+                }
+                const [services] = await conn.query(
+                    "SELECT price_per_kg FROM service_types WHERE service_id = ? AND status = 'Active'",
+                    [serviceId]
+                );
+                if (services.length === 0) {
+                    await conn.rollback();
+                    return res.status(400).json({ error: `Service ${serviceId} does not exist or is not active` });
+                }
+                const subtotal = Math.round(weight * Number(services[0].price_per_kg) * 100) / 100;
+                if (subtotal > 99999999.99) {
+                    await conn.rollback();
+                    return res.status(400).json({ error: 'A service line exceeds the maximum supported order amount.' });
+                }
+                pricedItems.push({
+                    service_id: serviceId,
+                    weight_kg: weight,
+                    subtotal
+                });
+            }
+            if (pricedItems.reduce((sum, item) => sum + item.subtotal, 0) > 99999999.99) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Order total exceeds the maximum supported amount.' });
+            }
+            await conn.query('DELETE FROM order_items WHERE order_id = ?', [id]);
+            for (const item of pricedItems) {
                 await conn.query(
                     'INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES (?, ?, ?, ?)',
                     [id, item.service_id, item.weight_kg, item.subtotal]
                 );
             }
-        } else if (total !== undefined) {
-            await conn.query(
-                'UPDATE order_items SET subtotal = ? WHERE order_id = ? LIMIT 1',
-                [Number(total), id]
-            );
         }
 
+        const [totals] = await conn.query(`
+            SELECT COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                SELECT SUM(d.fee) FROM deliveries d
+                WHERE d.order_id = o.order_id
+                  AND d.type = 'Delivery'
+                  AND d.status <> 'Cancelled'
+                  AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+            ), 0) AS total,
+            COALESCE((
+                SELECT SUM(p.amount_paid) FROM payments p
+                WHERE p.order_id = o.order_id AND (p.status IS NULL OR p.status = 'Paid')
+                  AND (p.is_archived IS NULL OR p.is_archived = FALSE)
+            ), 0) AS total_paid,
+            os.status_name
+            FROM orders o
+            LEFT JOIN order_items oi ON oi.order_id = o.order_id
+            JOIN order_statuses os ON os.status_id = o.status_id
+            WHERE o.order_id = ?
+            GROUP BY o.order_id, os.status_name
+        `, [id]);
         await conn.commit();
 
-        const statusNames = { 1: 'Received', 2: 'Washing', 3: 'Ready for Pickup', 4: 'Out for Delivery', 5: 'Completed', 6: 'Folding' };
-        const resolvedName = order_status || statusNames[newStatusId] || 'Received';
         res.json({
             order_id: Number(id),
-            order_status: resolvedName,
-            total: Number(total) || 0
+            order_status: targetStatus,
+            total: Number(totals[0]?.total || 0)
         });
     } catch (error) {
         await conn.rollback();
@@ -612,14 +740,42 @@ exports.updateOrder = async (req, res) => {
 };
 
 exports.archiveOrder = async (req, res) => {
+    const conn = await pool.getConnection();
     try {
+        await conn.beginTransaction();
         const { id } = req.params;
-        const [result] = await pool.query('UPDATE orders SET is_archived = TRUE WHERE order_id = ?', [id]);
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
+        const [rows] = await conn.query(`
+            SELECT os.status_name,
+                   COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.order_id), 0)
+                     + COALESCE((SELECT SUM(d.fee) FROM deliveries d
+                         WHERE d.order_id = o.order_id AND d.type = 'Delivery' AND d.status <> 'Cancelled'
+                           AND (d.is_archived IS NULL OR d.is_archived = FALSE)), 0) AS total,
+                   COALESCE((SELECT SUM(p.amount_paid) FROM payments p
+                       WHERE p.order_id = o.order_id AND (p.status IS NULL OR p.status = 'Paid')
+                         AND (p.is_archived IS NULL OR p.is_archived = FALSE)), 0) AS total_paid
+            FROM orders o
+            JOIN order_statuses os ON os.status_id = o.status_id
+            WHERE o.order_id = ?
+            FOR UPDATE
+        `, [id]);
+        if (rows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        if (rows[0].status_name !== 'Completed' ||
+            Math.abs(Number(rows[0].total_paid) - Number(rows[0].total)) > 0.001) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Only completed and fully paid orders can be archived' });
+        }
+        await conn.query('UPDATE orders SET is_archived = TRUE WHERE order_id = ?', [id]);
+        await conn.commit();
         res.json({ success: true, message: 'Order archived successfully', order_id: Number(id) });
     } catch (error) {
+        await conn.rollback();
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
     }
 };
 
