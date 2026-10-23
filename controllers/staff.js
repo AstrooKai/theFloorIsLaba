@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { cleanName, isValidPersonName, normalizePhone } = require('../utils/validation');
 const STAFF_ROLES = ['Manager', 'Cashier', 'Washer', 'Folder', 'Rider'];
 
 // Check if a staff member is the sole active manager
@@ -122,33 +123,27 @@ exports.createStaff = async (req, res) => {
             last_name = parts.slice(1).join(' ') || '';
         }
 
-        if (!first_name) {
-            return res.status(400).json({ error: 'First name is required' });
+        first_name = cleanName(first_name);
+        last_name = cleanName(last_name || '');
+        if (!isValidPersonName(first_name) || !isValidPersonName(last_name)) {
+            return res.status(400).json({ error: 'Enter valid first and last names (maximum 50 characters).' });
         }
         if (!STAFF_ROLES.includes(role)) {
             return res.status(400).json({ error: 'Please select a valid staff role' });
         }
-        if (typeof password !== 'string' || password.length < 8) {
-            return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+        if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters and no more than 72 UTF-8 bytes long.' });
         }
 
-        if (phone) {
-            if (/[a-zA-Z]/.test(phone)) {
-                return res.status(400).json({ error: 'Contact number cannot contain letters' });
-            }
-            if (!/^\+?[0-9\s-]+$/.test(phone)) {
-                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-            }
-            const phoneDigits = phone.replace(/\D/g, '');
-            if (phoneDigits.length !== 11) {
-                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-            }
-            if (!phoneDigits.startsWith('09')) {
-                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
-            }
+        const normalizedPhone = phone ? normalizePhone(phone) : '';
+        if (phone && !normalizedPhone) {
+            return res.status(400).json({ error: 'Enter a valid 11-digit mobile number starting with 09.' });
         }
 
         const finalEmail = (email || `${first_name.toLowerCase()}.${(last_name || 'staff').toLowerCase()}@laba.ph`).trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail) || finalEmail.length > 100) {
+            return res.status(400).json({ error: 'Enter a valid email address.' });
+        }
 
         // Check for duplicate email
         const [existingEmail] = await pool.query(
@@ -167,7 +162,7 @@ exports.createStaff = async (req, res) => {
         // Initial status: Active
         const [result] = await pool.query(
             'INSERT INTO staff (first_name, last_name, role, email, password, phone, status, is_archived) VALUES (?, ?, ?, ?, ?, ?, "Active", FALSE)',
-            [first_name, last_name || '', role, finalEmail, hashedPassword, phone || '']
+            [first_name, last_name, role, finalEmail, hashedPassword, normalizedPhone]
         );
 
         res.status(201).json({
@@ -177,7 +172,7 @@ exports.createStaff = async (req, res) => {
             full_name: `${first_name} ${last_name || ''}`.trim(),
             role,
             email: finalEmail,
-            phone: phone || '',
+            phone: normalizedPhone,
             status: 'Active',
             is_archived: false
         });
@@ -206,6 +201,14 @@ exports.updateStaff = async (req, res) => {
             first_name = parts[0] || '';
             last_name = parts.slice(1).join(' ') || '';
         }
+        if (first_name !== undefined) {
+            first_name = cleanName(first_name);
+            if (!isValidPersonName(first_name)) return res.status(400).json({ error: 'Enter a valid first name.' });
+        }
+        if (last_name !== undefined) {
+            last_name = cleanName(last_name);
+            if (!isValidPersonName(last_name)) return res.status(400).json({ error: 'Enter a valid last name.' });
+        }
 
         const updates = [];
         const params = [];
@@ -227,6 +230,9 @@ exports.updateStaff = async (req, res) => {
         }
         if (email) {
             const cleanEmail = email.trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanEmail.length > 100) {
+                return res.status(400).json({ error: 'Enter a valid email address.' });
+            }
             const [existingEmail] = await pool.query(
                 'SELECT staff_id FROM staff WHERE LOWER(email) = LOWER(?) AND staff_id != ?',
                 [cleanEmail, id]
@@ -241,31 +247,20 @@ exports.updateStaff = async (req, res) => {
             params.push(cleanEmail);
         }
         if (password && password.trim()) {
-            if (password.trim().length < 8) {
-                return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+            if (password.trim().length < 8 || Buffer.byteLength(password.trim(), 'utf8') > 72) {
+                return res.status(400).json({ error: 'Password must be at least 8 characters and no more than 72 UTF-8 bytes long.' });
             }
             const hashedPassword = await bcrypt.hash(password.trim(), 10);
             updates.push('password = ?');
             params.push(hashedPassword);
         }
         if (phone !== undefined) {
-            if (phone) {
-                if (/[a-zA-Z]/.test(phone)) {
-                    return res.status(400).json({ error: 'Contact number cannot contain letters' });
-                }
-                if (!/^\+?[0-9\s-]+$/.test(phone)) {
-                    return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-                }
-                const phoneDigits = phone.replace(/\D/g, '');
-                if (phoneDigits.length !== 11) {
-                    return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-                }
-                if (!phoneDigits.startsWith('09')) {
-                    return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
-                }
+            const normalizedPhone = phone ? normalizePhone(phone) : '';
+            if (phone && !normalizedPhone) {
+                return res.status(400).json({ error: 'Enter a valid 11-digit mobile number starting with 09.' });
             }
             updates.push('phone = ?');
-            params.push(phone);
+            params.push(normalizedPhone);
         }
         if (status) {
             const normStatus = status === 'Inactive' ? 'Deactivated' : status;
@@ -363,27 +358,6 @@ exports.toggleStaffStatus = async (req, res) => {
         const newStatus = currentStatus === 'Active' ? 'Deactivated' : 'Active';
         await pool.query('UPDATE staff SET status = ? WHERE staff_id = ?', [newStatus, id]);
         res.json({ success: true, staff_id: Number(id), status: newStatus });
-    } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-exports.deleteStaff = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const requesterId = req.staff?.staff_id;
-        if (await isSoleActiveManager(id, requesterId)) {
-            return res.status(400).json({ error: 'A manager cannot change the status of their own account when they are the only manager.' });
-        }
-        // Soft-archive staff
-        const [result] = await pool.query("UPDATE staff SET is_archived = TRUE, status = 'Deactivated' WHERE staff_id = ?", [id]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Staff member not found' });
-        }
-
-        res.json({ message: 'Staff member archived successfully', staff_id: Number(id) });
     } catch (error) {
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });

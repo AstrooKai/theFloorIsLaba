@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { isValidServiceCategory, isValidServiceName } = require('../utils/validation');
 
 exports.getAllServices = async (req, res) => {
     try {
@@ -59,22 +60,31 @@ exports.createService = async (req, res) => {
         if (!service_name || finalPrice === undefined) {
             return res.status(400).json({ error: 'service_name and price are required' });
         }
+        const cleanServiceName = String(service_name).trim();
+        const numericPrice = Number(finalPrice);
+        const hours = Number(turnaround_hours);
+        if (!isValidServiceName(cleanServiceName) || !Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 99999.99 ||
+            !['kg', 'piece'].includes(unit) || !Number.isSafeInteger(hours) || hours <= 0 ||
+            !['Active', 'Discontinued'].includes(status) || !isValidServiceCategory(category) ||
+            (description !== undefined && String(description).length > 255)) {
+            return res.status(400).json({ error: 'Service name, rate, unit, turnaround, status, category, or description is invalid.' });
+        }
 
-        const finalDesc = description || `Standard laundry service charged at ₱${Number(finalPrice).toFixed(2)} per ${unit}.`;
+        const finalDesc = description || `Standard laundry service charged at ₱${numericPrice.toFixed(2)} per ${unit}.`;
 
         const [result] = await pool.query(
             'INSERT INTO service_types (service_name, price_per_kg, unit, category, turnaround_hours, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [service_name.trim(), Number(finalPrice), unit, category, Number(turnaround_hours), status, finalDesc]
+            [cleanServiceName, numericPrice, unit, String(category).trim(), hours, status, finalDesc]
         );
 
         res.status(201).json({
             service_id: result.insertId,
-            service_name: service_name.trim(),
-            price_per_kg: Number(finalPrice),
-            price: Number(finalPrice),
+            service_name: cleanServiceName,
+            price_per_kg: numericPrice,
+            price: numericPrice,
             unit,
-            category,
-            turnaround_hours: Number(turnaround_hours),
+            category: String(category).trim(),
+            turnaround_hours: hours,
             status,
             description: finalDesc
         });
@@ -89,17 +99,29 @@ exports.updateService = async (req, res) => {
         const { id } = req.params;
         const { service_name, price, price_per_kg, unit, category, turnaround_hours, status, description } = req.body;
         const finalPrice = price_per_kg !== undefined ? price_per_kg : price;
+        const finalStatus = status === 'Inactive' ? 'Discontinued' : status;
+        const numericPrice = finalPrice === undefined ? undefined : Number(finalPrice);
+        const hours = turnaround_hours === undefined ? undefined : Number(turnaround_hours);
+        if ((service_name !== undefined && !isValidServiceName(String(service_name).trim())) ||
+            (numericPrice !== undefined && (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 99999.99)) ||
+            (unit !== undefined && !['kg', 'piece'].includes(unit)) ||
+            (hours !== undefined && (!Number.isSafeInteger(hours) || hours <= 0)) ||
+            (finalStatus !== undefined && !['Active', 'Discontinued'].includes(finalStatus)) ||
+            (category !== undefined && !isValidServiceCategory(category)) ||
+            (description !== undefined && String(description).length > 255)) {
+            return res.status(400).json({ error: 'Service name, rate, unit, turnaround, status, category, or description is invalid.' });
+        }
 
         const updates = [];
         const params = [];
 
         if (service_name !== undefined) {
             updates.push('service_name = ?');
-            params.push(service_name.trim());
+            params.push(String(service_name).trim());
         }
         if (finalPrice !== undefined) {
             updates.push('price_per_kg = ?');
-            params.push(Number(finalPrice));
+            params.push(numericPrice);
         }
         if (unit !== undefined) {
             updates.push('unit = ?');
@@ -107,16 +129,15 @@ exports.updateService = async (req, res) => {
         }
         if (category !== undefined) {
             updates.push('category = ?');
-            params.push(category);
+            params.push(String(category).trim());
         }
         if (turnaround_hours !== undefined) {
             updates.push('turnaround_hours = ?');
-            params.push(Number(turnaround_hours));
+            params.push(hours);
         }
         if (status !== undefined) {
-            const normStatus = status === 'Inactive' ? 'Discontinued' : status;
             updates.push('status = ?');
-            params.push(normStatus);
+            params.push(finalStatus);
         }
         if (description !== undefined) {
             updates.push('description = ?');
@@ -159,17 +180,6 @@ exports.toggleServiceStatus = async (req, res) => {
             status: nextStatus,
             message: `Service status updated to ${nextStatus}`
         });
-    } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-exports.deleteService = async (req, res) => {
-    try {
-        const { id } = req.params;
-        await pool.query("UPDATE service_types SET status = 'Discontinued' WHERE service_id = ?", [id]);
-        res.json({ message: 'Service discontinued successfully', service_id: Number(id), status: 'Discontinued' });
     } catch (error) {
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });

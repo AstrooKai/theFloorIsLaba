@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { cleanName, isValidPersonName, normalizePhone } = require('../utils/validation');
 
 exports.getAllCustomers = async (req, res) => {
     try {
@@ -71,31 +72,25 @@ exports.createCustomer = async (req, res) => {
             first_name = parts[0] || '';
             last_name = parts.slice(1).join(' ') || '';
         }
-        const finalPhone = phone || contact || '';
+        first_name = cleanName(first_name);
+        last_name = cleanName(last_name || '');
+        const finalPhone = normalizePhone(phone || contact || '');
         const rawStreet = street_address !== undefined ? street_address : (street !== undefined ? street : (address || ''));
         const finalStreetAddress = (rawStreet || '').trim();
         const finalBarangay = (barangay || '').trim();
         const finalStatus = status || 'Active';
 
-        if (!first_name) {
-            return res.status(400).json({ error: 'First name is required' });
+        if (!isValidPersonName(first_name) || !isValidPersonName(last_name)) {
+            return res.status(400).json({ error: 'Enter valid first and last names (maximum 50 characters).' });
         }
-
-        if (!finalPhone || !finalPhone.trim()) {
-            return res.status(400).json({ error: 'Contact number is required' });
+        if (!finalPhone) {
+            return res.status(400).json({ error: 'Enter a valid 11-digit mobile number starting with 09.' });
         }
-        if (/[a-zA-Z]/.test(finalPhone)) {
-            return res.status(400).json({ error: 'Contact number cannot contain letters' });
+        if (!finalStreetAddress || finalStreetAddress.length > 150 || !finalBarangay || finalBarangay.length > 50) {
+            return res.status(400).json({ error: 'A valid street address and barangay are required.' });
         }
-        if (!/^\+?[0-9\s-]+$/.test(finalPhone)) {
-            return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-        }
-        const phoneDigits = finalPhone.replace(/\D/g, '');
-        if (phoneDigits.length !== 11) {
-            return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-        }
-        if (!phoneDigits.startsWith('09')) {
-            return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
+        if (!['Active', 'Inactive'].includes(finalStatus)) {
+            return res.status(400).json({ error: 'Customer status must be Active or Inactive.' });
         }
 
         const [result] = await pool.query(
@@ -127,6 +122,9 @@ exports.updateCustomer = async (req, res) => {
     try {
         const { id } = req.params;
         let { first_name, last_name, full_name, phone, contact, street_address, street, barangay, address, status, is_archived } = req.body;
+        if (is_archived !== undefined && String(req.staff?.role || '').toLowerCase() !== 'manager') {
+            return res.status(403).json({ error: 'Only a Manager may archive customers.' });
+        }
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
@@ -139,9 +137,10 @@ exports.updateCustomer = async (req, res) => {
         }
 
         const current = existing[0];
-        const finalFirstName = first_name !== undefined ? first_name : current.first_name;
-        const finalLastName = last_name !== undefined ? last_name : current.last_name;
-        const finalPhone = (phone !== undefined ? phone : (contact !== undefined ? contact : current.phone)) || '';
+        const finalFirstName = cleanName(first_name !== undefined ? first_name : current.first_name);
+        const finalLastName = cleanName(last_name !== undefined ? last_name : current.last_name);
+        const rawPhone = (phone !== undefined ? phone : (contact !== undefined ? contact : current.phone)) || '';
+        const finalPhone = normalizePhone(rawPhone);
         
         const inputStreet = street_address !== undefined ? street_address : (street !== undefined ? street : address);
         const finalStreetAddress = inputStreet !== undefined ? inputStreet.trim() : (current.street_address || '');
@@ -149,20 +148,14 @@ exports.updateCustomer = async (req, res) => {
         const finalStatus = status !== undefined ? status : (current.status || 'Active');
         const finalArchived = is_archived !== undefined ? Boolean(is_archived) : Boolean(current.is_archived);
 
-        if (finalPhone) {
-            if (/[a-zA-Z]/.test(finalPhone)) {
-                return res.status(400).json({ error: 'Contact number cannot contain letters' });
-            }
-            if (!/^\+?[0-9\s-]+$/.test(finalPhone)) {
-                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-            }
-            const phoneDigits = finalPhone.replace(/\D/g, '');
-            if (phoneDigits.length !== 11) {
-                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-            }
-            if (!phoneDigits.startsWith('09')) {
-                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
-            }
+        if (!isValidPersonName(finalFirstName) || !isValidPersonName(finalLastName) || !finalPhone) {
+            return res.status(400).json({ error: 'Enter valid first and last names and a valid 11-digit mobile number starting with 09.' });
+        }
+        if (finalStreetAddress.length > 150 || finalBarangay.length > 50) {
+            return res.status(400).json({ error: 'Address fields exceed their maximum length.' });
+        }
+        if (!['Active', 'Inactive'].includes(finalStatus)) {
+            return res.status(400).json({ error: 'Customer status must be Active or Inactive.' });
         }
 
         if (finalArchived && !current.is_archived) {
@@ -247,25 +240,6 @@ exports.unarchiveCustomer = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Customer not found' });
         res.json({ success: true, message: 'Customer reactivated successfully', customer_id: Number(id) });
     } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-exports.deleteCustomer = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const [result] = await pool.query('DELETE FROM customers WHERE customer_id = ?', [id]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Customer not found' });
-        }
-
-        res.json({ message: 'Customer deleted successfully', customer_id: Number(id) });
-    } catch (error) {
-        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-            return res.status(400).json({ error: 'Cannot delete customer with existing orders. Please archive instead.' });
-        }
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }

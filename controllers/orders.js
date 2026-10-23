@@ -792,19 +792,3 @@ exports.unarchiveOrder = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-
-exports.deleteOrder = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const [result] = await pool.query('DELETE FROM orders WHERE order_id = ?', [id]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Order not found' });
-        }
-
-        res.json({ message: 'Order deleted successfully', order_id: Number(id) });
-    } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-};
