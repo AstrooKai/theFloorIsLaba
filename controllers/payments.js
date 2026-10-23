@@ -97,6 +97,10 @@ exports.createPayment = async (req, res) => {
             await conn.rollback();
             return res.status(400).json({ error: 'A reference number is required for non-cash payments' });
         }
+        if (finalRef && (finalRef.length > 100 || !/^[\p{L}\p{N} ._/-]+$/u.test(finalRef))) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Reference number contains invalid characters or exceeds 100 characters.' });
+        }
         if (!isValidDate(finalDate)) {
             await conn.rollback();
             return res.status(400).json({ error: 'Payment date must be a valid YYYY-MM-DD date' });
@@ -105,6 +109,7 @@ exports.createPayment = async (req, res) => {
         const [orderRows] = await conn.query(`
             SELECT 
                 o.order_id,
+                o.is_archived,
                 COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = o.order_id), 0)
                   + COALESCE((
                       SELECT SUM(fee) FROM deliveries
@@ -131,11 +136,16 @@ exports.createPayment = async (req, res) => {
         }
 
         const orderInfo = orderRows[0];
+        if (orderInfo.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Payments cannot be added to an archived order.' });
+        }
         const orderTotal = Number(orderInfo.total || 0);
         const orderPaid = Number(orderInfo.total_paid || 0);
         const remainingBalance = Math.round((orderTotal - orderPaid) * 100) / 100;
 
         if (remainingBalance <= 0) {
+            await conn.rollback();
             return res.status(400).json({ error: 'Order is already fully paid' });
         }
 
@@ -147,7 +157,7 @@ exports.createPayment = async (req, res) => {
 
         if (finalRef) {
             const [duplicates] = await conn.query(
-                "SELECT payment_id FROM payments WHERE payment_method = ? AND reference_no = ? AND (is_archived IS NULL OR is_archived = FALSE) LIMIT 1",
+                'SELECT payment_id FROM payments WHERE payment_method = ? AND reference_no = ? LIMIT 1',
                 [finalMethod, finalRef]
             );
             if (duplicates.length > 0) {

@@ -79,18 +79,37 @@ exports.getDeliveryById = async (req, res) => {
 };
 
 exports.createDelivery = async (req, res) => {
+    const conn = await pool.getConnection();
     try {
+        await conn.beginTransaction();
         const { order_id, type = 'Delivery', scheduled_date, time_slot = '10 AM - 12 PM', fee, rider, rider_id, street, street_address, barangay, address, contact, notes } = req.body;
         if (!order_id) {
+            await conn.rollback();
             return res.status(400).json({ error: 'order_id is required' });
         }
+        if (!['Pickup', 'Delivery'].includes(type)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Run type must be Pickup or Delivery' });
+        }
 
-        const [orderRows] = await pool.query(`
-            SELECT o.order_id, o.status_id, os.status_name,
-                   (SELECT COUNT(*) FROM deliveries d WHERE d.order_id = o.order_id AND d.status = 'Completed' AND (d.is_archived IS NULL OR d.is_archived = FALSE)) AS completed_runs_count
+        const [orderRows] = await conn.query(`
+            SELECT o.order_id, o.status_id, o.is_archived, os.status_name, o.release_type,
+                   c.street_address, c.barangay, c.phone,
+                   COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.order_id), 0) AS item_total,
+                   COALESCE((SELECT SUM(d.fee) FROM deliveries d
+                       WHERE d.order_id = o.order_id AND d.type = 'Delivery' AND d.status <> 'Cancelled'
+                         AND (d.is_archived IS NULL OR d.is_archived = FALSE)), 0) AS delivery_fees,
+                   COALESCE((SELECT SUM(p.amount_paid) FROM payments p
+                       WHERE p.order_id = o.order_id AND (p.status IS NULL OR p.status = 'Paid')
+                         AND (p.is_archived IS NULL OR p.is_archived = FALSE)), 0) AS total_paid,
+                   (SELECT COUNT(*) FROM deliveries d
+                       WHERE d.order_id = o.order_id AND d.status IN ('Scheduled', 'On the way')
+                         AND (d.is_archived IS NULL OR d.is_archived = FALSE)) AS active_runs_count
             FROM orders o 
+            JOIN customers c ON c.customer_id = o.customer_id
             JOIN order_statuses os ON o.status_id = os.status_id 
             WHERE o.order_id = ?
+            FOR UPDATE
         `, [order_id]);
 
         if (orderRows.length === 0) {

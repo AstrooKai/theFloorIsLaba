@@ -35,11 +35,46 @@ exports.getAllOrders = async (req, res) => {
                 ) AS completed_runs_count,
                 MAX(oi.service_id) AS service_id,
                 COALESCE(SUM(oi.weight_kg), 1.00) AS weight_kg,
-                COALESCE(SUM(oi.subtotal), 0) AS total_amount,
-                COALESCE(SUM(oi.subtotal), 0) AS total,
+                COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                    SELECT SUM(d.fee) FROM deliveries d
+                    WHERE d.order_id = o.order_id
+                      AND d.type = 'Delivery'
+                      AND d.status <> 'Cancelled'
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ), 0) AS total_amount,
+                COALESCE((
+                    SELECT SUM(d.fee) FROM deliveries d
+                    WHERE d.order_id = o.order_id
+                      AND d.type = 'Delivery'
+                      AND d.status <> 'Cancelled'
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ), 0) AS delivery_fee,
+                COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                    SELECT SUM(d.fee) FROM deliveries d
+                    WHERE d.order_id = o.order_id
+                      AND d.type = 'Delivery'
+                      AND d.status <> 'Cancelled'
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ), 0) AS total,
                 COALESCE(pay.total_paid, 0) AS total_paid,
                 CASE 
-                    WHEN COALESCE(pay.total_paid, 0) >= COALESCE(SUM(oi.subtotal), 0) AND COALESCE(SUM(oi.subtotal), 0) > 0 THEN 'Paid'
+                    WHEN COALESCE(pay.total_paid, 0) >= (
+                        COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                            SELECT SUM(d.fee) FROM deliveries d
+                            WHERE d.order_id = o.order_id
+                              AND d.type = 'Delivery'
+                              AND d.status <> 'Cancelled'
+                              AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                        ), 0)
+                    ) AND (
+                        COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                            SELECT SUM(d.fee) FROM deliveries d
+                            WHERE d.order_id = o.order_id
+                              AND d.type = 'Delivery'
+                              AND d.status <> 'Cancelled'
+                              AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                        ), 0)
+                    ) > 0 THEN 'Paid'
                     WHEN (
                         SELECT COUNT(*) 
                         FROM payments 
@@ -99,11 +134,46 @@ exports.getOrderById = async (req, res) => {
                       AND d.status = 'Completed' 
                       AND (d.is_archived IS NULL OR d.is_archived = FALSE)
                 ) AS completed_runs_count,
-                COALESCE(SUM(oi.subtotal), 0) AS total,
-                COALESCE(SUM(oi.subtotal), 0) AS total_amount,
+                COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                    SELECT SUM(d.fee) FROM deliveries d
+                    WHERE d.order_id = o.order_id
+                      AND d.type = 'Delivery'
+                      AND d.status <> 'Cancelled'
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ), 0) AS total,
+                COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                    SELECT SUM(d.fee) FROM deliveries d
+                    WHERE d.order_id = o.order_id
+                      AND d.type = 'Delivery'
+                      AND d.status <> 'Cancelled'
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ), 0) AS total_amount,
+                COALESCE((
+                    SELECT SUM(d.fee) FROM deliveries d
+                    WHERE d.order_id = o.order_id
+                      AND d.type = 'Delivery'
+                      AND d.status <> 'Cancelled'
+                      AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                ), 0) AS delivery_fee,
                 COALESCE(pay.total_paid, 0) AS total_paid,
                 CASE 
-                    WHEN COALESCE(pay.total_paid, 0) >= COALESCE(SUM(oi.subtotal), 0) AND COALESCE(SUM(oi.subtotal), 0) > 0 THEN 'Paid'
+                    WHEN COALESCE(pay.total_paid, 0) >= (
+                        COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                            SELECT SUM(d.fee) FROM deliveries d
+                            WHERE d.order_id = o.order_id
+                              AND d.type = 'Delivery'
+                              AND d.status <> 'Cancelled'
+                              AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                        ), 0)
+                    ) AND (
+                        COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                            SELECT SUM(d.fee) FROM deliveries d
+                            WHERE d.order_id = o.order_id
+                              AND d.type = 'Delivery'
+                              AND d.status <> 'Cancelled'
+                              AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                        ), 0)
+                    ) > 0 THEN 'Paid'
                     WHEN (
                         SELECT COUNT(*) 
                         FROM payments 
