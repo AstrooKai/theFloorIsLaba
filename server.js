@@ -18,20 +18,17 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(require('./middleware/auth').authenticate);
-
-// Database auto-init
-let dbReady = false;
-let dbInitPromise = null;
-app.use(async (req, res, next) => {
-    if (!dbReady && req.path.startsWith('/api')) {
-        if (!dbInitPromise) {
-            dbInitPromise = initDB()
-                .then(() => { dbReady = true; })
-                .catch(err => { console.warn('Database auto-init note:', err.message); });
-        }
-        await dbInitPromise;
+app.use('/api', async (req, res, next) => {
+    if (req.path === '/health' ||
+        (process.env.AUTO_SEED !== 'true' && process.env.NODE_ENV === 'production')) {
+        return next();
     }
-    next();
+    try {
+        await initDB();
+        return next();
+    } catch (error) {
+        return next(error);
+    }
 });
 
 // Legacy login redirect

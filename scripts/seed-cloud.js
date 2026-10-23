@@ -21,15 +21,16 @@ function parseDatabaseUrl(urlStr) {
             password: decodeURIComponent(u.password),
             database: u.pathname ? u.pathname.replace(/^\//, '') : undefined,
             multipleStatements: true,
-            ssl: { rejectUnauthorized: false }
+            ssl: { rejectUnauthorized: true }
         };
     } catch {
-        return { uri: urlStr, multipleStatements: true, ssl: { rejectUnauthorized: false } };
+        return { uri: urlStr, multipleStatements: true, ssl: { rejectUnauthorized: true } };
     }
 }
 
 async function seedCloud() {
     console.log('--- The Floor Is Laba: Cloud Database Seeder ---');
+    const force = process.argv.includes('--force');
 
     const isCloud = Boolean(
         process.env.DATABASE_URL ||
@@ -50,7 +51,7 @@ async function seedCloud() {
     const connConfig = parsedUrl
         ? {
             ...parsedUrl,
-            ...(process.env.DB_SSL === 'false' ? { ssl: undefined } : { ssl: { rejectUnauthorized: false } })
+            ...(process.env.DB_SSL === 'false' ? { ssl: undefined } : { ssl: { rejectUnauthorized: true } })
         }
         : {
             host: process.env.DB_HOST,
@@ -59,7 +60,7 @@ async function seedCloud() {
             password: process.env.DB_PASSWORD,
             database: dbName,
             multipleStatements: true,
-            ssl: process.env.DB_SSL === 'false' ? undefined : { rejectUnauthorized: false }
+            ssl: process.env.DB_SSL === 'false' ? undefined : { rejectUnauthorized: true }
         };
 
     let conn;
@@ -85,18 +86,32 @@ async function seedCloud() {
         await conn.query(schemaSql);
         console.log('Schema applied successfully.');
 
-        console.log('Inserting initial seed data (staff, services, order statuses, samples)...');
+        const [staffRows] = await conn.query('SELECT COUNT(*) AS count FROM staff');
+        if (Number(staffRows[0].count) > 0 && !force) {
+            console.log('Staff data already exists; cloud seed skipped. Use --force to insert seed rows anyway.');
+            return;
+        }
+
+        const tables = ['customers', 'staff', 'service_types', 'order_statuses', 'orders', 'order_items', 'payments', 'deliveries'];
+        const counts = await Promise.all(tables.map(async (table) => {
+            const [rows] = await conn.query(`SELECT COUNT(*) AS count FROM \`${table}\``);
+            return Number(rows[0].count);
+        }));
         let seedSql = fs.readFileSync(seedPath, 'utf8');
         seedSql = seedSql.replace(/USE\s+[`\w]+;/gi, '');
-        await conn.query(seedSql);
-        console.log('Seed data inserted successfully.');
+        if (counts.every((count) => count === 0) || force) {
+            console.log('Inserting initial seed data (staff, services, order statuses, samples)...');
+            await conn.query(seedSql);
+            console.log('Seed data inserted successfully.');
+        } else {
+            throw new Error('Database contains non-staff data; refusing to insert duplicate sample data. Use --force only if duplicate sample rows are intended.');
+        }
 
         console.log('\n[SUCCESS] Cloud database initialized and seeded!');
         console.log('Your Vercel deployment is now ready to connect to this cloud database.');
-        process.exit(0);
     } catch (err) {
         console.error('Cloud database seeding failed:', err.message || err);
-        process.exit(1);
+        process.exitCode = 1;
     } finally {
         if (conn) await conn.end();
     }
