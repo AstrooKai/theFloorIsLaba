@@ -191,40 +191,51 @@ exports.updatePayment = async (req, res) => {
     try {
         const { id } = req.params;
         const { amount, amount_paid, method, payment_method, paid_at, payment_date, reference_no, status, is_archived } = req.body;
-        const finalAmount = amount_paid !== undefined ? amount_paid : amount;
-        const finalMethod = payment_method || method;
         const finalDate = payment_date || paid_at;
+        if (amount !== undefined || amount_paid !== undefined || method !== undefined ||
+            payment_method !== undefined || status !== undefined || is_archived !== undefined) {
+            return res.status(400).json({ error: 'Only payment reference number and date may be corrected' });
+        }
 
+        const [paymentRows] = await pool.query(
+            'SELECT payment_id, payment_method, reference_no, payment_date FROM payments WHERE payment_id = ?',
+            [id]
+        );
+        if (paymentRows.length === 0) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        const payment = paymentRows[0];
         const updates = [];
         const params = [];
+        let finalReference = payment.reference_no;
 
-        if (finalAmount !== undefined) {
-            updates.push('amount_paid = ?');
-            params.push(Number(finalAmount));
-        }
-        if (finalMethod) {
-            updates.push('payment_method = ?');
-            params.push(finalMethod);
-        }
         if (reference_no !== undefined) {
+            finalReference = payment.payment_method === 'Cash' ? null : String(reference_no || '').trim();
+            if (payment.payment_method !== 'Cash' && !finalReference) {
+                return res.status(400).json({ error: 'A reference number is required for non-cash payments' });
+            }
+            if (finalReference) {
+                const [duplicates] = await pool.query(
+                    'SELECT payment_id FROM payments WHERE payment_method = ? AND reference_no = ? AND payment_id <> ? LIMIT 1',
+                    [payment.payment_method, finalReference, id]
+                );
+                if (duplicates.length > 0) {
+                    return res.status(400).json({ error: 'This reference number has already been used for this payment method' });
+                }
+            }
             updates.push('reference_no = ?');
-            params.push((finalMethod === 'Cash') ? '' : String(reference_no).trim());
+            params.push(finalReference);
         }
-        if (finalDate) {
+        if (finalDate !== undefined) {
+            if (!isValidDate(finalDate)) {
+                return res.status(400).json({ error: 'Payment date must be a valid YYYY-MM-DD date' });
+            }
             updates.push('payment_date = ?');
             params.push(finalDate);
         }
-        if (status) {
-            updates.push('status = ?');
-            params.push(status);
-        }
-        if (is_archived !== undefined) {
-            updates.push('is_archived = ?');
-            params.push(Boolean(is_archived));
-        }
 
         if (updates.length === 0) {
-            return res.status(400).json({ error: 'No fields provided to update' });
+            return res.status(400).json({ error: 'Provide a payment reference number or date to correct' });
         }
 
         params.push(id);
@@ -236,15 +247,11 @@ exports.updatePayment = async (req, res) => {
 
         res.json({
             payment_id: Number(id),
-            amount_paid: finalAmount !== undefined ? Number(finalAmount) : undefined,
-            amount: finalAmount !== undefined ? Number(finalAmount) : undefined,
-            payment_method: finalMethod,
-            method: finalMethod,
-            reference_no: reference_no,
-            payment_date: finalDate,
-            paid_at: finalDate,
-            status: status || 'Paid',
-            is_archived: is_archived !== undefined ? Boolean(is_archived) : undefined
+            payment_method: payment.payment_method,
+            method: payment.payment_method,
+            reference_no: finalReference,
+            payment_date: finalDate || payment.payment_date,
+            paid_at: finalDate || payment.payment_date
         });
     } catch (error) {
         console.error('Controller error:', error);

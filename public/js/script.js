@@ -1650,6 +1650,11 @@ document.addEventListener("DOMContentLoaded", () => {
       name: "payments", id: "payment_id", defaults: () => ({ paid_at: today(), method: "Cash", status: "Paid" }),
       init: (f) => {
         f.elements.paid_at.max = today();
+        if (EDIT) {
+          ["order_id", "amount", "method"].forEach((name) => {
+            if (f.elements[name]) f.elements[name].disabled = true;
+          });
+        }
         if (f.elements.amount) {
           f.elements.amount.readOnly = true;
         }
@@ -1721,9 +1726,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const isProdOrRider = isProductionStaff() || isRider();
         return list.map((p) => {
           const items = [];
-          if (p.status === "Pending" && isCashierMgr) {
-            items.push(`<button class="dropdown-item text-success fw-semibold" data-act="paid" data-id="${p.payment_id}" type="button"><i class="bi bi-check2-circle me-2"></i>Mark Paid</button>`);
-          }
           items.push(`<button class="dropdown-item" data-act="receipt" data-id="${p.payment_id}" type="button"><i class="bi bi-receipt me-2 text-primary"></i>Receipt</button>`);
           if (!isProdOrRider && isCashierMgr) {
             items.push(`<button class="dropdown-item" data-act="edit" data-id="${p.payment_id}" type="button"><i class="bi bi-pencil me-2"></i>Edit</button>`);
@@ -1735,7 +1737,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const pStatus = p.status || "Paid";
           const pStatusCls = { Paid: "ok", Pending: "warn", Refunded: "bad" }[pStatus] || "mute";
           const nextPStatus = pStatus === "Paid" ? "Pending" : "Paid";
-          const statusBadgeHtml = isCashierMgr
+          const statusBadgeHtml = isMgr
             ? `<span class="badge status-clickable ${pStatusCls}" data-act="quick-payment-status" data-id="${p.payment_id}" data-current="${esc(pStatus)}" role="button" tabindex="0" title="Click to mark as ${nextPStatus}">${esc(pStatus)}</span>`
             : `<span class="badge ${pStatusCls}">${esc(pStatus)}</span>`;
           return `<tr><td><strong>${pay(p.payment_id)}</strong>${p.reference_no ? `<span class="sub">Ref ${esc(p.reference_no)}</span>` : ""}</td><td><strong>${ord(p.order_id)}</strong><span class="sub">${esc(nameOf(p))}</span></td><td>${esc(p.method)}</td><td>${formatDate(p.paid_at || p.payment_date)}</td><td class="num"><strong>${peso(p.amount)}</strong></td><td>${statusBadgeHtml}</td><td>${actsHtml}</td></tr>`;
@@ -1743,10 +1745,11 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       validate(d) {
         const e = {};
-        if (!d.order_id) e.order_id = "Please choose an order";
-        if (!d.amount || Number(d.amount) <= 0) e.amount = "Valid amount is required";
-        if (!d.method) e.method = "Payment method is required";
-        if (d.method && d.method !== "Cash" && (!d.reference_no || !d.reference_no.trim())) {
+        const method = EDIT ? (EDIT.method || EDIT.payment_method) : d.method;
+        if (!EDIT && !d.order_id) e.order_id = "Please choose an order";
+        if (!EDIT && (!d.amount || Number(d.amount) <= 0)) e.amount = "Valid amount is required";
+        if (!method) e.method = "Payment method is required";
+        if (method && method !== "Cash" && (!d.reference_no || !d.reference_no.trim())) {
           e.reference_no = "Reference number is required";
         }
         if (!EDIT && d.order_id) {
@@ -1762,19 +1765,23 @@ document.addEventListener("DOMContentLoaded", () => {
         return e;
       },
       payload: (d) => ({
-        order_id: +d.order_id,
-        amount: +d.amount,
-        amount_paid: +d.amount,
-        method: d.method,
-        payment_method: d.method,
-        reference_no: (d.method === "Cash") ? "" : (d.reference_no || "").trim(),
-        status: d.status || (EDIT ? (EDIT.status || "Paid") : "Paid"),
-        paid_at: d.paid_at || today(),
-        payment_date: d.paid_at || today()
+        ...(EDIT ? {
+          reference_no: (EDIT.method === "Cash" || EDIT.payment_method === "Cash") ? null : (d.reference_no || "").trim(),
+          payment_date: d.paid_at || today()
+        } : {
+          order_id: +d.order_id,
+          amount: +d.amount,
+          amount_paid: +d.amount,
+          method: d.method,
+          payment_method: d.method,
+          reference_no: (d.method === "Cash") ? null : (d.reference_no || "").trim(),
+          status: "Paid",
+          paid_at: d.paid_at || today(),
+          payment_date: d.paid_at || today()
+        })
       }),
       delMsg: (r) => `Archive payment <strong>#${pay(r.payment_id)} of ${peso(r.amount)}</strong>?`,
       async act(a, r) {
-        if (a === "paid") return patch(r, { status: "Paid" }, `Marked as paid.`);
         if (a === "archive") {
           if (await ask("Archive Payment?", `Archive payment <strong>#${pay(r.payment_id)} of ${peso(r.amount)}</strong>? It will be hidden while preserving financial audit trails.`, "Archive")) {
             const res = await fetch(`/api/payments/${r.payment_id}/archive`, { method: "PUT", headers: getAuthHeaders() });
@@ -2344,40 +2351,9 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
       }
-      if (a === "quick-payment" && r) {
-        if (!isCashierOrManager()) {
-          return toast("Only Cashiers and Managers can update payment status.", 1);
-        }
-        const curr = r.payment_status || "Unpaid";
-        const isPaid = curr === "Paid";
-        const next = isPaid ? "Unpaid" : "Paid";
-        const modalTitle = isPaid ? "Mark Payment as Unpaid?" : "Mark Payment as Paid?";
-        const modalMsg = isPaid
-          ? `Change payment status for Order <strong>#${ord(r.order_id)}</strong> (${peso(r.total)}) to <strong>Unpaid</strong>? Existing payment will be marked as pending.`
-          : `Mark payment for Order <strong>#${ord(r.order_id)}</strong> (${peso(r.total)}) as <strong>Paid</strong>?`;
-        const confirmBtn = isPaid ? "Mark Unpaid" : "Mark Paid";
-
-        if (await ask(modalTitle, modalMsg, confirmBtn)) {
-          try {
-            const res = await fetch(`/api/orders/${r.order_id}/toggle-payment`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json", ...getAuthHeaders() }
-            });
-            if (!res.ok) {
-              const errData = await res.json().catch(() => ({}));
-              throw new Error(errData.error || "Failed to update payment status");
-            }
-            toast(`Order #${ord(r.order_id)} payment marked as ${next}.`);
-            await init();
-          } catch (err) {
-            toast(err.message, 1);
-          }
-        }
-        return;
-      }
       if (a === "quick-payment-status" && r) {
-        if (!isCashierOrManager()) {
-          return toast("Only Cashiers and Managers can update payment status.", 1);
+        if (!isManager()) {
+          return toast("Only Managers can update payment status.", 1);
         }
         const curr = r.status || "Paid";
         const isPaid = curr === "Paid";
