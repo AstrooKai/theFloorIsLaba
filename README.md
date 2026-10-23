@@ -298,26 +298,26 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 * **Validation**: Validates 11-digit Philippine mobile numbers (`09XXXXXXXXX`), rejecting non-numeric symbols or invalid prefixes.
 * **Inline Order Creation**: Customers can be quickly registered directly inside the Order modal without leaving the order intake screen.
 
-### 3. Order Intake & Multi-Item Calculation
-* **Dynamic Price Calculation**: As staff enter weights or piece quantities, the interface immediately calculates item subtotals and overall order balance (`price * weight`).
+### 3. Order Intake & Pricing
+* **Server-Calculated Pricing**: The server validates each submitted service line and calculates subtotals from the current active catalog rate; client-supplied totals are not trusted.
+* **Current UI Limitation**: Order intake currently exposes one service line. The API accepts multiple service lines, but the edit form loads and preserves existing lines without allowing line-item edits. Editing other order fields does not replace or remove those lines.
 * **Catalog Rates Integration**: Unit labels dynamically adjust between kilograms (`kg`) and piece count (`piece`) according to the selected service.
 
 ### 4. Operational Order Lifecycle Progression
-* **6-Stage Lifecycle**: Full workflow tracking:
+* **Release-Specific Status Paths**:
   $$\text{Received} \longrightarrow \text{Washing} \longrightarrow \text{Folding} \longrightarrow \begin{cases} \text{Ready for Pickup} & (\text{Pickup}) \\ \text{Out for Delivery} & (\text{Delivery}) \end{cases} \longrightarrow \text{Completed}$$
-* **Smart Cycling**:
-  * Delivery orders bypass the counter-pickup state and cycle into `Out for Delivery`.
-  * Pickup orders bypass courier transit and cycle directly into `Ready for Pickup`.
-  * Advancing an order to `Completed` automatically marks the order release timestamp.
+* **Enforced Transitions**: The server accepts only the current state or the next state in the applicable path. `Completed` is final; only a Manager can explicitly reopen an order. A Delivery order reaches `Out for Delivery` when its run starts and reaches `Completed` when its run completes. Pickup orders advance through `Ready for Pickup`.
+* **Release Date**: Completing an order or its delivery run sets `release_date` on the server. Orders cannot be completed until fully paid.
 
 ### 5. Service Catalog & Rates
 * **Complete Category Coverage**: Supports all 6 shop service classifications: `Wash & fold`, `Wash & dry`, `Pressing`, `Specialty care`, `Bedding & bulky`, and `Dry cleaning`.
 * **Discontinue vs. Reactivate**: Managers can discontinue a service, immediately hiding it from new order creation dropdowns while preserving historical invoice calculations. Discontinued services can be reactivated with a single click.
 
 ### 6. Payment Settlement & Billing
-* **Full-Payment Enforcement**:
-  * Disallows partial payments. When an order is selected, the exact balance due is automatically populated into a non-editable (`readonly`) input field.
-  * Backend API guards reject any payment payload where `amount < remainingBalance` with HTTP `400 Bad Request`.
+* **Full-Balance Settlement**:
+  * Payments must equal the exact remaining balance; the server serializes payment creation and rejects partial, excess, or duplicate-reference payments.
+  * The outstanding balance includes active, non-cancelled delivery fees. Changing a fee after full payment is blocked.
+  * An order cannot be completed or archived until it is fully paid.
 * **Exclusion of Settled Orders**: Fully paid orders are automatically excluded from the "Record Payment" order dropdown.
 * **Direct Status Allocation**: New payments are automatically logged with status `"Paid"`.
 * **Printable Invoices & Receipts**: Generates clean, printable HTML payment receipts and invoices complete with transaction timestamps, customer details, itemized service lines, and balance summaries.
