@@ -2,13 +2,40 @@ const pool = require('../config/db');
 const { cleanName, isValidDate, isValidPersonName, normalizePhone, todayManila } = require('../utils/validation');
 const { REQUIRE_PAYMENT_BEFORE_COMPLETE } = require('../utils/business-rules');
 
+const isProductionRole = role => ['washer', 'folder'].includes(String(role || '').toLowerCase());
+
+function redactOrderForProductionRole(order) {
+    const {
+        customer_id,
+        customer_phone,
+        contact,
+        street_address,
+        street,
+        barangay,
+        address,
+        total_amount,
+        delivery_fee,
+        total,
+        total_paid,
+        payment_status,
+        payments,
+        ...safeOrder
+    } = order;
+
+    if (Array.isArray(safeOrder.items)) {
+        safeOrder.items = safeOrder.items.map(({ subtotal, ...item }) => item);
+    }
+    return safeOrder;
+}
+
 exports.getAllOrders = async (req, res) => {
     try {
-        const includeArchived = req.query.include_archived === 'true' || req.query.history === 'true';
+        const includeArchived = !isProductionRole(req.staff?.role) &&
+            (req.query.include_archived === 'true' || req.query.history === 'true');
         const archiveFilter = includeArchived ? '' : 'WHERE (o.is_archived IS NULL OR o.is_archived = FALSE)';
 
         const [rows] = await pool.query(`
-            SELECT 
+            SELECT
                 o.order_id,
                 o.order_date,
                 o.release_type,
@@ -102,7 +129,7 @@ exports.getAllOrders = async (req, res) => {
             GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.is_archived, o.customer_id, c.first_name, c.last_name, c.phone, c.street_address, c.barangay, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
             ORDER BY o.order_id DESC
         `);
-        res.json(rows);
+        res.json(isProductionRole(req.staff?.role) ? rows.map(redactOrderForProductionRole) : rows);
     } catch (error) {
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -219,27 +246,28 @@ exports.getOrderById = async (req, res) => {
             WHERE oi.order_id = ?
         `, [id]);
 
-        const [payments] = await pool.query(`
-            SELECT 
-                payment_id, 
-                amount_paid, 
-                amount_paid AS amount,
-                payment_method, 
-                payment_method AS method,
-                DATE_FORMAT(payment_date, '%Y-%m-%d') AS payment_date,
-                DATE_FORMAT(payment_date, '%Y-%m-%d') AS paid_at,
-                COALESCE(status, 'Paid') AS status,
-                COALESCE(reference_no, '') AS reference_no,
-                COALESCE(is_archived, FALSE) AS is_archived
-            FROM payments
-            WHERE order_id = ?
-            ORDER BY payment_date DESC, payment_id DESC
-        `, [id]);
-
         order.items = items;
-        order.payments = payments;
+        if (!isProductionRole(req.staff?.role)) {
+            const [payments] = await pool.query(`
+                SELECT
+                    payment_id,
+                    amount_paid,
+                    amount_paid AS amount,
+                    payment_method,
+                    payment_method AS method,
+                    DATE_FORMAT(payment_date, '%Y-%m-%d') AS payment_date,
+                    DATE_FORMAT(payment_date, '%Y-%m-%d') AS paid_at,
+                    COALESCE(status, 'Paid') AS status,
+                    COALESCE(reference_no, '') AS reference_no,
+                    COALESCE(is_archived, FALSE) AS is_archived
+                FROM payments
+                WHERE order_id = ?
+                ORDER BY payment_date DESC, payment_id DESC
+            `, [id]);
+            order.payments = payments;
+        }
 
-        res.json(order);
+        res.json(isProductionRole(req.staff?.role) ? redactOrderForProductionRole(order) : order);
     } catch (error) {
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -449,6 +477,11 @@ exports.createOrder = async (req, res) => {
 };
 
 exports.updateOrder = async (req, res) => {
+    if (isProductionRole(req.staff?.role) &&
+        Object.keys(req.body || {}).some(key => !['order_status', 'status_id'].includes(key))) {
+        return res.status(403).json({ error: 'Washers and Folders may only update order status.' });
+    }
+
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();

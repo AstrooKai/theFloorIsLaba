@@ -2,7 +2,7 @@
 
 <blockquote style="border-left: 4px solid #ea580c; padding: 12px 18px; background-color: rgba(234, 88, 12, 0.08); border-radius: 6px; margin: 16px 0 24px 0;">
 
-**Test Suite Summary:** **94 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **94 Pending Verification**
+**Test Suite Summary:** **95 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **95 Pending Verification**
 
 - **1. Authentication & Session Management:** verification pending
 - **2. Role-Based Access Control (RBAC):** verification pending
@@ -18,7 +18,7 @@
 - **12. UI/UX, Themes & Responsive Mobile Views:** verification pending
 - **13. Database Operations & Cloud Deployment Readiness:** verification pending
 
-**Progress:** 0.0% verified (0/94)
+**Progress:** 0.0% verified (0/95)
 
 **Test Environment:** `http://localhost:5000`
 
@@ -462,3 +462,7 @@
 - [ ] **14.24 Rider Run Ownership and Update Scope**
   - **Steps:** As a Rider, list runs, request another Rider's run by ID, and attempt to change fee, address, or assignment on an assigned run.
   - **Expected:** The list contains only the Rider's non-archived assignments and does not expose fees; other Riders' runs are unavailable, and assigned Riders can change only run status.
+
+- [ ] **14.25 Order Read and Update Role Restrictions**
+  - **Steps:** Request order list and detail as a Rider; as Washer or Folder, inspect list/detail fields and attempt to update customer_id, customer fields, release type, or service lines. Repeat normal order reads as Cashier or Manager and a status-only update as Washer or Folder.
+  - **Expected:** Riders receive HTTP `403`; Washer and Folder responses omit customer contact/address, payment and pricing details, and archived order history. Their non-status update attempts receive HTTP `403`, while status-only updates and full Cashier/Manager reads continue to work.
