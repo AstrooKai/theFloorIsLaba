@@ -435,9 +435,8 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
          │
          ▼ HTTP PUT /api/deliveries/12/advance { status: "Completed" }
 [Express Backend - controllers/deliveries.js]
-  7. Updates delivery status to "Completed".
-  8. Synchronizes linked order: updates linked orders.status_id = 5 ("Completed")
-     and sets release_date = CURRENT_DATE.
+  7. In one transaction, updates delivery status to "Completed".
+  8. Resolves the "Completed" status by name, updates the linked order, and sets its release date using Manila local date.
          │
          ▼ SQL Queries (Transaction)
 [MySQL Database]
