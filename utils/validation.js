@@ -1,5 +1,13 @@
 const PERSON_NAME_PATTERN = /^[\p{L}][\p{L}\s.'-]*$/u;
 const SERVICE_NAME_PATTERN = /^[\p{L}\s&'().,-]+$/u;
+const SERVICE_CATEGORIES = [
+    'Wash & fold',
+    'Wash & dry',
+    'Pressing',
+    'Specialty care',
+    'Bedding & bulky',
+    'Dry cleaning'
+];
 
 function cleanName(value) {
     return String(value || '').trim().replace(/\s+/g, ' ');
@@ -13,6 +21,10 @@ function isValidPersonName(value) {
 function isValidServiceName(value) {
     const name = cleanName(value);
     return name.length > 0 && name.length <= 50 && SERVICE_NAME_PATTERN.test(name);
+}
+
+function isValidServiceCategory(value) {
+    return SERVICE_CATEGORIES.some(category => category.toLowerCase() === String(value || '').trim().toLowerCase());
 }
 
 function normalizePhone(value) {
@@ -36,6 +48,8 @@ module.exports = {
     cleanName,
     isValidPersonName,
     isValidServiceName,
+    isValidServiceCategory,
+    SERVICE_CATEGORIES,
     normalizePhone,
     isValidDate,
     todayManila

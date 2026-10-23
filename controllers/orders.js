@@ -268,58 +268,102 @@ exports.createOrder = async (req, res) => {
             customer_name,
             contact,
             address,
-            status_id,
-            order_status,
             release_type = 'Pickup',
             release_date = null,
             order_date,
-            total = 0,
             items = []
         } = req.body;
+        if (!Array.isArray(items) || items.length === 0) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'At least one service item is required' });
+        }
+        if (!['Pickup', 'Delivery'].includes(release_type)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Release type must be Pickup or Delivery' });
+        }
+        const finalOrderDate = order_date || todayManila();
+        if (!isValidDate(finalOrderDate) || (release_date && !isValidDate(release_date))) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Order dates must be valid YYYY-MM-DD dates' });
+        }
+
+        const pricedItems = [];
+        for (const item of items) {
+            const serviceId = Number(item.service_id);
+            const weight = Number(item.weight_kg);
+            if (!Number.isSafeInteger(serviceId) || !Number.isFinite(weight) || weight <= 0 || weight > 999.99) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Each service item needs a valid service and a weight greater than 0 and no more than 999.99' });
+            }
+            const [services] = await conn.query(
+                "SELECT price_per_kg FROM service_types WHERE service_id = ? AND status = 'Active'",
+                [serviceId]
+            );
+            if (services.length === 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: `Service ${serviceId} does not exist or is not active` });
+            }
+            const subtotal = Math.round(weight * Number(services[0].price_per_kg) * 100) / 100;
+            if (subtotal > 99999999.99) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'A service line exceeds the maximum supported order amount.' });
+            }
+            pricedItems.push({ service_id: serviceId, weight_kg: weight, subtotal });
+        }
+        const computedTotal = pricedItems.reduce((sum, item) => sum + item.subtotal, 0);
+        if (computedTotal > 99999999.99) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Order total exceeds the maximum supported amount.' });
+        }
 
         // Resolve customer
-        let finalCustomerId = customer_id ? Number(customer_id) : null;
-        let firstName = (req.body.first_name || '').trim();
-        let lastName = (req.body.last_name || '').trim();
+        let finalCustomerId = customer_id !== undefined && customer_id !== null && customer_id !== '' ? Number(customer_id) : null;
+        let firstName = cleanName(req.body.first_name || '');
+        let lastName = cleanName(req.body.last_name || '');
+        if (!finalCustomerId && !firstName && customer_name) {
+            const nameParts = cleanName(customer_name).split(' ');
+            firstName = nameParts[0] || '';
+            lastName = nameParts.slice(1).join(' ');
+        }
         const contactNo = (contact || req.body.phone || '').trim();
+        const normalizedContactNo = contactNo ? normalizePhone(contactNo) : '';
         const streetAddr = (req.body.street_address || req.body.street || '').trim();
         const barangayVal = (req.body.barangay || '').trim();
 
-        if (contactNo) {
-            if (/[a-zA-Z]/.test(contactNo)) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Contact number cannot contain letters' });
-            }
-            if (!/^\+?[0-9\s-]+$/.test(contactNo)) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-            }
-            const digits = contactNo.replace(/\D/g, '');
-            if (digits.length !== 11) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-            }
-            if (!digits.startsWith('09')) {
-                await conn.rollback();
-                conn.release();
-                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
-            }
+        if (customer_id !== undefined && customer_id !== null && customer_id !== '' &&
+            (!Number.isSafeInteger(finalCustomerId) || finalCustomerId <= 0)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Invalid customer ID' });
+        }
+        if ((!finalCustomerId || firstName || lastName) &&
+            (!isValidPersonName(firstName) || !isValidPersonName(lastName))) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Enter valid first and last names (maximum 50 characters).' });
+        }
+        if (contactNo && !normalizedContactNo) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number starting with 09' });
+        }
+        if (!finalCustomerId && (!normalizedContactNo || !streetAddr || !barangayVal)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'A new customer requires a valid phone number, street address, and barangay.' });
         }
 
         if (finalCustomerId) {
-            const [custRows] = await conn.query('SELECT customer_id FROM customers WHERE customer_id = ?', [finalCustomerId]);
+            const [custRows] = await conn.query(
+                "SELECT customer_id FROM customers WHERE customer_id = ? AND status = 'Active' AND (is_archived IS NULL OR is_archived = FALSE)",
+                [finalCustomerId]
+            );
             if (custRows.length > 0) {
                 if (streetAddr || barangayVal || contactNo) {
                     await conn.query(
                         'UPDATE customers SET street_address = COALESCE(NULLIF(?, ""), street_address), barangay = COALESCE(NULLIF(?, ""), barangay), phone = COALESCE(NULLIF(?, ""), phone) WHERE customer_id = ?',
-                        [streetAddr, barangayVal, contactNo, finalCustomerId]
+                        [streetAddr, barangayVal, normalizedContactNo, finalCustomerId]
                     );
                 }
             } else {
-                finalCustomerId = null;
+                await conn.rollback();
+                return res.status(400).json({ error: 'Customer not found or inactive' });
             }
         }
 
@@ -340,7 +384,7 @@ exports.createOrder = async (req, res) => {
             } else if (contactNo) {
                 const [byPhone] = await conn.query(
                     'SELECT customer_id FROM customers WHERE phone = ? AND phone != "" LIMIT 1',
-                    [contactNo]
+                    [normalizedContactNo]
                 );
                 found = byPhone;
             }
@@ -356,7 +400,7 @@ exports.createOrder = async (req, res) => {
             } else {
                 const [createdCust] = await conn.query(
                     'INSERT INTO customers (first_name, last_name, phone, street_address, barangay, status, is_archived) VALUES (?, ?, ?, ?, ?, "Active", FALSE)',
-                    [firstName || 'Customer', lastName || '', contactNo || '09170000000', streetAddr, barangayVal]
+                    [firstName, lastName, normalizedContactNo, streetAddr, barangayVal]
                 );
                 finalCustomerId = createdCust.insertId;
             }
@@ -364,8 +408,6 @@ exports.createOrder = async (req, res) => {
 
         // Initial status: Received
         const finalStatusId = 1;
-
-        const finalOrderDate = order_date || new Date().toISOString().split('T')[0];
 
         // Insert order
         const [orderResult] = await conn.query(
@@ -376,24 +418,10 @@ exports.createOrder = async (req, res) => {
         const newOrderId = orderResult.insertId;
 
         // Insert order items
-        if (Array.isArray(items) && items.length > 0) {
-            for (const item of items) {
-                await conn.query(
-                    'INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES (?, ?, ?, ?)',
-                    [newOrderId, item.service_id, item.weight_kg, item.subtotal]
-                );
-            }
-        } else {
-            // Default order item fallback
-            const [defaultService] = await conn.query('SELECT service_id, price_per_kg FROM service_types LIMIT 1');
-            const svcId = defaultService.length > 0 ? defaultService[0].service_id : 1;
-            const rate = defaultService.length > 0 ? Number(defaultService[0].price_per_kg) : 45.00;
-            const subtotalVal = Number(total) || rate;
-            const weightVal = Number((subtotalVal / rate).toFixed(2)) || 1.0;
-
+        for (const item of pricedItems) {
             await conn.query(
                 'INSERT INTO order_items (order_id, service_id, weight_kg, subtotal) VALUES (?, ?, ?, ?)',
-                [newOrderId, svcId, weightVal, subtotalVal]
+                [newOrderId, item.service_id, item.weight_kg, item.subtotal]
             );
         }
 
@@ -403,11 +431,11 @@ exports.createOrder = async (req, res) => {
             order_id: newOrderId,
             customer_id: finalCustomerId,
             customer_name: `${firstName} ${lastName}`.trim() || customer_name || 'Customer',
-            contact: contactNo || contact || '',
+            contact: normalizedContactNo || '',
             address: streetAddr || address || '',
             order_date: finalOrderDate,
-            order_status: order_status || (finalStatusId === 5 ? 'Completed' : 'Received'),
-            total: Number(total) || 0
+            order_status: 'Received',
+            total: Math.round(computedTotal * 100) / 100
         });
     } catch (error) {
         await conn.rollback();
