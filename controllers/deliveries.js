@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const { isValidDate, normalizePhone, todayManila } = require('../utils/validation');
+const { REQUIRE_PAYMENT_BEFORE_COMPLETE } = require('../utils/business-rules');
 
 exports.getAllDeliveries = async (req, res) => {
     try {
@@ -113,16 +115,47 @@ exports.createDelivery = async (req, res) => {
         `, [order_id]);
 
         if (orderRows.length === 0) {
+            await conn.rollback();
             return res.status(404).json({ error: 'Order not found' });
         }
+        const order = orderRows[0];
+        if (order.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Delivery runs cannot be added to an archived order.' });
+        }
 
-        if (orderRows[0].status_id === 5 || (orderRows[0].status_name || '').toLowerCase() === 'completed' || orderRows[0].completed_runs_count > 0) {
+        if (type !== order.release_type) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Run type must match the order release type' });
+        }
+        if (Number(order.active_runs_count) > 0) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'This order already has an active run' });
+        }
+        if ((order.status_name || '').toLowerCase() === 'completed') {
+            await conn.rollback();
             return res.status(400).json({ error: 'Orders that have already been picked up or delivered cannot be scheduled for a run' });
+        }
+
+        const dateVal = scheduled_date || todayManila();
+        if (!isValidDate(dateVal)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Scheduled date must be a valid YYYY-MM-DD date' });
+        }
+        const finalFee = fee !== undefined ? Number(fee) : (type === 'Delivery' ? 50.00 : 0.00);
+        if (!Number.isFinite(finalFee) || finalFee < 0 || finalFee > 99999999.99) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Delivery fee must be a non-negative amount' });
+        }
+        const orderBalance = Math.round((Number(order.item_total) + Number(order.delivery_fees) - Number(order.total_paid)) * 100) / 100;
+        if (finalFee !== 0 && orderBalance <= 0) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Cannot add a delivery fee to an order that is already fully paid' });
         }
 
         let resolvedRiderId = rider_id || null;
         if (!resolvedRiderId && rider && type === 'Delivery') {
-            const [riderRows] = await pool.query(
+            const [riderRows] = await conn.query(
                 "SELECT staff_id FROM staff WHERE CONCAT(first_name, ' ', last_name) = ? OR first_name = ? LIMIT 1",
                 [rider, rider]
             );
@@ -132,34 +165,25 @@ exports.createDelivery = async (req, res) => {
             resolvedRiderId = null;
         }
 
-        const dateVal = scheduled_date || new Date().toISOString().split('T')[0];
-        const finalFee = fee !== undefined ? Number(fee) : (type === 'Delivery' ? 50.00 : 0.00);
-        const finalStreet = (street || street_address || (address && address.split(',')[0]) || '').trim();
-        const finalBarangay = (barangay || (address && address.split(',')[1]) || '').trim();
-        const finalContact = contact || '09170000000';
-
-        if (contact) {
-            if (/[a-zA-Z]/.test(contact)) {
-                return res.status(400).json({ error: 'Contact number cannot contain letters' });
-            }
-            if (!/^\+?[0-9\s-]+$/.test(contact)) {
-                return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-            }
-            const phoneDigits = contact.replace(/\D/g, '');
-            if (phoneDigits.length !== 11) {
-                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-            }
-            if (!phoneDigits.startsWith('09')) {
-                return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
-            }
+        const addressParts = String(address || '').split(',');
+        const finalStreet = String(street || street_address || addressParts[0] || order.street_address || '').trim();
+        const finalBarangay = String(barangay || addressParts[1] || order.barangay || '').trim();
+        const finalContact = contact !== undefined ? normalizePhone(contact) : normalizePhone(order.phone);
+        if (!finalContact) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number starting with 09' });
+        }
+        if (!finalStreet || !finalBarangay) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'A street address and barangay are required for the run' });
         }
 
-        const displayAddress = finalStreet && finalBarangay ? `${finalStreet}, ${finalBarangay}` : (finalStreet || finalBarangay || 'Cabuyao, Laguna');
-
-        const [result] = await pool.query(`
+        const displayAddress = `${finalStreet}, ${finalBarangay}`;
+        const [result] = await conn.query(`
             INSERT INTO deliveries (order_id, type, rider_id, scheduled_date, time_slot, fee, status, street, barangay, contact, notes, is_archived)
             VALUES (?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, ?, FALSE)
         `, [order_id, type, resolvedRiderId, dateVal, time_slot, finalFee, finalStreet, finalBarangay, finalContact, notes || '']);
+        await conn.commit();
 
         res.status(201).json({
             delivery_id: result.insertId,
@@ -180,22 +204,94 @@ exports.createDelivery = async (req, res) => {
             is_archived: false
         });
     } catch (error) {
+        await conn.rollback();
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
     }
 };
 
 exports.updateDelivery = async (req, res) => {
+    const conn = await pool.getConnection();
     try {
+        await conn.beginTransaction();
         const { id } = req.params;
-        const { type, scheduled_date, time_slot, fee, rider, rider_id, status, street, street_address, barangay, contact, notes, is_archived } = req.body;
+        const { type, scheduled_date, time_slot, fee, rider, rider_id, status, street, street_address, barangay, contact, notes } = req.body;
+        const [currentRows] = await conn.query(`
+            SELECT d.*, o.release_type, o.is_archived AS order_is_archived, os.status_name AS order_status,
+                   COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.order_id), 0) AS item_total,
+                   COALESCE((SELECT SUM(fd.fee) FROM deliveries fd
+                       WHERE fd.order_id = o.order_id AND fd.type = 'Delivery' AND fd.status <> 'Cancelled'
+                         AND (fd.is_archived IS NULL OR fd.is_archived = FALSE)), 0) AS delivery_fees,
+                   COALESCE((SELECT SUM(p.amount_paid) FROM payments p
+                       WHERE p.order_id = o.order_id AND (p.status IS NULL OR p.status = 'Paid')
+                         AND (p.is_archived IS NULL OR p.is_archived = FALSE)), 0) AS total_paid
+            FROM deliveries d
+            JOIN orders o ON o.order_id = d.order_id
+            JOIN order_statuses os ON os.status_id = o.status_id
+            WHERE d.delivery_id = ?
+            FOR UPDATE
+        `, [id]);
+        if (currentRows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Delivery run not found' });
+        }
+        const current = currentRows[0];
+        if (current.order_is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Delivery runs on archived orders cannot be changed.' });
+        }
+        if (current.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Archived delivery runs must be restored before they can be changed.' });
+        }
+        const finalType = type || current.type;
+        if (!['Pickup', 'Delivery'].includes(finalType) || finalType !== current.release_type) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Run type must match the order release type' });
+        }
+        if (scheduled_date !== undefined && !isValidDate(scheduled_date)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Scheduled date must be a valid YYYY-MM-DD date' });
+        }
+        const allowedStatuses = ['Scheduled', 'On the way', 'Completed', 'Cancelled'];
+        const transitions = {
+            Scheduled: ['On the way', 'Cancelled'],
+            'On the way': ['Completed', 'Cancelled'],
+            Completed: [],
+            Cancelled: []
+        };
+        if (status !== undefined && !allowedStatuses.includes(status)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Invalid delivery run status' });
+        }
+        if (status && status !== current.status && !transitions[current.status]?.includes(status)) {
+            await conn.rollback();
+            return res.status(400).json({ error: `Delivery run cannot transition from ${current.status} to ${status}` });
+        }
+        if (status === 'On the way' && finalType === 'Delivery' &&
+            !['Folding', 'Out for Delivery'].includes(current.order_status)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Delivery runs can start only after the order reaches the ready stage' });
+        }
+        if (status === 'Completed' && finalType === 'Pickup' &&
+            current.order_status !== 'Ready for Pickup') {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Pickup runs can complete only after the order is ready for pickup' });
+        }
+        if (status === 'Completed' && current.status !== 'Completed' && REQUIRE_PAYMENT_BEFORE_COMPLETE &&
+            Number(current.total_paid) + 0.001 < Number(current.item_total) + Number(current.delivery_fees)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'The order must be fully paid before the run can be completed.' });
+        }
 
         const updates = [];
         const params = [];
 
         if (type) {
             updates.push('type = ?');
-            params.push(type);
+            params.push(finalType);
         }
         if (scheduled_date) {
             updates.push('scheduled_date = ?');
@@ -206,32 +302,53 @@ exports.updateDelivery = async (req, res) => {
             params.push(time_slot);
         }
         if (fee !== undefined) {
+            const newFee = Number(fee);
+            if (!Number.isFinite(newFee) || newFee < 0 || newFee > 99999999.99) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Delivery fee must be a non-negative amount' });
+            }
+            if (newFee !== Number(current.fee)) {
+                if (current.type === 'Delivery' && current.status !== 'Cancelled' &&
+                    Number(current.item_total) + Number(current.delivery_fees) - Number(current.total_paid) <= 0) {
+                    await conn.rollback();
+                    return res.status(400).json({ error: 'Cannot change a delivery fee on an order that is already fully paid' });
+                }
+                const currentFeeIsBillable = current.type === 'Delivery' && current.status !== 'Cancelled';
+                const proposedTotal = Number(current.item_total) + Number(current.delivery_fees) -
+                    (currentFeeIsBillable ? Number(current.fee) : 0) +
+                    (currentFeeIsBillable ? newFee : 0);
+                if (proposedTotal + 0.001 < Number(current.total_paid)) {
+                    await conn.rollback();
+                    return res.status(400).json({ error: 'Changing this delivery fee would make the order overpaid.' });
+                }
+            }
             updates.push('fee = ?');
-            params.push(Number(fee));
+            params.push(newFee);
+        }
+        if (status === 'Cancelled' && current.status !== 'Cancelled' &&
+            current.type === 'Delivery' &&
+            Number(current.item_total) + Number(current.delivery_fees) - Number(current.fee) + 0.001 < Number(current.total_paid)) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'This run cannot be cancelled because its fee has already been paid.' });
         }
         if (status) {
-            if (status === 'On the way') {
+            if (status === 'On the way' && finalType === 'Delivery') {
                 let targetRiderId = rider_id;
                 if (!targetRiderId && rider) {
-                    const [riderRows] = await pool.query(
+                    const [riderRows] = await conn.query(
                         "SELECT staff_id FROM staff WHERE CONCAT(first_name, ' ', last_name) = ? OR first_name = ? LIMIT 1",
                         [rider, rider]
                     );
                     if (riderRows.length > 0) targetRiderId = riderRows[0].staff_id;
                 }
                 if (!targetRiderId) {
-                    const [current] = await pool.query('SELECT rider_id, type FROM deliveries WHERE delivery_id = ?', [id]);
-                    if (current.length > 0) {
-                        if (current[0].type === 'Pickup') {
-                            return res.status(400).json({ error: 'Pickup runs do not have a transit state.' });
-                        }
-                        targetRiderId = current[0].rider_id;
-                    }
+                    targetRiderId = current.rider_id;
                 }
                 if (!targetRiderId) {
+                    await conn.rollback();
                     return res.status(400).json({ error: 'Please assign a rider before starting the run.' });
                 }
-                const [busyRuns] = await pool.query(
+                const [busyRuns] = await conn.query(
                     `SELECT d.delivery_id, CONCAT(s.first_name, ' ', s.last_name) AS rider_name 
                      FROM deliveries d 
                      JOIN staff s ON d.rider_id = s.staff_id 
@@ -239,6 +356,7 @@ exports.updateDelivery = async (req, res) => {
                     [targetRiderId, id]
                 );
                 if (busyRuns.length > 0) {
+                    await conn.rollback();
                     return res.status(400).json({ 
                         error: `Rider ${busyRuns[0].rider_name} is currently occupied on an active delivery (#${busyRuns[0].delivery_id}). Please wait until they complete their current run.` 
                     });
@@ -251,7 +369,7 @@ exports.updateDelivery = async (req, res) => {
             updates.push('rider_id = ?');
             params.push(rider_id);
         } else if (rider) {
-            const [riderRows] = await pool.query(
+            const [riderRows] = await conn.query(
                 "SELECT staff_id FROM staff WHERE CONCAT(first_name, ' ', last_name) = ? OR first_name = ? LIMIT 1",
                 [rider, rider]
             );
@@ -260,7 +378,7 @@ exports.updateDelivery = async (req, res) => {
                 params.push(riderRows[0].staff_id);
             }
         }
-        if (type === 'Pickup') {
+        if (finalType === 'Pickup') {
             updates.push('rider_id = NULL');
         }
         const targetStreet = street !== undefined ? street : street_address;
@@ -273,89 +391,167 @@ exports.updateDelivery = async (req, res) => {
             params.push(barangay);
         }
         if (contact !== undefined) {
-            if (contact) {
-                if (/[a-zA-Z]/.test(contact)) {
-                    return res.status(400).json({ error: 'Contact number cannot contain letters' });
-                }
-                if (!/^\+?[0-9\s-]+$/.test(contact)) {
-                    return res.status(400).json({ error: 'Contact number cannot contain symbols' });
-                }
-                const phoneDigits = contact.replace(/\D/g, '');
-                if (phoneDigits.length !== 11) {
-                    return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number (e.g. 0917XXXXXXX)' });
-                }
-                if (!phoneDigits.startsWith('09')) {
-                    return res.status(400).json({ error: 'Contact number should start with 09 (e.g. 0917XXXXXXX)' });
-                }
+            const phoneDigits = normalizePhone(contact);
+            if (!phoneDigits) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Please enter a valid 11-digit mobile number starting with 09' });
             }
             updates.push('contact = ?');
-            params.push(contact);
+            params.push(phoneDigits);
         }
         if (notes !== undefined) {
             updates.push('notes = ?');
             params.push(notes);
         }
-        if (is_archived !== undefined) {
-            updates.push('is_archived = ?');
-            params.push(Boolean(is_archived));
-        }
-
         if (updates.length > 0) {
             params.push(id);
-            await pool.query(`UPDATE deliveries SET ${updates.join(', ')} WHERE delivery_id = ?`, params);
+            await conn.query(`UPDATE deliveries SET ${updates.join(', ')} WHERE delivery_id = ?`, params);
         }
 
-        if (status === 'Completed') {
-            await pool.query(
-                `UPDATE orders 
-                 SET status_id = 5, 
-                     release_date = COALESCE(release_date, CURRENT_DATE) 
-                 WHERE order_id = (SELECT order_id FROM deliveries WHERE delivery_id = ?)`,
-                [id]
+        if (status === 'Completed' || (status === 'On the way' && finalType === 'Delivery')) {
+            const orderStatusName = status === 'Completed' ? 'Completed' : 'Out for Delivery';
+            const [statusRows] = await conn.query(
+                'SELECT status_id FROM order_statuses WHERE status_name = ? LIMIT 1',
+                [orderStatusName]
             );
+            if (statusRows.length === 0) {
+                throw new Error(`Missing order status: ${orderStatusName}`);
+            }
+            if (status === 'Completed') {
+                await conn.query(
+                    'UPDATE orders SET status_id = ?, release_date = ? WHERE order_id = ?',
+                    [statusRows[0].status_id, todayManila(), current.order_id]
+                );
+            } else {
+                await conn.query(
+                    'UPDATE orders SET status_id = ? WHERE order_id = ?',
+                    [statusRows[0].status_id, current.order_id]
+                );
+            }
         }
+        await conn.commit();
 
         res.json({
             delivery_id: Number(id),
-            status: status || 'Scheduled'
+            status: status || current.status
         });
     } catch (error) {
+        await conn.rollback();
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
     }
 };
 
 exports.archiveDelivery = async (req, res) => {
+    const conn = await pool.getConnection();
     try {
+        await conn.beginTransaction();
         const { id } = req.params;
-        const [result] = await pool.query('UPDATE deliveries SET is_archived = TRUE WHERE delivery_id = ?', [id]);
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Delivery not found' });
+        const [rows] = await conn.query(
+            'SELECT order_id, type, status, fee, is_archived FROM deliveries WHERE delivery_id = ? FOR UPDATE',
+            [id]
+        );
+        if (rows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Delivery not found' });
+        }
+        const [orderRows] = await conn.query(
+            'SELECT is_archived FROM orders WHERE order_id = ? FOR UPDATE',
+            [rows[0].order_id]
+        );
+        if (orderRows[0]?.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Delivery runs on archived orders cannot be archived.' });
+        }
+        if (rows[0].is_archived) {
+            await conn.commit();
+            return res.json({ success: true, message: 'Delivery run is already archived', delivery_id: Number(id) });
+        }
+        if (rows[0].type === 'Delivery' && rows[0].status !== 'Cancelled') {
+            const [totals] = await conn.query(`
+                SELECT
+                    COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = ?), 0) +
+                    COALESCE((SELECT SUM(fee) FROM deliveries WHERE order_id = ? AND type = 'Delivery'
+                        AND status <> 'Cancelled' AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS total,
+                    COALESCE((SELECT SUM(amount_paid) FROM payments WHERE order_id = ? AND (status IS NULL OR status = 'Paid')
+                        AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS total_paid
+            `, [rows[0].order_id, rows[0].order_id, rows[0].order_id]);
+            if (Number(totals[0].total) - Number(rows[0].fee) + 0.001 < Number(totals[0].total_paid)) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'This run cannot be archived because its fee has already been paid.' });
+            }
+        }
+        await conn.query('UPDATE deliveries SET is_archived = TRUE WHERE delivery_id = ?', [id]);
+        await conn.commit();
         res.json({ success: true, message: 'Delivery run archived successfully', delivery_id: Number(id) });
     } catch (error) {
+        await conn.rollback();
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
     }
 };
 
 exports.unarchiveDelivery = async (req, res) => {
+    const conn = await pool.getConnection();
     try {
+        await conn.beginTransaction();
         const { id } = req.params;
-        const [result] = await pool.query('UPDATE deliveries SET is_archived = FALSE WHERE delivery_id = ?', [id]);
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Delivery not found' });
+        const [rows] = await conn.query(
+            'SELECT order_id, type, status, fee, is_archived FROM deliveries WHERE delivery_id = ?',
+            [id]
+        );
+        if (rows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Delivery not found' });
+        }
+        const [orderRows] = await conn.query(
+            'SELECT is_archived FROM orders WHERE order_id = ? FOR UPDATE',
+            [rows[0].order_id]
+        );
+        if (orderRows[0]?.is_archived) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Delivery runs on archived orders cannot be restored.' });
+        }
+        if (!rows[0].is_archived) {
+            await conn.commit();
+            return res.json({ success: true, message: 'Delivery run is already active', delivery_id: Number(id) });
+        }
+        if (['Scheduled', 'On the way'].includes(rows[0].status)) {
+            const [activeRuns] = await conn.query(
+                "SELECT delivery_id FROM deliveries WHERE order_id = ? AND delivery_id <> ? AND status IN ('Scheduled', 'On the way') AND (is_archived IS NULL OR is_archived = FALSE) LIMIT 1",
+                [rows[0].order_id, id]
+            );
+            if (activeRuns.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Another active run already exists for this order.' });
+            }
+        }
+        if (rows[0].type === 'Delivery' && rows[0].status !== 'Cancelled') {
+            const [totals] = await conn.query(`
+                SELECT
+                    COALESCE((SELECT SUM(subtotal) FROM order_items WHERE order_id = ?), 0) +
+                    COALESCE((SELECT SUM(fee) FROM deliveries WHERE order_id = ? AND type = 'Delivery'
+                        AND status <> 'Cancelled' AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS current_total,
+                    COALESCE((SELECT SUM(amount_paid) FROM payments WHERE order_id = ? AND (status IS NULL OR status = 'Paid')
+                        AND (is_archived IS NULL OR is_archived = FALSE)), 0) AS total_paid
+            `, [rows[0].order_id, rows[0].order_id, rows[0].order_id]);
+            if (Number(totals[0].total_paid) > Number(totals[0].current_total) + Number(rows[0].fee) + 0.001) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Restoring this delivery fee would make the order overpaid.' });
+            }
+        }
+        await conn.query('UPDATE deliveries SET is_archived = FALSE WHERE delivery_id = ?', [id]);
+        await conn.commit();
         res.json({ success: true, message: 'Delivery run unarchived successfully', delivery_id: Number(id) });
     } catch (error) {
+        await conn.rollback();
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-exports.deleteDelivery = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const [result] = await pool.query('UPDATE deliveries SET is_archived = TRUE WHERE delivery_id = ?', [id]);
-        res.json({ message: 'Delivery run archived successfully', delivery_id: Number(id) });
-    } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        conn.release();
     }
 };
