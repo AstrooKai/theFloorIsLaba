@@ -293,7 +293,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 
 ### 1. Authentication & RBAC Guard
 * **Role-Based Routing**: Restricts administrative capabilities (Staff Directory, Service Catalog Rate changes) to the `Manager` role.
-* **Operational Roles**: Washer and Folder accounts can view processing orders with customer contact/address and financial details redacted, and can update only order status. Rider accounts use assigned delivery runs and cannot list orders. Cashier and Manager roles can access full order records.
+* **Operational Roles**: Washer and Folder accounts can view non-archived processing orders with customer contact/address and financial/payment details redacted, and can update only order status. Their dashboard omits financial order totals and service revenue. Rider accounts use assigned delivery runs and cannot list orders. Cashier and Manager roles can access full order and financial dashboard details.
 * **Secure Sessions**: User credentials authenticated via bcrypt verification against database hashes.
 
 ### 2. Customer Management

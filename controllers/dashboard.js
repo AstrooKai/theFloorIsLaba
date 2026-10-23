@@ -111,6 +111,12 @@ exports.getDashboardSummary = async (req, res) => {
         const statusDistribution = statusDistributionRows[0] || [];
         const recentOrders = latestOrderRows[0] || [];
         const serviceBreakdown = serviceBreakdownRows[0] || [];
+        const visibleRecentOrders = canViewFinancials
+            ? recentOrders
+            : recentOrders.map(({ total, ...order }) => order);
+        const visibleServiceBreakdown = canViewFinancials
+            ? serviceBreakdown
+            : serviceBreakdown.map(({ total_revenue, ...service }) => service);
 
         // Return structured dashboard payload
         const summary = {
@@ -123,8 +129,8 @@ exports.getDashboardSummary = async (req, res) => {
             },
             pending_deliveries: pendingDeliveries,
             status_distribution: statusDistribution,
-            latest_orders: recentOrders,
-            service_breakdown: serviceBreakdown
+            latest_orders: visibleRecentOrders,
+            service_breakdown: visibleServiceBreakdown
         };
         if (canViewFinancials) {
             summary.counts.revenue = totalRevenue;

@@ -139,6 +139,9 @@ exports.getAllOrders = async (req, res) => {
 exports.getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
+        const archivedFilter = isProductionRole(req.staff?.role)
+            ? 'AND (o.is_archived IS NULL OR o.is_archived = FALSE)'
+            : '';
         const [orders] = await pool.query(`
             SELECT 
                 o.order_id,
@@ -224,7 +227,7 @@ exports.getOrderById = async (req, res) => {
                   AND (status IS NULL OR status = 'Paid')
                 GROUP BY order_id
             ) pay ON o.order_id = pay.order_id
-            WHERE o.order_id = ?
+            WHERE o.order_id = ? ${archivedFilter}
             GROUP BY o.order_id, o.order_date, o.release_type, o.release_date, o.customer_id, c.first_name, c.last_name, c.phone, c.street_address, c.barangay, o.staff_id, s.first_name, s.last_name, os.status_id, os.status_name, pay.total_paid
         `, [id]);
 
