@@ -103,7 +103,8 @@ exports.getDashboardSummary = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching dashboard summary:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 

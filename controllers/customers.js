@@ -26,7 +26,8 @@ exports.getAllCustomers = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -57,7 +58,8 @@ exports.getCustomerById = async (req, res) => {
         }
         res.json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -116,7 +118,8 @@ exports.createCustomer = async (req, res) => {
             is_archived: false
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -197,7 +200,8 @@ exports.updateCustomer = async (req, res) => {
             is_archived: finalArchived
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -228,7 +232,8 @@ exports.archiveCustomer = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Customer not found' });
         res.json({ success: true, message: 'Customer archived/deactivated successfully', customer_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -242,7 +247,8 @@ exports.unarchiveCustomer = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Customer not found' });
         res.json({ success: true, message: 'Customer reactivated successfully', customer_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -260,6 +266,7 @@ exports.deleteCustomer = async (req, res) => {
         if (error.code === 'ER_ROW_IS_REFERENCED_2') {
             return res.status(400).json({ error: 'Cannot delete customer with existing orders. Please archive instead.' });
         }
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };

@@ -34,7 +34,8 @@ exports.getAllDeliveries = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -72,7 +73,8 @@ exports.getDeliveryById = async (req, res) => {
         }
         res.json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -159,7 +161,8 @@ exports.createDelivery = async (req, res) => {
             is_archived: false
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -298,7 +301,8 @@ exports.updateDelivery = async (req, res) => {
             status: status || 'Scheduled'
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -309,7 +313,8 @@ exports.archiveDelivery = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Delivery not found' });
         res.json({ success: true, message: 'Delivery run archived successfully', delivery_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -320,7 +325,8 @@ exports.unarchiveDelivery = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Delivery not found' });
         res.json({ success: true, message: 'Delivery run unarchived successfully', delivery_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -330,6 +336,7 @@ exports.deleteDelivery = async (req, res) => {
         const [result] = await pool.query('UPDATE deliveries SET is_archived = TRUE WHERE delivery_id = ?', [id]);
         res.json({ message: 'Delivery run archived successfully', delivery_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };

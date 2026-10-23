@@ -55,7 +55,8 @@ exports.getAllStaff = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -78,7 +79,8 @@ exports.getRiders = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -106,7 +108,8 @@ exports.getStaffById = async (req, res) => {
         }
         res.json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -185,7 +188,8 @@ exports.createStaff = async (req, res) => {
                 field: 'email'
             });
         }
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -297,7 +301,8 @@ exports.updateStaff = async (req, res) => {
                 field: 'email'
             });
         }
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -319,7 +324,8 @@ exports.archiveStaff = async (req, res) => {
 
         res.json({ message: 'Staff member archived successfully', staff_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -337,7 +343,8 @@ exports.unarchiveStaff = async (req, res) => {
 
         res.json({ success: true, message: 'Staff member unarchived successfully', staff_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -357,7 +364,8 @@ exports.toggleStaffStatus = async (req, res) => {
         await pool.query('UPDATE staff SET status = ? WHERE staff_id = ?', [newStatus, id]);
         res.json({ success: true, staff_id: Number(id), status: newStatus });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -377,7 +385,8 @@ exports.deleteStaff = async (req, res) => {
 
         res.json({ message: 'Staff member archived successfully', staff_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -438,6 +447,7 @@ exports.loginStaff = async (req, res) => {
             message: `Welcome back, ${staffMember.full_name}!`
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };

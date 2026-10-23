@@ -29,7 +29,8 @@ exports.getAllPayments = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -63,7 +64,8 @@ exports.getPaymentById = async (req, res) => {
         }
         res.json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -131,7 +133,8 @@ exports.createPayment = async (req, res) => {
             is_archived: false
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -195,7 +198,8 @@ exports.updatePayment = async (req, res) => {
             is_archived: is_archived !== undefined ? Boolean(is_archived) : undefined
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -209,7 +213,8 @@ exports.archivePayment = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Payment not found' });
         res.json({ success: true, message: 'Payment archived successfully', payment_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -223,7 +228,8 @@ exports.unarchivePayment = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Payment not found' });
         res.json({ success: true, message: 'Payment unarchived successfully', payment_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -245,7 +251,8 @@ exports.togglePaymentStatus = async (req, res) => {
             status: next
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -260,6 +267,7 @@ exports.deletePayment = async (req, res) => {
 
         res.json({ message: 'Payment deleted successfully', payment_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };

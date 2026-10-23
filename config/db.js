@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 function parseDatabaseUrl(urlStr) {
+    const ssl = { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
     try {
         const u = new URL(urlStr);
         return {
@@ -12,10 +13,10 @@ function parseDatabaseUrl(urlStr) {
             user: decodeURIComponent(u.username),
             password: decodeURIComponent(u.password),
             database: u.pathname ? u.pathname.replace(/^\//, '') : undefined,
-            ssl: { rejectUnauthorized: false }
+            ssl
         };
     } catch {
-        return { uri: urlStr, ssl: { rejectUnauthorized: false } };
+        return { uri: urlStr, ssl };
     }
 }
 
@@ -35,7 +36,9 @@ const poolConfig = parsedUrl
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        ...(process.env.DB_SSL === 'false' ? { ssl: undefined } : { ssl: { rejectUnauthorized: false } })
+        ...(process.env.DB_SSL === 'false'
+            ? { ssl: undefined }
+            : { ssl: { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' } })
     }
     : {
         host: process.env.DB_HOST || 'localhost',
@@ -48,7 +51,7 @@ const poolConfig = parsedUrl
         connectionLimit: 10,
         queueLimit: 0,
         ...(process.env.DB_SSL === 'true' || (isCloud && process.env.DB_SSL !== 'false')
-            ? { ssl: { rejectUnauthorized: false } }
+            ? { ssl: { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' } }
             : {})
     };
 
@@ -140,5 +143,4 @@ async function testConnection() {
 module.exports = pool;
 module.exports.initDB = initDB;
 module.exports.testConnection = testConnection;
-
 

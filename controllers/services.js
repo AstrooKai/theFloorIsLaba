@@ -18,7 +18,8 @@ exports.getAllServices = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -45,7 +46,8 @@ exports.getServiceById = async (req, res) => {
         }
         res.json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -77,7 +79,8 @@ exports.createService = async (req, res) => {
             description: finalDesc
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -131,7 +134,8 @@ exports.updateService = async (req, res) => {
         const [rows] = await pool.query('SELECT *, price_per_kg AS price FROM service_types WHERE service_id = ?', [id]);
         res.json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -156,7 +160,8 @@ exports.toggleServiceStatus = async (req, res) => {
             message: `Service status updated to ${nextStatus}`
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -166,6 +171,7 @@ exports.deleteService = async (req, res) => {
         await pool.query("UPDATE service_types SET status = 'Discontinued' WHERE service_id = ?", [id]);
         res.json({ message: 'Service discontinued successfully', service_id: Number(id), status: 'Discontinued' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };

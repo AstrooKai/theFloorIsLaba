@@ -67,7 +67,8 @@ exports.getAllOrders = async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -168,7 +169,8 @@ exports.getOrderById = async (req, res) => {
 
         res.json(order);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -177,7 +179,8 @@ exports.getOrderStatuses = async (req, res) => {
         const [rows] = await pool.query('SELECT status_id, status_name FROM order_statuses ORDER BY status_id ASC');
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -338,7 +341,8 @@ exports.createOrder = async (req, res) => {
         });
     } catch (error) {
         await conn.rollback();
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     } finally {
         conn.release();
     }
@@ -502,7 +506,8 @@ exports.updateOrder = async (req, res) => {
         });
     } catch (error) {
         await conn.rollback();
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     } finally {
         conn.release();
     }
@@ -515,7 +520,8 @@ exports.archiveOrder = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
         res.json({ success: true, message: 'Order archived successfully', order_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -526,7 +532,8 @@ exports.unarchiveOrder = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
         res.json({ success: true, message: 'Order unarchived successfully', order_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -637,7 +644,8 @@ exports.togglePaymentStatus = async (req, res) => {
         });
     } catch (error) {
         await conn.rollback();
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     } finally {
         conn.release();
     }
@@ -654,6 +662,7 @@ exports.deleteOrder = async (req, res) => {
 
         res.json({ message: 'Order deleted successfully', order_id: Number(id) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Controller error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
