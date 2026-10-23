@@ -2142,7 +2142,9 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       init: (f) => {
         const pwdHelp = $("#pwdHelp");
-        if (pwdHelp) pwdHelp.textContent = EDIT ? "Leave blank to keep existing password." : "Default password if blank: admin123";
+        if (pwdHelp) pwdHelp.textContent = EDIT ? "Leave blank to keep the current password." : "Enter a password of at least 8 characters.";
+        const passwordInput = f.elements.password;
+        if (passwordInput) passwordInput.required = !EDIT;
         const statusField = f.querySelector('[data-f="status"]');
         if (statusField) {
           statusField.style.display = EDIT ? "" : "none";
@@ -2180,6 +2182,11 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
         if (!d.role) e.role = "Role is required";
+        if (!EDIT && (!d.password || d.password.length < 8)) {
+          e.password = "Password must be at least 8 characters long";
+        } else if (EDIT && d.password && d.password.length < 8) {
+          e.password = "Password must be at least 8 characters long";
+        }
         if (d.phone && d.phone.trim()) {
           const phoneErr = validateContact(d.phone, "Contact number", false);
           if (phoneErr) e.phone = phoneErr;

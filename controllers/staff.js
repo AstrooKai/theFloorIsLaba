@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const STAFF_ROLES = ['Manager', 'Cashier', 'Washer', 'Folder', 'Rider'];
 
 // Check if a staff member is the sole active manager
 async function isSoleActiveManager(targetStaffId, requesterStaffId = null) {
@@ -111,7 +112,7 @@ exports.getStaffById = async (req, res) => {
 
 exports.createStaff = async (req, res) => {
     try {
-        let { first_name, last_name, full_name, role = 'Staff', email, password = 'password123', phone } = req.body;
+        let { first_name, last_name, full_name, role, email, password, phone } = req.body;
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0] || '';
@@ -120,6 +121,12 @@ exports.createStaff = async (req, res) => {
 
         if (!first_name) {
             return res.status(400).json({ error: 'First name is required' });
+        }
+        if (!STAFF_ROLES.includes(role)) {
+            return res.status(400).json({ error: 'Please select a valid staff role' });
+        }
+        if (typeof password !== 'string' || password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters long' });
         }
 
         if (phone) {
@@ -152,7 +159,7 @@ exports.createStaff = async (req, res) => {
             });
         }
 
-        const hashedPassword = await bcrypt.hash(password || 'password123', 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
         // Initial status: Active
         const [result] = await pool.query(
@@ -208,6 +215,9 @@ exports.updateStaff = async (req, res) => {
             params.push(last_name);
         }
         if (role) {
+            if (!STAFF_ROLES.includes(role)) {
+                return res.status(400).json({ error: 'Please select a valid staff role' });
+            }
             updates.push('role = ?');
             params.push(role);
         }
@@ -227,6 +237,9 @@ exports.updateStaff = async (req, res) => {
             params.push(cleanEmail);
         }
         if (password && password.trim()) {
+            if (password.trim().length < 8) {
+                return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+            }
             const hashedPassword = await bcrypt.hash(password.trim(), 10);
             updates.push('password = ?');
             params.push(hashedPassword);
