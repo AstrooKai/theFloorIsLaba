@@ -1438,11 +1438,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const actsHtml = actionsDropdown(items);
           const payStatus = o.payment_status || "Unpaid";
           const payStatusCls = payStatus === "Paid" ? "ok" : (payStatus === "Refunded" ? "bad" : "mute");
-          const nextPayStatus = payStatus === "Paid" ? "Unpaid" : "Paid";
-          const payBadgeHtml = isCashierMgr
-            ? `<span class="badge status-clickable ${payStatusCls}" data-act="quick-payment" data-id="${o.order_id}" data-current="${esc(payStatus)}" role="button" tabindex="0" title="Click to mark as ${nextPayStatus}">${esc(payStatus)}</span>`
-            : `<span class="badge ${payStatusCls}">${esc(payStatus)}</span>`;
-          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id, o.release_type)}</td><td>${payBadgeHtml}</td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
+          return `<tr><td><strong>${ord(o.order_id)}</strong></td><td>${esc(o.customer_name)}</td><td>${formatDate(o.order_date)}</td><td>${orderTypeBadge(o.release_type)}</td><td>${orderStatusBadge(o.order_status, o.order_id, o.release_type)}</td><td><span class="badge ${payStatusCls}">${esc(payStatus)}</span></td><td class="num">${peso(o.total)}</td><td>${actsHtml}</td></tr>`;
         }).join("");
       },
       validate(d) {
