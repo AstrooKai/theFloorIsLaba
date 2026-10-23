@@ -333,7 +333,8 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 * **Sole-Manager Protection**: The system detects if only one active Manager exists. It blocks that manager from self-deactivation, changing their own role, or archiving their account, preventing accidental shop lockout.
 
 ### 9. Soft Archiving & Restoration Audit Hub
-* **Two-Way Recovery**: Inactive customers, discontinued services, settled orders, and retired staff can be soft-archived (`is_archived = TRUE`).
+* **Two-Way Recovery**: Inactive customers, discontinued services, completed and fully-paid orders, settled payments, delivery runs, and retired staff can be soft-archived (`is_archived = TRUE`) and restored by a Manager.
+* **No Permanent Delete API**: Record deletion endpoints are not exposed; database initialization is non-destructive by default.
 * **Centralized Archive Hub**: Accessible at `history.html`, where managers can filter records by category and restore them to active status at any time.
 
 ### 10. Executive Dashboard & Real-Time Analytics
