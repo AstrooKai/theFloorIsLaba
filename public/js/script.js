@@ -2895,7 +2895,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Dashboard init
   async function initDashboard() {
     try {
-      const res = await fetch("/api/dashboard/summary");
+      const res = await fetch("/api/dashboard/summary", { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load dashboard metrics");
       const data = await res.json();
 
