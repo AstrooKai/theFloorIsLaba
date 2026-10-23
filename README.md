@@ -58,18 +58,21 @@ The system enforces strict Role-Based Access Control (RBAC):
 | :--- | :---: | :--- |
 | **Manager (Admin)** | **Full System Access** | Staff administration, service catalog pricing, operational overrides, financial reports, viewing and restoring soft-archived records. |
 | **Cashier** | **Operational Access** | Customer registration, order intake, payment processing, invoice generation, status advancing, scheduling runs. |
-| **Washer / Folder / Rider** | **Operational Tracking** | Dedicated operational staff credited in system assignments and delivery manifests. (Login restricted to Manager and Cashier roles to safeguard financial data). |
+| **Washer / Folder** | **Production Workspace** | Login access to assigned order queues and progression through the ready stage only. |
+| **Rider** | **Delivery Workspace** | Login access to pickup and delivery run operations without payment or staff administration. |
 
 ### Core System Objectives
 1. **Centralize Data**: Replace fragmented paper notebooks with an ACID-compliant MySQL relational database.
 2. **End-to-End Tracking**: Track order status through an updated 6-stage lifecycle (`Received` -> `Washing` -> `Folding` -> `Ready for Pickup` / `Out for Delivery` -> `Completed`).
-3. **Automate Pricing**: Dynamically calculate order totals based on certified catalog rates (per kg or per piece).
-4. **Enforce Financial Integrity**: Strictly enforce a **full-settlement policy** (disallow partial payments, auto-fill remaining balance, prevent overpayments).
+3. **Automate Pricing**: The server calculates order totals from active catalog rates (per kg or per piece); delivery fees are added separately to billable totals.
+4. **Enforce Financial Integrity**: Require exact-balance payments, include active delivery fees, reject overpayments, and require full payment before an order can be completed or archived.
 5. **Preserve Audit Trails**: Implement soft-delete archiving (`is_archived = TRUE`) so historical metrics and order histories remain preserved even when entities are retired.
 
 ### Non-Functional Requirements & Security
 * **Data Integrity**: Parameterized SQL queries prevent SQL Injection (SQLi).
-* **Password Security**: Administrative credentials stored using adaptive one-way `bcryptjs` hashing (10 salt rounds).
+* **Authentication & Authorization**: Staff sign-in issues a signed JWT; protected API routes use the token's verified staff ID and role. Role workspaces limit operations on the server, not only in navigation.
+* **Password Security**: Staff credentials are stored using adaptive one-way `bcryptjs` hashing (10 salt rounds).
+* **Request Boundaries**: Login attempts are rate-limited, CORS is restricted to configured trusted origins, and cloud database TLS certificate verification is enabled by default.
 * **Referential Integrity**: Cascading rules (`ON DELETE CASCADE`, `ON DELETE SET NULL`, `ON DELETE RESTRICT`) prevent orphaned database rows.
 * **Concurrency & Validation**: Both frontend (real-time input constraints) and backend controllers perform dual-layer payload validation.
 * **Localization**: Tailored specifically for Philippine laundromat operations, featuring Philippine Peso (`₱`) formatting, 11-digit mobile validation (`09XXXXXXXXX`), and Cabuyao, Laguna barangay integration.
@@ -276,7 +279,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 ### Constraints & Referential Integrity Rules
 
 * **`ON DELETE CASCADE`**:
-  * Used for dependent child records: `orders` -> `order_items`, `payments`, and `deliveries`. Deleting or hard-purging a parent order cleanly removes its line items, financial logs, and transport tickets, preventing orphaned child rows.
+  * Used as a database-level referential-integrity rule for dependent child records: `orders` -> `order_items`, `payments`, and `deliveries`. The application does not expose permanent-delete endpoints; operational record removal uses archive/restore workflows.
 * **`ON DELETE SET NULL`**:
   * Used for `deliveries.rider_id` -> `staff.staff_id`. If an employee profile is removed, historical delivery records are preserved with rider set to `NULL` (`"—"`), maintaining route and audit history.
 * **`ON DELETE RESTRICT`**:
@@ -290,7 +293,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 
 ### 1. Authentication & RBAC Guard
 * **Role-Based Routing**: Restricts administrative capabilities (Staff Directory, Service Catalog Rate changes) to the `Manager` role.
-* **Non-Administrative Access**: Washer, Folder, and Rider roles are tracked as system personnel but cannot log in to administrative screens, protecting sensitive customer contacts and revenue records.
+* **Operational Roles**: Washer, Folder, and Rider accounts can log in for their operational views; server-side authorization still restricts staff administration, service pricing, and financial corrections.
 * **Secure Sessions**: User credentials authenticated via bcrypt verification against database hashes.
 
 ### 2. Customer Management
@@ -326,7 +329,8 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 * **Fulfillment Segmentation**: Clear segmentation between in-store customer counter pickups and rider home deliveries.
 * **Rider Assignment Protection**: Pickup tickets cleanly display `"—"` rather than an inappropriate `"Unassigned"` rider badge.
 * **Single-Run Constraint**: Orders that have already been picked up or completed are excluded from scheduling new transport runs.
-* **Run Completion Synchronization**: Marking a transport run as `Completed` automatically updates the linked order's operational status to `Completed`.
+* **Run Completion Synchronization**: Run status changes follow an explicit transition sequence and cannot skip the linked order's ready stage. Completing a run updates the linked order to `Completed`.
+* **Fee Billing**: Non-cancelled, non-archived Delivery run fees are part of the order total; Pickup run fees are not.
 
 ### 8. Staff Management & Sole-Manager Safeguards
 * **Duplicate Email Prevention**: Prevents duplicate email accounts on both the client (real-time input & blur warnings) and server (`SELECT` check + MySQL UNIQUE key fallback returning HTTP `400`).
@@ -338,8 +342,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 * **Centralized Archive Hub**: Accessible at `history.html`, where managers can filter records by category and restore them to active status at any time.
 
 ### 10. Executive Dashboard & Real-Time Analytics
-* **Live KPI Counters**: Instant visual summaries of total revenue collected, active orders in processing, pending deliveries, and registered customers.
-* **Status Distribution**: Real-time breakdown of orders across the entire lifecycle spectrum.
+* **Current Overview**: Displays registered customers, total orders, completed orders, and the latest orders. Payment revenue is returned only to Cashier and Manager dashboard requests; the current page does not display revenue or status-distribution charts.
 
 ---
 
@@ -409,7 +412,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
      SELECT SUM(subtotal) FROM order_items WHERE order_id = 101;  --> ₱202.50
      SELECT SUM(amount_paid) FROM payments WHERE order_id = 101;  --> ₱0.00
      Remaining Balance = ₱202.50.
-  8. Guard check: Validates amount >= 202.50. (Rejects partial amounts with HTTP 400).
+  8. Guard check: Requires the submitted amount to exactly equal the remaining balance (rejects partial and excess amounts with HTTP 400).
          │
          ▼ SQL Query
 [MySQL Database]
@@ -431,9 +434,9 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
   3. Selects Rider: "Pedro Ramos", Date: "2026-10-22", Window: "1 - 3 PM".
   4. Clicks "Save". Run is logged with status "Scheduled".
   5. When rider departs, cashier clicks "Start" -> status becomes "On the way".
-  6. Upon arrival, cashier clicks "Done" (Mark Completed).
+  6. After the order is fully paid, upon arrival the cashier clicks "Done" (Mark Completed).
          │
-         ▼ HTTP PUT /api/deliveries/12/advance { status: "Completed" }
+         ▼ HTTP PUT /api/deliveries/12 { status: "Completed" }
 [Express Backend - controllers/deliveries.js]
   7. In one transaction, updates delivery status to "Completed".
   8. Resolves the "Completed" status by name, updates the linked order, and sets its release date using Manila local date.
@@ -441,7 +444,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
          ▼ SQL Queries (Transaction)
 [MySQL Database]
   9. UPDATE deliveries SET status = 'Completed' WHERE delivery_id = 12;
- 10. UPDATE orders SET status_id = 5, release_date = '2026-10-22' WHERE order_id = 102;
+ 10. UPDATE orders SET status_id = (resolved Completed status), release_date = (Manila date) WHERE order_id = 102;
          │
          ▼ HTTP 200 OK
 [User Interface]
@@ -491,8 +494,8 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 > *"In relational database design, keeping `payments` in a separate 1:N table is best practice for three key reasons:*
 > 1. * **Normalization (3NF)**: Payment attributes (method, transaction reference number, date, audit status) do not belong in the `orders` table. Merging them would violate 3NF and create null-heavy columns.*
 > 2. * **Zero Payments (0..*)**: A newly created order starts with **zero payments** (Unpaid).*
-> 3. * **Financial Audit Trails (>1 Payments)**: If a payment is refunded (`status = 'Refunded'`) due to a customer dispute and later repaid, the system logs a new payment record rather than overwriting historical financial data, maintaining a tamper-proof audit trail.*
-> *The business policy of disallowing partial installments is enforced via application logic and backend validation (`amount >= remainingBalance`), not by compromising relational normalization."*
+> 3. * **Financial Audit Trails (>1 Payments)**: If a payment is refunded (`status = 'Refunded'`) due to a customer dispute and later repaid, the system can retain the original record and log the replacement rather than overwrite the payment history.*
+> *The business policy of disallowing partial installments is enforced via application logic and backend validation (the submitted amount must exactly equal the remaining balance), not by compromising relational normalization."*
 
 ---
 
@@ -535,7 +538,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 
 ### Prerequisites
 * **Node.js** (v18.0.0 or higher)
-* **MySQL Server** (v8.0 or higher / XAMPP / MariaDB)
+* **MySQL Server** (v8.0.16 or higher, required for enforced CHECK constraints)
 * **Git**
 
 ### Step-by-Step Installation
@@ -559,14 +562,24 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
    DB_USER=root
    DB_PASSWORD=
    DB_NAME=laundry_shop_db
+   JWT_SECRET=replace-with-a-long-random-secret
+   ALLOWED_ORIGINS=http://localhost:5000
+   DB_SSL=false
    ```
+   `JWT_SECRET` must be set to a private random value. `DB_SSL=false` is for local development only; otherwise database TLS certificate verification is enabled. In production, set `ALLOWED_ORIGINS` to the exact trusted frontend origin(s).
 
 4. **Initialize and Seed Database**:
    Run the automated database setup script:
    ```bash
-   npm run db:reset
+   npm run db:init
    ```
-   *This command creates `laundry_shop_db`, applies `database/schema.sql`, and populates `database/seed.sql` with sample customers, staff, services, orders, payments, and transport runs.*
+   This creates the configured database when needed, applies `database/schema.sql`, and inserts sample data only into an empty database. Re-running it does not duplicate the seed.    In non-production environments the same safe, idempotent initialization runs on the first authenticated API request; production skips automatic initialization unless `AUTO_SEED=true` is explicitly configured.
+
+   For an existing database created before the integrity constraints were added, back it up and use your MySQL client to run the preflight `SELECT` statements in `database/migrations/001_constraints.sql` first. Resolve all reported duplicates or invalid values; only when every query returns no rows, run that file's `ALTER TABLE` statements once. Do not execute the whole file as one script or apply this migration to a fresh database; the constraints are already included in `database/schema.sql`.
+
+   The initializer refuses production or remote database targets unless `--force` is supplied. For an intentional production or remote initialization, run `npm run db:init -- --force`. Destructive reset additionally requires `ALLOW_DB_RESET=true`; `--force` alone never permits a reset.
+
+   To explicitly drop and recreate the database for local testing, set `ALLOW_DB_RESET=true` and run `npm run db:reset`; this permanently deletes all data in the configured database. In PowerShell: `$env:ALLOW_DB_RESET='true'; npm run db:reset`. In Bash: `ALLOW_DB_RESET=true npm run db:reset`. The reset command refuses to run without that opt-in.
 
 5. **Start the Application**:
    * For production:
@@ -590,6 +603,6 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 | :--- | :--- | :--- | :--- |
 | **Manager** | `rosa.mendoza@laba.ph` | `admin123` | Full access (Staff, Rates, Archiving, Operations) |
 | **Cashier** | `maria.santos@laba.ph` | `admin123` | Operational access (Orders, Intake, Payments, Runs) |
-| **Washer** | `jose.delacruz@laba.ph` | `admin123` | Operational personnel record (login restricted) |
-| **Folder** | `ana.lopez@laba.ph` | `admin123` | Operational personnel record (login restricted) |
-| **Rider** | `pedro.ramos@laba.ph` | `admin123` | Logistics personnel record (login restricted) |
+| **Washer** | `jose.delacruz@laba.ph` | `admin123` | Order workflow up to the ready stage |
+| **Folder** | `ana.lopez@laba.ph` | `admin123` | Order workflow up to the ready stage |
+| **Rider** | `pedro.ramos@laba.ph` | `admin123` | Delivery-run status updates |
