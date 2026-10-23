@@ -2,7 +2,7 @@
 
 <blockquote style="border-left: 4px solid #ea580c; padding: 12px 18px; background-color: rgba(234, 88, 12, 0.08); border-radius: 6px; margin: 16px 0 24px 0;">
 
-**Test Suite Summary:** **83 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **83 Pending Verification**
+**Test Suite Summary:** **84 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **84 Pending Verification**
 
 - **1. Authentication & Session Management:** verification pending
 - **2. Role-Based Access Control (RBAC):** verification pending
@@ -18,7 +18,7 @@
 - **12. UI/UX, Themes & Responsive Mobile Views:** verification pending
 - **13. Database Operations & Cloud Deployment Readiness:** verification pending
 
-**Progress:** 0.0% verified (0/83)
+**Progress:** 0.0% verified (0/84)
 
 **Test Environment:** `http://localhost:5000`
 
@@ -426,3 +426,7 @@
 - [ ] **14.15 Service Names Reject Digits and Preserve Seed Names**
   - **Steps:** Submit a service named `Wash123`, then submit `Comforter & Duvet Care`.
   - **Expected:** The first is rejected with HTTP `400`; the seed service name passes validation.
+
+- [ ] **14.16 Server Validates Phone, Service, Release, and Date Fields**
+  - **Steps:** Submit a phone beginning with `+`, an invalid service unit/category, a zero or over-limit service rate, an unsupported order release type or run status, and an invalid date.
+  - **Expected:** Each invalid request receives HTTP `400`; normalized valid phones contain digits only, and valid catalog/service values are persisted.
