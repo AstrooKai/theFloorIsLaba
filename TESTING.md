@@ -2,7 +2,7 @@
 
 <blockquote style="border-left: 4px solid #ea580c; padding: 12px 18px; background-color: rgba(234, 88, 12, 0.08); border-radius: 6px; margin: 16px 0 24px 0;">
 
-**Test Suite Summary:** **84 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **84 Pending Verification**
+**Test Suite Summary:** **85 Manual Test Cases** &bull; **0 Verified in this change set** &bull; **85 Pending Verification**
 
 - **1. Authentication & Session Management:** verification pending
 - **2. Role-Based Access Control (RBAC):** verification pending
@@ -18,7 +18,7 @@
 - **12. UI/UX, Themes & Responsive Mobile Views:** verification pending
 - **13. Database Operations & Cloud Deployment Readiness:** verification pending
 
-**Progress:** 0.0% verified (0/84)
+**Progress:** 0.0% verified (0/85)
 
 **Test Environment:** `http://localhost:5000`
 
@@ -430,3 +430,7 @@
 - [ ] **14.16 Server Validates Phone, Service, Release, and Date Fields**
   - **Steps:** Submit a phone beginning with `+`, an invalid service unit/category, a zero or over-limit service rate, an unsupported order release type or run status, and an invalid date.
   - **Expected:** Each invalid request receives HTTP `400`; normalized valid phones contain digits only, and valid catalog/service values are persisted.
+
+- [ ] **14.17 Delivery Run Type and Customer Contact Defaults**
+  - **Steps:** Attempt to create a run whose type differs from the order release type; for a matching type, omit contact and address and inspect the created run. Then try to schedule a second active run.
+  - **Expected:** A mismatched type and second active run receive HTTP `400`; the first matching run uses the customer's saved phone and address rather than a placeholder.
