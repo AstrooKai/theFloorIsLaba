@@ -1,42 +1,41 @@
-// Auth and RBAC middleware
+const jwt = require('jsonwebtoken');
 
-// Extract staff info
 const authenticate = (req, res, next) => {
-    try {
-        const staffRole = req.headers['x-staff-role'] || req.body?.staff_role || req.query?.staff_role;
-        const staffId = req.headers['x-staff-id'] || req.body?.staff_id || req.query?.staff_id;
+    if (!req.path.startsWith('/api') ||
+        req.path === '/api/health' ||
+        (req.method === 'POST' && req.path === '/api/staff/login')) {
+        return next();
+    }
 
-        req.staff = {
-            staff_id: staffId ? Number(staffId) : null,
-            role: staffRole ? String(staffRole).trim() : null
-        };
-        next();
-    } catch (error) {
-        res.status(500).json({ error: 'Authentication error: ' + error.message });
+    const authorization = req.get('authorization') || '';
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    if (!match || !process.env.JWT_SECRET) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+        const payload = jwt.verify(match[1], process.env.JWT_SECRET);
+        const staffId = Number(payload.staff_id);
+        if (!Number.isSafeInteger(staffId) || staffId <= 0 || typeof payload.role !== 'string') {
+            return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        req.staff = { staff_id: staffId, role: payload.role };
+        return next();
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired token' });
     }
 };
 
-// Validate staff role
-const authorizeRoles = (...allowedRoles) => {
-    return (req, res, next) => {
-        const userRole = (req.staff?.role || req.headers['x-staff-role'] || '').trim().toLowerCase();
-        
-        if (!userRole) {
-            return res.status(401).json({ error: 'Unauthorized: Staff authentication required' });
-        }
+const authorizeRoles = (...allowedRoles) => (req, res, next) => {
+    const userRole = req.staff?.role;
+    if (!userRole) {
+        return res.status(401).json({ error: 'Staff authentication required' });
+    }
 
-        const isAllowed = allowedRoles.some(role => role.toLowerCase() === userRole);
-        if (!isAllowed) {
-            return res.status(403).json({ 
-                error: `Forbidden: Action restricted to [${allowedRoles.join(', ')}]. Current role: ${req.staff?.role || req.headers['x-staff-role']}` 
-            });
-        }
-
-        next();
-    };
+    if (!allowedRoles.some(role => role.toLowerCase() === userRole.toLowerCase())) {
+        return res.status(403).json({ error: `Action restricted to ${allowedRoles.join(', ')}` });
+    }
+    return next();
 };
 
-module.exports = {
-    authenticate,
-    authorizeRoles
-};
+module.exports = { authenticate, authorizeRoles };

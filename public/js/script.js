@@ -42,9 +42,10 @@ function getAuthStaff() {
 }
 
 // Persist authenticated staff user to localStorage
-function setAuthStaff(staff) {
+function setAuthStaff(staff, token) {
   try {
     localStorage.setItem("current_staff", JSON.stringify(staff));
+    localStorage.setItem("auth_token", token);
   } catch (error) {
     console.error("Error saving current_staff to localStorage:", error);
   }
@@ -54,6 +55,7 @@ function setAuthStaff(staff) {
 function clearAuthStaff() {
   try {
     localStorage.removeItem("current_staff");
+    localStorage.removeItem("auth_token");
   } catch (error) {
     console.error("Error clearing current_staff from localStorage:", error);
   }
@@ -96,19 +98,19 @@ function enforceAuthAndRouteGuards() {
 
   // Redirect already authenticated users away from the login page
   if (currentStaff && isLoginPage) {
-    const role = (currentStaff.role || "Manager").toLowerCase();
-    const targetPage = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+    const role = (currentStaff.role || "").toLowerCase();
+    const targetPage = ROLE_DEFAULT_PAGES[role] || "index.html";
     window.location.replace(targetPage);
     return false;
   }
 
   // Verify that the current user's role is allowed on this page
   if (currentStaff && isWorkspace) {
-    const role = (currentStaff.role || "Manager").toLowerCase();
-    const permittedPages = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.manager;
+    const role = (currentStaff.role || "").toLowerCase();
+    const permittedPages = ROLE_PERMISSIONS[role] || [];
 
     if (!permittedPages.includes(pageName)) {
-      const targetPage = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+      const targetPage = ROLE_DEFAULT_PAGES[role] || "index.html";
       localStorage.setItem("auth_redirect_msg", `Access restricted: Your role (${currentStaff.role}) does not have permission to view ${pageName}. Redirected to your authorized workspace.`);
       window.location.replace(targetPage);
       return false;
@@ -129,7 +131,7 @@ function enforceAuthAndRouteGuards() {
 enforceAuthAndRouteGuards();
 
 // User role check helpers
-const getStaffRole = () => ((getAuthStaff() || {}).role || "Manager").toLowerCase();
+const getStaffRole = () => ((getAuthStaff() || {}).role || "").toLowerCase();
 const isManager = () => getStaffRole() === "manager";
 const isCashierOrManager = () => ["cashier", "manager"].includes(getStaffRole());
 const isProductionStaff = () => ["washer", "folder"].includes(getStaffRole());
@@ -677,12 +679,8 @@ document.addEventListener("DOMContentLoaded", () => {
 const ID = { services: "service_id", payments: "payment_id", deliveries: "delivery_id", customers: "customer_id", orders: "order_id", staff: "staff_id" };
 
 const getAuthHeaders = () => {
-  const staff = getAuthStaff() || {};
-  const headers = {};
-  if (staff.role) headers["x-staff-role"] = staff.role;
-  else headers["x-staff-role"] = "Manager";
-  if (staff.staff_id) headers["x-staff-id"] = staff.staff_id;
-  return headers;
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 const db = {
@@ -3426,9 +3424,9 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error(`Server returned status ${res.status}. Please check your database connection or try again.`);
         }
         if (!res.ok) throw new Error(data.error || "Login failed");
-        setAuthStaff(data.staff);
-        const role = (data.staff.role || "Manager").toLowerCase();
-        const target = ROLE_DEFAULT_PAGES[role] || "dashboard.html";
+        setAuthStaff(data.staff, data.token);
+        const role = (data.staff.role || "").toLowerCase();
+        const target = ROLE_DEFAULT_PAGES[role] || "index.html";
         window.location.href = target;
       } catch (err) {
         if (errorEl) {

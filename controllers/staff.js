@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // Check if a staff member is the sole active manager
 async function isSoleActiveManager(targetStaffId, requesterStaffId = null) {
@@ -400,27 +401,27 @@ exports.loginStaff = async (req, res) => {
             return res.status(401).json({ error: 'Account is deactivated. Please contact your manager.' });
         }
 
-        let isMatch = false;
-
-        if (staffMember.password.startsWith('$2a$') || staffMember.password.startsWith('$2b$')) {
-            isMatch = await bcrypt.compare(password, staffMember.password);
-        } else {
-            isMatch = (password === staffMember.password);
-            if (isMatch) {
-                const newHash = await bcrypt.hash(password, 10);
-                await pool.query('UPDATE staff SET password = ? WHERE staff_id = ?', [newHash, staffMember.staff_id]);
-            }
-        }
+        const isMatch = await bcrypt.compare(password, staffMember.password);
 
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
         delete staffMember.password;
+        if (!process.env.JWT_SECRET) {
+            console.error('JWT_SECRET is not configured');
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+        const token = jwt.sign(
+            { staff_id: staffMember.staff_id, role: staffMember.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '8h' }
+        );
 
         res.json({
             success: true,
             staff: staffMember,
+            token,
             message: `Welcome back, ${staffMember.full_name}!`
         });
     } catch (error) {
