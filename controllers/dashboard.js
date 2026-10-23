@@ -3,6 +3,7 @@ const pool = require('../config/db');
 // Controller for dashboard overview metrics and analytics
 exports.getDashboardSummary = async (req, res) => {
     try {
+        const canViewFinancials = ['cashier', 'manager'].includes(String(req.staff?.role || '').toLowerCase());
         // Run database aggregation queries concurrently to optimize dashboard loading
         const [
             customerRows,
@@ -11,11 +12,13 @@ exports.getDashboardSummary = async (req, res) => {
             inProgressRows,
             revenueRows,
             deliveryRows,
+            pendingDeliveryRows,
+            statusDistributionRows,
             latestOrderRows,
             serviceBreakdownRows
         ] = await Promise.all([
             // 1. Total customer count
-            pool.query('SELECT COUNT(*) AS total FROM customers'),
+            pool.query('SELECT COUNT(*) AS total FROM customers WHERE (is_archived IS NULL OR is_archived = FALSE)'),
 
             // 2. Total active orders count
             pool.query('SELECT COUNT(*) AS total FROM orders WHERE (is_archived IS NULL OR is_archived = FALSE)'),
@@ -39,10 +42,23 @@ exports.getDashboardSummary = async (req, res) => {
             `),
 
             // 5. Total revenue accumulated from payments
-            pool.query('SELECT COALESCE(SUM(amount_paid), 0) AS total FROM payments'),
+            canViewFinancials
+                ? pool.query("SELECT COALESCE(SUM(amount_paid), 0) AS total FROM payments WHERE status = 'Paid' AND (is_archived IS NULL OR is_archived = FALSE)")
+                : Promise.resolve([[{ total: 0 }], []]),
 
             // 6. Delivery-type orders count
             pool.query("SELECT COUNT(*) AS total FROM orders WHERE release_type = 'Delivery' AND (is_archived IS NULL OR is_archived = FALSE)"),
+
+            pool.query("SELECT COUNT(*) AS total FROM deliveries WHERE status IN ('Scheduled', 'On the way') AND (is_archived IS NULL OR is_archived = FALSE)"),
+
+            pool.query(`
+                SELECT os.status_name, COUNT(*) AS total
+                FROM orders o
+                JOIN order_statuses os ON o.status_id = os.status_id
+                WHERE (o.is_archived IS NULL OR o.is_archived = FALSE)
+                GROUP BY os.status_id, os.status_name
+                ORDER BY os.status_id
+            `),
 
             // 7. Recent 5 orders for dashboard feed
             pool.query(`
@@ -53,7 +69,13 @@ exports.getDashboardSummary = async (req, res) => {
                     o.order_date,
                     o.release_type,
                     os.status_name AS order_status,
-                    COALESCE(SUM(oi.subtotal), 0) AS total
+                    COALESCE(SUM(oi.subtotal), 0) + COALESCE((
+                        SELECT SUM(d.fee) FROM deliveries d
+                        WHERE d.order_id = o.order_id
+                          AND d.type = 'Delivery'
+                          AND d.status <> 'Cancelled'
+                          AND (d.is_archived IS NULL OR d.is_archived = FALSE)
+                    ), 0) AS total
                 FROM orders o
                 JOIN customers c ON o.customer_id = c.customer_id
                 JOIN order_statuses os ON o.status_id = os.status_id
@@ -85,26 +107,32 @@ exports.getDashboardSummary = async (req, res) => {
         const totalInProgress = inProgressRows[0][0]?.total || 0;
         const totalRevenue = Number(revenueRows[0][0]?.total || 0);
         const totalDeliveries = deliveryRows[0][0]?.total || 0;
+        const pendingDeliveries = pendingDeliveryRows[0][0]?.total || 0;
+        const statusDistribution = statusDistributionRows[0] || [];
         const recentOrders = latestOrderRows[0] || [];
         const serviceBreakdown = serviceBreakdownRows[0] || [];
 
         // Return structured dashboard payload
-        res.json({
+        const summary = {
             counts: {
                 customers: totalCustomers,
                 orders: totalOrders,
                 completed: totalCompleted,
                 in_progress: totalInProgress,
-                revenue: totalRevenue,
                 deliveries: totalDeliveries
             },
+            pending_deliveries: pendingDeliveries,
+            status_distribution: statusDistribution,
             latest_orders: recentOrders,
             service_breakdown: serviceBreakdown
-        });
+        };
+        if (canViewFinancials) {
+            summary.counts.revenue = totalRevenue;
+        }
+        res.json(summary);
     } catch (error) {
         console.error('Error fetching dashboard summary:', error);
         console.error('Controller error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-
