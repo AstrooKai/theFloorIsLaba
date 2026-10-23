@@ -84,7 +84,7 @@ The system enforces strict Role-Based Access Control (RBAC):
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      CLIENT / BROWSER                       │
-│  HTML5 + Vanilla CSS (Custom Design System) + Vanilla JS   │
+│  HTML5 + Vanilla CSS (Custom Design System) + Vanilla JS    │
 │  Modular Entity Architecture (ENT) + State Store (appState) │
 └──────────────────────────────▲──────────────────────────────┘
                                │ HTTP / JSON REST APIs
@@ -147,7 +147,7 @@ The database `laundry_shop_db` comprises **8 relational tables** structured in *
 Stores registered customer profiles and localized address data.
 * `customer_id` (INT, PK, Auto Increment): Unique customer identifier.
 * `first_name` (VARCHAR(50), NOT NULL): Customer first name.
-* `last_name` (VARCHAR(50), NOT NULL): Customer last name / surname.
+* `last_name` (VARCHAR(50), NOT NULL): Customer last name/surname.
 * `phone` (VARCHAR(15), NOT NULL): 11-digit mobile contact number (`09XXXXXXXXX`).
 * `street_address` (VARCHAR(150), NOT NULL): House number, building, street, or subdivision.
 * `barangay` (VARCHAR(50), NULL): City of Cabuyao barangay jurisdiction.
@@ -157,7 +157,7 @@ Stores registered customer profiles and localized address data.
 
 #### 2. `staff`
 Stores employee profiles, administrative roles, and secure hashed credentials.
-* `staff_id` (INT, PK, Auto Increment): Unique employee identifier.
+* `staff_id` (INT, PK, AUTO_INCREMENT): Unique employee identifier.
 * `first_name` (VARCHAR(50), NOT NULL)
 * `last_name` (VARCHAR(50), NOT NULL)
 * `role` (VARCHAR(30), NOT NULL): Assigned role (`Manager`, `Cashier`, `Washer`, `Folder`, `Rider`).
@@ -182,7 +182,7 @@ Lookup table defining allowable order lifecycle stages.
 #### 4. `service_types`
 Maintains laundry catalog offerings and rate parameters.
 * `service_id` (INT, PK, Auto Increment): Unique service identifier.
-* `service_name` (VARCHAR(50), NOT NULL): Display title (e.g. "Wash and Fold").
+* `service_name` (VARCHAR(50), NOT NULL): Display title (e.g., "Wash and Fold").
 * `price_per_kg` (DECIMAL(8,2), NOT NULL): Unit pricing rate in PHP.
 * `unit` (VARCHAR(20), DEFAULT 'kg'): Billing basis (`kg` for bulk wash; `piece` for dry cleaning/bedding).
 * `category` (VARCHAR(50), DEFAULT 'Wash & fold'): Service group (`Wash & fold`, `Wash & dry`, `Pressing`, `Specialty care`, `Bedding & bulky`, `Dry cleaning`).
@@ -211,7 +211,7 @@ Junction table resolving the many-to-many relationship between `orders` and `ser
 * `subtotal` (DECIMAL(10,2), NOT NULL): Precomputed line total (`weight_kg * rate`).
 
 #### 7. `payments`
-Maintains financial settlement records, method instruments, and digital audit references.
+Maintains financial settlement records, payment instruments, and digital audit references.
 * `payment_id` (INT, PK, Auto Increment): Unique financial transaction ID (`PAY-XXXX`).
 * `order_id` (INT, NOT NULL, FK -> `orders.order_id`): Linked order.
 * `amount_paid` (DECIMAL(10,2), NOT NULL): Settlement amount in PHP.
@@ -401,14 +401,14 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 [User Interface]
   1. Cashier opens payments.html and clicks "Record Payment".
   2. Selects unpaid order #ORD-0101 (Balance due: ₱202.50).
-  3. UI auto-fills Amount: ₱202.50 in a readonly input (partial payment blocked).
+  3. UI auto-fills Amount: ₱202.50 in a read-only input (partial payment blocked).
   4. Selects Method: "GCash" -> reference_no input field appears.
   5. Enters Reference #: "GCASH-78910".
   6. Clicks "Save Payment".
          │
          ▼ HTTP POST /api/payments { order_id: 101, amount: 202.50, method: "GCash", reference_no: "GCASH-78910" }
 [Express Backend - controllers/payments.js]
-  7. Queries database to check order total and existing payments:
+  7. Queries the database to check the order total and existing payments:
      SELECT SUM(subtotal) FROM order_items WHERE order_id = 101;  --> ₱202.50
      SELECT SUM(amount_paid) FROM payments WHERE order_id = 101;  --> ₱0.00
      Remaining Balance = ₱202.50.
@@ -456,12 +456,12 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
 ```
 [User Interface]
   1. Manager clicks "Archive" on an old customer profile.
-  2. Tactile confirmation modal appears with red "Archive" action button.
+  2. Tactile confirmation modal appears with a red "Archive" action button.
   3. Manager confirms.
          │
          ▼ HTTP PUT /api/customers/8/archive
 [Express Backend - controllers/customers.js]
-  4. Checks if customer has unsettled active orders.
+  4. Checks if the customer has unsettled active orders.
   5. Sets `is_archived = TRUE`.
          │
          ▼ SQL Query
@@ -471,7 +471,7 @@ Manages logistics dispatch, assigned riders, scheduled delivery windows, and ful
          ▼ HTTP 200 OK
 [User Interface]
   7. Customer is removed from customers.html active list.
-  8. When opening history.html, customer record appears under the "Customers" tab.
+  8. When opening history.html, the customer record appears under the "Customers" tab.
   9. Clicking "Restore" sends PUT /api/customers/8/restore -> `is_archived = FALSE`.
  10. Record instantly returns to the active customer list.
 ```
